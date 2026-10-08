@@ -60,6 +60,17 @@ public final class MagisterGear {
    private static final double BLINK_CHANCE = 0.35;
    private static final float BLINK_MIN_DAMAGE = 7.0F;
 
+   /** Starlight: the pale blue every Magister effect is drawn in. */
+   private static final int STARLIGHT = 0x99EEFF;
+   /** The gold at the heart of a star. */
+   private static final int STARGOLD = 0xFFE7A0;
+   /** The violet of bent space, for Gravity and the Step. */
+   private static final int WARP = 0x8C5CFF;
+   /** How long a Meteor takes to land after it is called. */
+   private static final int METEOR_FUSE = 26;
+   private static final double METEOR_RADIUS = 3.6;
+   private static final float METEOR_DAMAGE = 14.0F;
+
    private static final Map<UUID, Integer> SPELL = new HashMap<>();
    private static final Map<UUID, Integer> HITS = new HashMap<>();
    private static final Map<UUID, Long> COOLDOWN_UNTIL = new HashMap<>();
@@ -144,7 +155,8 @@ public final class MagisterGear {
          Vec3 aim = rotate(player.getViewVector(1.0F), i * 4.0);
          fireStar(level, player, from, aim, 6.0F, 1.5);
       }
-      level.sendParticles(ColorParticleOption.create(ParticleTypes.FLASH, 0x99EEFF), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ColorParticleOption.create(ParticleTypes.FLASH, STARLIGHT), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.END_ROD, from.add(player.getViewVector(1.0F).scale(0.8)), Vec3.ZERO, 0.9, 0.0, STARLIGHT);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 0.9F, 1.5F);
       bar(player, "&bStar Bolt");
    }
@@ -168,19 +180,22 @@ public final class MagisterGear {
             continue;
          }
          Vec3 unit = pull.scale(1.0 / len);
-         living.push(unit.x * 0.9, 0.25, unit.z * 0.9);
+         // Heavy things are pulled less: the well is not a way to drag a boss out of its arena.
+         double weight = 1.0 - Math.max(0.0, Math.min(1.0, living.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE)));
+         if (BossManager.isMarkedBoss(living)) {
+            weight = Math.min(weight, 0.25);
+         }
+         weight = Math.max(0.15, weight);
+         living.push(unit.x * 0.9 * weight, 0.25 * weight, unit.z * 0.9 * weight);
          living.hurtMarked = true;
          living.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 90, 2, false, true, true));
          living.hurtServer(level, level.damageSources().playerAttack(player), 3.0F);
          caught++;
       }
-      for (int i = 0; i < 80; i++) {
-         double a = RANDOM.nextDouble() * Math.PI * 2.0;
-         double r = 7.0;
-         double x = centre.x + Math.cos(a) * r;
-         double z = centre.z + Math.sin(a) * r;
-         level.sendParticles(ParticleTypes.REVERSE_PORTAL, x, centre.y, z, 1, -Math.cos(a) * 0.4, 0.0, -Math.sin(a) * 0.4, 0.0);
-      }
+      // A well opens in the air and everything in reach falls sideways into it.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, ParticleTypes.REVERSE_PORTAL, centre, Vec3.ZERO, 0.0, 0.0, WARP);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.REVERSE_PORTAL, centre, Vec3.ZERO, 7.0, 0.0, WARP);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.END_ROD, centre, Vec3.ZERO, 3.5, 0.0, STARLIGHT);
       level.playSound(null, centre.x, centre.y, centre.z, SoundEvents.ENDER_DRAGON_FLAP, SoundSource.PLAYERS, 1.2F, 0.8F);
       bar(player, "&5Gravity &7- &f" + caught + " &7caught");
    }
@@ -190,9 +205,26 @@ public final class MagisterGear {
          return;
       }
       Vec3 dir = player.getViewVector(1.0F);
-      Vec3 at = player.getEyePosition().add(dir.scale(12.0));
-      BlockPos ground = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, BlockPos.containing(at));
-      METEORS.add(new Meteor(new Vec3(ground.getX() + 0.5, ground.getY(), ground.getZ() + 0.5), 26, player.getUUID()));
+      Vec3 eye = player.getEyePosition();
+      // The spot under the crosshair, up to 24 blocks out; the heightmap only when the look hits
+      // nothing. The heightmap alone put a meteor cast in a cave on the grass above the cave.
+      net.minecraft.world.phys.BlockHitResult look = level.clip(new net.minecraft.world.level.ClipContext(
+         eye, eye.add(dir.scale(24.0)), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, player
+      ));
+      Vec3 impact;
+      if (look.getType() != net.minecraft.world.phys.HitResult.Type.MISS) {
+         BlockPos hit = look.getBlockPos();
+         impact = new Vec3(hit.getX() + 0.5, hit.getY() + 1.0, hit.getZ() + 0.5);
+      } else {
+         BlockPos ground = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, BlockPos.containing(eye.add(dir.scale(12.0))));
+         impact = new Vec3(ground.getX() + 0.5, ground.getY(), ground.getZ() + 0.5);
+      }
+      METEORS.add(new Meteor(impact, METEOR_FUSE, player.getUUID()));
+      // Marked once and drawn by the client for the whole fuse - the old ring re-sent twenty-two
+      // particle packets every tick until it landed - with the star already falling toward it.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.END_ROD, impact.add(0.0, 0.1, 0.0), Vec3.ZERO, METEOR_RADIUS, METEOR_FUSE, STARLIGHT);
+      Vec3 sky = impact.add(dir.x * -6.0, 22.0, dir.z * -6.0);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.METEOR, ParticleTypes.END_ROD, sky, impact, 0.0, METEOR_FUSE, STARGOLD);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.PLAYERS, 1.0F, 0.8F);
       bar(player, "&bMeteor &7- marked, clear the ring");
    }
@@ -208,11 +240,13 @@ public final class MagisterGear {
       Arrow arrow = new Arrow(level, owner, new ItemStack(Items.ARROW), new ItemStack(Items.BOW));
       arrow.setPos(from.x, from.y, from.z);
       arrow.setDeltaMovement(dir.scale(speed));
-      arrow.setBaseDamage(damage);
+      // An arrow hits for its speed times its base damage, so the base is divided back out:
+      // Starpiercer's "11" star was hitting for 23, and each Star Bolt shard for 9.
+      arrow.setBaseDamage(damage / Math.max(0.1, speed));
       arrow.setCritArrow(false);
       arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
       level.addFreshEntity(arrow);
-      level.sendParticles(ParticleTypes.END_ROD, from.x, from.y, from.z, 6, 0.1, 0.1, 0.1, 0.02);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.END_ROD, from, dir, 0.0, 0.0, STARLIGHT);
    }
 
    // ------------------------------------------------------------------ starpiercer
@@ -230,8 +264,10 @@ public final class MagisterGear {
       Vec3 from = attacker.getEyePosition();
       Vec3 dir = attacker.getViewVector(1.0F).normalize();
       fireStar(level, attacker, from, dir, STAR_DAMAGE, 2.1);
-      level.sendParticles(ParticleTypes.END_ROD, from.x, from.y, from.z, 20, 0.3, 0.3, 0.3, 0.1);
-      level.sendParticles(ColorParticleOption.create(ParticleTypes.FLASH, 0xBBEEFF), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
+      // The star leaves a lance of light down the line it was fired along.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, from.add(dir.scale(0.8)), from.add(dir.scale(18.0)), 0.0, 0.0, STARLIGHT);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, victim.getBbHeight() * 0.6, 0.0), dir, 0.0, 0.0, STARGOLD);
+      com.fortuneandfavors.net.FfVfx.particles(level, ColorParticleOption.create(ParticleTypes.FLASH, 0xBBEEFF), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
       level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.8F);
       attacker.sendOverlayMessage(Component.literal(Chat.colorize("&bStarpiercer &7- &fpiercing star")));
    }
@@ -260,28 +296,32 @@ public final class MagisterGear {
             it.remove();
             continue;
          }
-         int points = 22;
-         for (int i = 0; i < points; i++) {
-            double a = i * (Math.PI * 2.0 / points);
-            level.sendParticles(ParticleTypes.END_ROD, meteor.pos.x + Math.cos(a) * 3.0, meteor.pos.y + 0.15, meteor.pos.z + Math.sin(a) * 3.0, 1, 0.0, 0.0, 0.0, 0.0);
-         }
          meteor.fuse--;
          if (meteor.fuse > 0) {
             continue;
          }
          it.remove();
-         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, meteor.pos.x, meteor.pos.y + 0.4, meteor.pos.z, 3, 0.8, 0.4, 0.8, 0.0);
-         level.sendParticles(ParticleTypes.GUST, meteor.pos.x, meteor.pos.y + 0.4, meteor.pos.z, 24, 2.4, 0.4, 2.4, 0.15);
-         level.sendParticles(ParticleTypes.END_ROD, meteor.pos.x, meteor.pos.y + 0.4, meteor.pos.z, 60, 2.6, 0.8, 2.6, 0.2);
+         Vec3 at = meteor.pos.add(0.0, 0.3, 0.0);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, at, Vec3.ZERO, 3.0, 0.0, 0xD8E6F2);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.END_ROD, at, Vec3.ZERO, METEOR_RADIUS + 1.5, 0.0, STARLIGHT);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.END_ROD, meteor.pos, Vec3.ZERO, 7.0, 0.0, STARGOLD);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, meteor.pos.x, meteor.pos.y + 0.4, meteor.pos.z, 1, 0.4, 0.2, 0.4, 0.0);
          level.playSound(null, meteor.pos.x, meteor.pos.y, meteor.pos.z, SoundEvents.GENERIC_EXPLODE, SoundSource.PLAYERS, 1.4F, 1.1F);
          ServerPlayer owner = server.getPlayerList().getPlayer(meteor.owner);
-         for (ServerPlayer p : playersNear(level, meteor.pos.x, meteor.pos.y, meteor.pos.z, 3.6)) {
-            if (owner != null && p != owner && ScarletGear.isAlly(owner, p)) {
+         // Everything in the blast, not only players: the meteor used to skip every mob, which made
+         // it the one attack spell in the mod that did nothing in PvE - and it hit its own caster,
+         // because the ally check let the owner through.
+         net.minecraft.world.phys.AABB blast = new net.minecraft.world.phys.AABB(meteor.pos, meteor.pos).inflate(METEOR_RADIUS);
+         for (LivingEntity victim : level.getEntitiesOfClass(LivingEntity.class, blast, LivingEntity::isAlive)) {
+            if (victim.distanceToSqr(meteor.pos) > METEOR_RADIUS * METEOR_RADIUS) {
                continue;
             }
-            p.hurtServer(level, owner != null ? level.damageSources().playerAttack(owner) : level.damageSources().magic(), 14.0F);
-            p.push(0.0, 0.5, 0.0);
-            p.hurtMarked = true;
+            if (owner != null && (victim == owner || victim instanceof ServerPlayer p && ScarletGear.isAlly(owner, p))) {
+               continue;
+            }
+            victim.hurtServer(level, owner != null ? level.damageSources().playerAttack(owner) : level.damageSources().magic(), METEOR_DAMAGE);
+            victim.push(0.0, 0.5, 0.0);
+            victim.hurtMarked = true;
          }
       }
    }
@@ -304,7 +344,10 @@ public final class MagisterGear {
       }
 
       // Slow Falling is the Mantle's passive: it is a cloak cut from the sky.
-      player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 60, 0, false, false, true));
+      MobEffectInstance falling = player.getEffect(MobEffects.SLOW_FALLING);
+      if (falling == null || falling.getDuration() < 20) {
+         player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 60, 0, false, false, true));
+      }
 
       // Astral Step: two sneak taps in quick succession, because a chestplate's
       // right-click is how you put it on.
@@ -338,11 +381,14 @@ public final class MagisterGear {
       }
       flat = flat.normalize();
       Vec3 from = player.position();
-      level.sendParticles(ParticleTypes.REVERSE_PORTAL, from.x, from.y + 1.0, from.z, 40, 0.4, 0.6, 0.4, 0.1);
-      Vec3 to = from.add(flat.scale(STEP_DISTANCE));
+      Vec3 to = clearPath(level, player, flat, STEP_DISTANCE);
+      if (to == null) {
+         bar(player, "&7Astral Step &8| &7something is in the way");
+         return;
+      }
+      blinkFx(level, from, to);
       player.teleportTo(to.x, to.y, to.z);
       player.hurtMarked = true;
-      level.sendParticles(ParticleTypes.END_ROD, to.x, to.y + 1.0, to.z, 40, 0.4, 0.6, 0.4, 0.12);
       level.playSound(null, to.x, to.y, to.z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.7F);
       STEP_UNTIL.put(player.getUUID(), now + STEP_COOLDOWN_TICKS);
       bar(player, "&bAstral Step");
@@ -365,13 +411,43 @@ public final class MagisterGear {
          return;
       }
       flat = flat.normalize();
-      Vec3 to = player.position().add(flat.scale(5.0));
-      level.sendParticles(ParticleTypes.REVERSE_PORTAL, player.getX(), player.getY() + 1.0, player.getZ(), 30, 0.4, 0.6, 0.4, 0.1);
+      Vec3 to = clearPath(level, player, flat, 5.0);
+      if (to == null) {
+         return;
+      }
+      blinkFx(level, player.position(), to);
       player.teleportTo(to.x, to.y, to.z);
       player.hurtMarked = true;
-      level.sendParticles(ParticleTypes.END_ROD, to.x, to.y + 1.0, to.z, 24, 0.4, 0.6, 0.4, 0.1);
       level.playSound(null, to.x, to.y, to.z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 0.8F, 1.7F);
       bar(player, "&bThe Mantle blinks you clear");
+   }
+
+   /**
+    * The furthest point along {@code flat}, up to {@code distance}, that the body can stand in
+    * without touching anything - walked half a block at a time and stopped at the first
+    * obstruction. Both blinks used to teleport the full distance blind: into a wall to suffocate,
+    * or straight through it into a base or out of a boss arena.
+    *
+    * @return null when not even the first half-block is clear
+    */
+   private static Vec3 clearPath(ServerLevel level, ServerPlayer player, Vec3 flat, double distance) {
+      Vec3 from = player.position();
+      Vec3 best = null;
+      for (double d = 0.5; d <= distance + 1.0E-6; d += 0.5) {
+         Vec3 at = from.add(flat.scale(d));
+         if (!level.noCollision(player, player.getBoundingBox().move(at.subtract(from)))) {
+            break;
+         }
+         best = at;
+      }
+      return best;
+   }
+
+   /** A tear where the body left, a thread of starlight along the way, a burst where it lands. */
+   private static void blinkFx(ServerLevel level, Vec3 from, Vec3 to) {
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, from.add(0.0, 1.0, 0.0), new Vec3(to.z - from.z, 0.0, from.x - to.x).normalize(), 1.4, 14, WARP);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, from.add(0.0, 1.0, 0.0), to.add(0.0, 1.0, 0.0), 0.0, 0.0, STARLIGHT);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.END_ROD, to.add(0.0, 1.0, 0.0), Vec3.ZERO, 1.6, 0.0, STARLIGHT);
    }
 
    public static void onPlayerDisconnect(UUID id) {
@@ -394,20 +470,6 @@ public final class MagisterGear {
    }
 
    // ------------------------------------------------------------------ helpers
-
-   private static List<ServerPlayer> playersNear(ServerLevel level, double x, double y, double z, double range) {
-      List<ServerPlayer> out = new ArrayList<>();
-      double r2 = range * range;
-      for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.level() != level) {
-            continue;
-         }
-         if (p.distanceToSqr(x, y, z) <= r2) {
-            out.add(p);
-         }
-      }
-      return out;
-   }
 
    private static void bar(ServerPlayer player, String text) {
       player.sendOverlayMessage(Component.literal(Chat.colorize(text)));
