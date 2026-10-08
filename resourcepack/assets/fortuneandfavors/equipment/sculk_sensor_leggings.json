@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "fortuneandfavors:sculk_sensor_leggings"
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "fortuneandfavors:sculk_sensor_leggings"
+      }
+    ]
+  }
+}

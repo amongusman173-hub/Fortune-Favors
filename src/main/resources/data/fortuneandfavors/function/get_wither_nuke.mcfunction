@@ -1,0 +1,1 @@
+give @s minecraft:fishing_rod[damage=60,unbreakable={},enchantment_glint_override=true,lore=[{text:"§7Unbreakable — never wears out."},{text:"§7One-shot — consumed when fired."},{text:"§7Datapack-tuned — only works with the Fortune & Favors datapack."}],custom_data={Orbital_Cannon:1010},custom_name={text:"Wither Nuke Shot"}]

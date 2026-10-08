@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_clockwork",
+  "display": {
+    "icon": {
+      "id": "minecraft:gold_block"
+    },
+    "title": {
+      "text": "Scrapped For Parts",
+      "color": "red"
+    },
+    "description": {
+      "text": "Defeat the Clockwork King - his armour was his arsenal, so take it apart.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

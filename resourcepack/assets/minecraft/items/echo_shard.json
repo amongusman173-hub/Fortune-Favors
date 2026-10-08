@@ -1,0 +1,54 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550040.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/sculk_medallion"
+        }
+      },
+      {
+        "threshold": 4550050.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/sculk_loot_box"
+        }
+      },
+      {
+        "threshold": 4550054.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/sculk_orb"
+        }
+      },
+      {
+        "threshold": 4550055.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/sculk_essence"
+        }
+      },
+      {
+        "threshold": 4550060.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/distant_memory_shard"
+        }
+      },
+      {
+        "threshold": 4550265.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/shaping_sigil"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/echo_shard"
+    }
+  }
+}

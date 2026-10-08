@@ -1,0 +1,26 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550019.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/ominous_eye"
+        }
+      },
+      {
+        "threshold": 4550260.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/void_anchor"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/ender_eye"
+    }
+  }
+}

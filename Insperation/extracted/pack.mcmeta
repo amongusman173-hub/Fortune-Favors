@@ -1,0 +1,9 @@
+{
+    "__comment": "The datapack is assembled by Datapack Assembler",
+    "__link": "https://far.ddns.me",
+
+    "pack": {
+        "description": "Orbital Strike Cannon & Wolf Cannon",
+        "pack_format": 101
+    }
+}

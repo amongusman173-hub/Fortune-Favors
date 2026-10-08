@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:wither_skeleton_skull"
+    },
+    "title": {
+      "text": "The King Beckons",
+      "color": "gold"
+    },
+    "description": {
+      "text": "Summon the King Wither Skeleton to the arena.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

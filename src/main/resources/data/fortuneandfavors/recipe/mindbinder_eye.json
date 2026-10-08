@@ -1,0 +1,43 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "E E",
+    " P ",
+    "E E"
+  ],
+  "key": {
+    "E": "minecraft:ender_eye",
+    "P": "minecraft:ender_pearl"
+  },
+  "result": {
+    "id": "minecraft:ender_eye",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "mindbinder_eye"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550019.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§5§lOminous Eye"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7A gold-ringed eye that stares back at you."
+        },
+        {
+          "text": "§7Throw it to call the §5Mindbinder§7..."
+        },
+        {
+          "text": "§7it will see you."
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

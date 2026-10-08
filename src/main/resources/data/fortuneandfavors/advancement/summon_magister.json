@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:compass"
+    },
+    "title": {
+      "text": "A Ceiling of Stars",
+      "color": "aqua"
+    },
+    "description": {
+      "text": "Right-click an Astral Compass and call the Starbound Magister down.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

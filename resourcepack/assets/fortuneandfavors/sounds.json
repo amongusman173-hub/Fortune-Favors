@@ -1,0 +1,42 @@
+{
+  "ender_dragon_theme": {
+    "sounds": [
+      {
+        "name": "fortuneandfavors:ender_dragon_theme",
+        "stream": true
+      }
+    ]
+  },
+  "aria_math_epic": {
+    "sounds": [
+      {
+        "name": "fortuneandfavors:aria_math_epic",
+        "stream": true
+      }
+    ]
+  },
+  "withered_intro": {
+    "sounds": [
+      {
+        "name": "fortuneandfavors:withered_intro",
+        "stream": true
+      }
+    ]
+  },
+  "withered_loop": {
+    "sounds": [
+      {
+        "name": "fortuneandfavors:withered_loop",
+        "stream": true
+      }
+    ]
+  },
+  "withered_death": {
+    "sounds": [
+      {
+        "name": "fortuneandfavors:withered_death",
+        "stream": true
+      }
+    ]
+  }
+}

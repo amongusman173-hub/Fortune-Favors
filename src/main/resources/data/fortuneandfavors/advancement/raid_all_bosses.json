@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:raid_first_victory",
+  "display": {
+    "icon": {
+      "id": "minecraft:netherite_axe"
+    },
+    "title": {
+      "text": "Bane of the Hoard",
+      "color": "red"
+    },
+    "description": {
+      "text": "Slay the Raid Warlord and all four of his lieutenants in a single raid.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

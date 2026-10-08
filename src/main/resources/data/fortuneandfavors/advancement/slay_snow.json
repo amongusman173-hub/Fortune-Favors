@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_snow",
+  "display": {
+    "icon": {
+      "id": "minecraft:snow_block"
+    },
+    "title": {
+      "text": "Thawed Out",
+      "color": "aqua"
+    },
+    "description": {
+      "text": "Slay the Snow Queen.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:skill_master",
+  "display": {
+    "icon": {
+      "id": "minecraft:emerald"
+    },
+    "title": {
+      "text": "Master Trader",
+      "color": "green"
+    },
+    "description": {
+      "text": "Reach level 10 in Trading.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

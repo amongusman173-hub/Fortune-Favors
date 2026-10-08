@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:ender_pearl"
+    },
+    "title": {
+      "text": "Wrong Turn",
+      "color": "dark_purple"
+    },
+    "description": {
+      "text": "Fall into a wormhole and meet your end.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

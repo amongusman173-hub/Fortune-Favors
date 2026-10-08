@@ -1,0 +1,68 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550340.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/auto_sell_hopper"
+        }
+      },
+      {
+        "threshold": 4550341.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/upwards_hopper"
+        }
+      },
+      {
+        "threshold": 4550348.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/item_sorter"
+        }
+      },
+      {
+        "threshold": 4550349.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/super_hopper"
+        }
+      },
+      {
+        "threshold": 4550350.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/transfer_hopper"
+        }
+      },
+      {
+        "threshold": 4550351.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/checker_hopper"
+        }
+      },
+      {
+        "threshold": 4550352.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/two_way_splitter"
+        }
+      },
+      {
+        "threshold": 4550359.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/overflow_hopper"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/hopper"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "fortuneandfavors:automaton_armor"
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "fortuneandfavors:automaton_armor"
+      }
+    ]
+  }
+}

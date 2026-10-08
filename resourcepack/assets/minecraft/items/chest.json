@@ -1,0 +1,157 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550005.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/king_loot_box"
+        }
+      },
+      {
+        "threshold": 4550010.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/slime_loot_box"
+        }
+      },
+      {
+        "threshold": 4550018.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/golem_loot_box"
+        }
+      },
+      {
+        "threshold": 4550019.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/raid_loot_box"
+        }
+      },
+      {
+        "threshold": 4550023.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/mindbinder_loot_box"
+        }
+      },
+      {
+        "threshold": 4550025.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/wither_loot_box"
+        }
+      },
+      {
+        "threshold": 4550027.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/snow_loot_box"
+        }
+      },
+      {
+        "threshold": 4550050.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/sculk_loot_box"
+        }
+      },
+      {
+        "threshold": 4550211.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/time_lord_loot_box"
+        }
+      },
+      {
+        "threshold": 4550235.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/scarlet_loot_box"
+        }
+      },
+      {
+        "threshold": 4550245.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/clockwork_loot_box"
+        }
+      },
+      {
+        "threshold": 4550256.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/starbound_loot_box"
+        }
+      },
+      {
+        "threshold": 4550266.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/voidshaper_loot_box"
+        }
+      },
+      {
+        "threshold": 4550276.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/sovereign_loot_box"
+        }
+      },
+      {
+        "threshold": 4550291.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/puppeteer_loot_box"
+        }
+      },
+      {
+        "threshold": 4550324.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/drowned_loot_box"
+        }
+      },
+      {
+        "threshold": 4550329.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/gale_loot_box"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:select",
+      "cases": [
+        {
+          "model": {
+            "type": "minecraft:special",
+            "base": "minecraft:item/chest",
+            "model": {
+              "type": "minecraft:chest",
+              "texture": "minecraft:christmas"
+            }
+          },
+          "when": [
+            "12-24",
+            "12-25",
+            "12-26"
+          ]
+        }
+      ],
+      "fallback": {
+        "type": "minecraft:special",
+        "base": "minecraft:item/chest",
+        "model": {
+          "type": "minecraft:chest",
+          "texture": "minecraft:normal"
+        }
+      },
+      "pattern": "MM-dd",
+      "property": "minecraft:local_time"
+    }
+  }
+}

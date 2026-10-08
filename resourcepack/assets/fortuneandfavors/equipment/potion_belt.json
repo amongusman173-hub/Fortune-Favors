@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "fortuneandfavors:potion_belt"
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "fortuneandfavors:potion_belt"
+      }
+    ]
+  }
+}

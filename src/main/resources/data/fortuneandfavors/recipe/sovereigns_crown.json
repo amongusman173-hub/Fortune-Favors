@@ -1,0 +1,49 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "GEG",
+    "EGE",
+    "GEG"
+  ],
+  "key": {
+    "G": "minecraft:gold_block",
+    "E": "minecraft:emerald_block"
+  },
+  "result": {
+    "id": "minecraft:golden_helmet",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "sovereigns_crown"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550270.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§a§l👑 Sovereign's Crown"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7Far too small for the head it"
+        },
+        {
+          "text": "§7was made for."
+        },
+        {
+          "text": "§7Right-click to put it on and he"
+        },
+        {
+          "text": "§7will come to take it back."
+        },
+        {
+          "text": "§8Summons The Emerald Sovereign."
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

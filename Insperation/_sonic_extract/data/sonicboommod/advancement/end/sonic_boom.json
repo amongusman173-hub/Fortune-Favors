@@ -1,0 +1,47 @@
+{
+  "parent": "minecraft:end/elytra",
+  "criteria": {
+    "sonic_boom": {
+      "conditions": {
+        "items": [
+          {
+            "items": "sonicboommod:egle_statue"
+          },
+          {
+            "items": "minecraft:diamond"
+          },
+          {
+            "items": "minecraft:barrier"
+          },
+          {
+            "items": "minecraft:chest"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.sonicboommod.sonic_boom.description"
+    },
+    "frame": "challenge",
+    "icon": {
+      "count": 1,
+      "id": "minecraft:elytra"
+    },
+    "title": {
+      "translate": "advancements.sonicboommod.sonic_boom.title"
+    },
+    "background": "minecraft:textures/gui/advancements/backgrounds/end.png"
+  },
+  "requirements": [
+    [
+      "sonic_boom"
+    ]
+  ],
+  "rewards": {
+    "experience": 100
+  },
+  "sends_telemetry_event": true
+}

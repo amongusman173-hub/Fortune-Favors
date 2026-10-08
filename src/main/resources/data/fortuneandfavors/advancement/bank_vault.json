@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:gold_block"
+    },
+    "title": {
+      "text": "High Interest",
+      "color": "yellow"
+    },
+    "description": {
+      "text": "Upgrade your bank to level 3. Compound comfort, compound interest.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

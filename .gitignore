@@ -1,0 +1,9 @@
+build/
+.gradle/
+run/
+logs/
+.DS_Store
+.freebuff/
+.agents/
+net/
+*.log

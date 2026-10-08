@@ -1,0 +1,33 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550021.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/mindbinder_staff"
+        }
+      },
+      {
+        "threshold": 4550028.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/ice_staff"
+        }
+      },
+      {
+        "threshold": 4550051.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/sculk_mage_staff"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/blaze_rod"
+    }
+  }
+}

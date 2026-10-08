@@ -1,0 +1,33 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550207.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/raiders_upgrader"
+        }
+      },
+      {
+        "threshold": 4550213.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/chrono_shard"
+        }
+      },
+      {
+        "threshold": 4550252.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/magical_essence"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/amethyst_shard"
+    }
+  }
+}

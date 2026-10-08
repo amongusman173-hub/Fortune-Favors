@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "fortuneandfavors:slime_boots"
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "fortuneandfavors:slime_boots"
+      }
+    ]
+  }
+}

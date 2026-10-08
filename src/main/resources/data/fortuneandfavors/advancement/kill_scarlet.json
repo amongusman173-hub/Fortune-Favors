@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_scarlet",
+  "display": {
+    "icon": {
+      "id": "minecraft:netherite_sword"
+    },
+    "title": {
+      "text": "Until the Morning Light",
+      "color": "red"
+    },
+    "description": {
+      "text": "Defeat the Scarlet Devil - her mist burns away at dawn.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

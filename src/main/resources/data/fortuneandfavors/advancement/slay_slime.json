@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_slime",
+  "display": {
+    "icon": {
+      "id": "minecraft:slime_block"
+    },
+    "title": {
+      "text": "Gelatinous End",
+      "color": "green"
+    },
+    "description": {
+      "text": "Slay the Slime King.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

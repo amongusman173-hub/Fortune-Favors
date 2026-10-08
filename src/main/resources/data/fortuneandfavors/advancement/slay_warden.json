@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_warden",
+  "display": {
+    "icon": {
+      "id": "minecraft:sculk_shrieker"
+    },
+    "title": {
+      "text": "Silence the Deep",
+      "color": "dark_aqua"
+    },
+    "description": {
+      "text": "Slay the Elder Warden.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

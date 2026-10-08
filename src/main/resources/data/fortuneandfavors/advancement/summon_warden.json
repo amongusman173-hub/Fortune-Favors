@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:sculk"
+    },
+    "title": {
+      "text": "Awaken the Deep",
+      "color": "dark_aqua"
+    },
+    "description": {
+      "text": "Summon the Elder Warden.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

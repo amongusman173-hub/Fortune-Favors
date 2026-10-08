@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "fortuneandfavors:warlord_cloak"
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "fortuneandfavors:warlord_cloak"
+      }
+    ]
+  }
+}

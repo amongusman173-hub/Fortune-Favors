@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:raid_betrayal",
+  "display": {
+    "icon": {
+      "id": "minecraft:shield"
+    },
+    "title": {
+      "text": "Warlord's Defier",
+      "color": "green"
+    },
+    "description": {
+      "text": "Denied the Warlord's offer and kept fighting to the end.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

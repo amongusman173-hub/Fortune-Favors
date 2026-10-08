@@ -1,0 +1,57 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " S ",
+    "SCS",
+    " S "
+  ],
+  "key": {
+    "S": "minecraft:soul_sand",
+    "C": "minecraft:compass"
+  },
+  "result": {
+    "id": "minecraft:compass",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "death_compass"
+      },
+      "minecraft:custom_name": {
+        "text": "Death Compass",
+        "color": "dark_red",
+        "bold": true
+      },
+      "minecraft:lore": [
+        {
+          "text": "A compass bound to your last breath.",
+          "color": "gray"
+        },
+        {
+          "text": "Hold it: a soul-flame thread reaches",
+          "color": "gray"
+        },
+        {
+          "text": "toward your grave and the distance shows",
+          "color": "gray"
+        },
+        {
+          "text": "on your action bar. Right-click: sonar",
+          "color": "gray"
+        },
+        {
+          "text": "ping - a burst of soul fire marks the",
+          "color": "gray"
+        },
+        {
+          "text": "spot, even through walls.",
+          "color": "gray"
+        },
+        {
+          "text": "It quiets once you retrieve your grave.",
+          "color": "dark_gray"
+        }
+      ]
+    }
+  }
+}

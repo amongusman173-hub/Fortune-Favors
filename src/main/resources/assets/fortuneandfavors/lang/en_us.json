@@ -1,0 +1,20 @@
+{
+	"enchantment.fortuneandfavors.boltbringer": "Boltbringer",
+	"item.fortuneandfavors.auto_sell_hopper": "Auto-Sell Hopper",
+	"item.fortuneandfavors.upwards_hopper": "Upwards Hopper",
+	"item.fortuneandfavors.elevator": "Elevator",
+	"item.fortuneandfavors.buy_sign": "Buy Sign",
+	"item.fortuneandfavors.sell_sign": "Sell Sign",
+	"item.fortuneandfavors.land_claimer": "Land Claimer",
+	"item.fortuneandfavors.chunk_claimer": "Chunk Claimer",
+	"item.fortuneandfavors.token_1": "Favor Token",
+	"item.fortuneandfavors.token_2": "Favor Token",
+	"item.fortuneandfavors.token_3": "Favor Token",
+	"item.fortuneandfavors.token_4": "Favor Token",
+	"block.fortuneandfavors.auto_sell_hopper": "Auto-Sell Hopper",
+	"block.fortuneandfavors.elevator": "Elevator",
+	"tag.item.fortuneandfavors.ff_damage_weapons": "Melee Weapons",
+	"tag.item.fortuneandfavors.ff_impaling_weapons": "Impaling Weapons",
+	"tag.item.fortuneandfavors.ff_infinity_weapons": "Infinity Weapons",
+	"tag.item.fortuneandfavors.ff_breach_weapons": "Breach Weapons"
+}

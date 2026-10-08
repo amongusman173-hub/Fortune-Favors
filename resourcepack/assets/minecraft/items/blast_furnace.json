@@ -1,0 +1,19 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550354.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/portable_furnace"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:block/blast_furnace"
+    }
+  }
+}

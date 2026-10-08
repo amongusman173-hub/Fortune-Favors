@@ -1,0 +1,1203 @@
+# Changelog
+
+## 1.0.60
+
+### ⚙️ The Clockwork King has real mob AI
+- **He walks.** He was a `setNoAi(true)` puppet nudged by hand every tick, which is why he hovered after his own Piston Slam and walked straight into walls. He is a normal mob now: vanilla pathfinding sends him round an obstacle instead of through it, and vanilla gravity brings him back down. His scripted attacks layer on top, unchanged.
+- **Deliberately no melee goal.** The iron golem's default kit was cleared out first — its village-strolling goals would have walked him out of his own arena, and its 18-damage fist would have sat on top of an arsenal that is supposed to *be* his damage. What is left is what the fight wants: pick a player, walk at them, stop just outside reach.
+
+### 🧹 Seven teardown hooks that nothing ever called
+- **A whole class of "haunted arena" bug is fixed at the root.** Every boss and gear system had a `onServerStopping` teardown written for it, and **not one was registered with the server lifecycle**. So every world stop left the live fights' entities behind — bosses, machines, rigging, guards, summoned servants — while the in-memory state that drove them vanished with the process. What came back on the next boot was a body with no fight attached: no AI, no ticking, no loot. All seven are wired now, before the world is saved rather than after.
+- The periodic stray sweeps added in 1.0.59 are a backstop for crashes now, not the only line of defence.
+
+### 🩹 Fixes
+- **Per-player combat state no longer leaks.** `CombatGear` — the oldest of the gear systems — released nothing when a player logged out, so it kept one entry per player who had ever landed a hit or charged a super jump, forever. It now releases its rows on disconnect and resets entirely on server stop, matching what every newer gear class already did.
+- **`/changelog` was eleven releases stale.** It reads a bundled copy of the changelog, and that copy is now generated from `CHANGELOG.md` by the build instead of being maintained by hand.
+
+### 🧪 Three new guards, because dead code compiles
+- **`ffAuditSources` fails the build on an unwired shutdown hook.** The bug above was invisible for so long precisely because a teardown method nothing calls is perfectly legal Java. Proven to fail by unwiring one on purpose.
+- **`bosses.clockwork-ai`** asserts the King's goal rig: movement present, player targeting present, melee and wandering absent, and that both AI accessor mixins actually apply.
+- **`legendary.documented-numbers`** makes nine accessors load-bearing — they existed as "test hooks so the documented numbers cannot drift" and no test had ever called them. It now pins the Gauntlet's wind-up and ram reach, the Codex's spell cycle, Starfall and Void Reaver cadence, the Seal's cost, the Magister's overcharge window, and the Void Shaper's whole block-throwing table (stone, magma, ice, leaves, ore, log).
+- **`changelog.current`** fails if the bundled in-game changelog is not the version the mod actually is.
+
+## 1.0.59
+
+### 🧱 The four new raid bosses are actually killable now
+- **Their health is cut to endgame parity.** The Clockwork King, Starbound Magister, Void Shaper and Emerald Sovereign shipped at 1200 / 900 / 1400 / 1100 against the Scarlet Devil's 900, which is what "they just have WAY too much health" was. They are now 700 / 620 / 760 / 680.
+- **The shields no longer multiply it.** The Clockwork King's machinery was worth up to a **four-tier Resistance** and the Sovereign's court up to **three** - an 80% damage cut, permanently reapplied while anything lived, which turned a 1200 HP boss into more than 6000 effective HP. Both cap at **one** tier now: breaking the arsenal or the court still matters, but the armour is never a wall.
+- **The Sovereign heals less.** His Royal Tribute banked 12 HP per player taxed; with a full court in range he could out-heal a group's damage. It banks 5.
+
+### 🎁 They always drop their loot
+- **One loot path, paid exactly once.** Loot was granted only from the death ceremony, so any death that found another route - a command, an admin `/kill`, vanilla's own body falling over - dropped nothing at all. All four bosses now pay through a once-only ledger that the entity-death hook also calls: whichever route runs first pays, and the other is a no-op.
+- **The ceremony can no longer be interrupted into a loss.** It used to mark the boss invulnerable to protect the sequence, which meant a crash or restart mid-ceremony left him **permanently unkillable** - alive, invulnerable, at 1 HP, with no fight to drive him. It now cancels blows instead, so a boss can never be left immortal.
+- **Bodies orphaned by a crash are swept up.** Because a fight lives in memory, a boss saved when the server died comes back as a statue that never moves, never dies and never drops. A periodic sweep clears any boss body with no fight attached.
+
+### ⚙️ The Clockwork King walks now
+- **He no longer flies.** He is a no-AI puppet, so vanilla never applied gravity to him and never walked him anywhere: the Piston Slam puts him six blocks in the air and he simply stayed there, which made him a boss you could not reach from the ground. He is driven by hand now - grounded every tick, closing to just inside melee range - and rooted only while a telegraphed move is charging.
+
+### 🧪 Two new self-test assertions
+- **`bosses.new-are-killable`** - no new boss may out-tough the Scarlet Devil, and no shield may stack past one tier.
+- **`bosses.new-loot-once`** - the loot ledger must survive being called with nothing to pay and nobody to pay it to, because the death hook calls it on every entity death and a throw there would be swallowed and silence the payout.
+
+## 1.0.58
+
+### 🎨 Art the new bosses and their loot were missing
+- **Evoker and Illusioner cloaks and spellbooks redrawn.** All four are new 16x16 art, so the Evoker's and Illusioner's sets read as their own gear instead of a recoloured blur.
+- **Excalibur drawn.** The duel roll's 1-in-1000 legendary finally has art of its own rather than looking like the netherite sword it is underneath.
+- **The Mystery Box and all four Mystery Keys drawn.** The Box rendered as a plain barrel and every key tier rendered as the *same* tripwire hook - a Legendary Key and a Common Key were indistinguishable. Each tier has its own model now.
+- **The Clockwork King's trophy and gauntlet redrawn** so the two pieces of his kit are no longer near-identical brass shapes.
+
+### 🔮 The Illusioner's Spellbook does what it says
+- **True invisibility.** The caster is hidden with the entity flag rather than the potion effect, so the particles they give off stay visible while the body does not. **Armour is hidden from other players, not removed** - an empty equipment packet is sent, so full netherite still protects exactly as it did. Mobs drop the caster's target and are refused new ones, so armour no longer widens the range you are spotted at.
+- **Illusions update.** Every copy re-wears the caster's *current* kit each tick, so swapping a weapon or chestplate mid-window changes every clone with you instead of leaving them standing in the armour you cast in.
+
+### 🧪 Each of the four new bosses has its own enchant
+- **Overclock** (Clockwork King) - hits discharge an arc that overloads the target and drags in whatever is packed around it with Weakness and Slowness.
+- **Starfall** (Starbound Magister) - the blow lands heavier and a star falls on the victim, cleaving the enemies around them.
+- **Voidrend** (Void Shaper) - hits tear a seam through armour and drag the target *in* rather than knocking it away, the opposite of Seismic.
+- **Sovereign's Levy** (Emerald Sovereign) - hits mark the target for tribute and the kill shakes emeralds loose.
+- Each drops as a Tome from its own boss and fuses in the Item Forge like every other enchant: `/ff give overclocktome`, `starfalltome`, `voidrendtome`, `levytome`.
+
+### 🩹 Fixes
+- **The Starbound Magister dropped nothing.** Her lethal-blow hook was returning "allow the killing blow", so she died instantly and the death ceremony - and with it `grantLoot` - never ran. The same bug was in the Clockwork King, Void Shaper and Emerald Sovereign; all four are fixed.
+- **The Sovereign's Bell now makes villagers fight.** Vanilla villagers have no attack goal, so buffing them left them standing there being hit. A rung bell turns nearby villagers into Royal Subjects that close on the nearest hostile and land a real pitchfork strike, credited to the villager.
+- **The Shaping Sigil no longer throws blocks at you.** Gripping and hurling were the same click, so looking at a wall picked a block up and flung it. Right-click grips, sneak-right-click hurls.
+- **The Void Reaver works.** It threw whatever you were looking at, which in a fight is the enemy and never terrain - so its whole gimmick was dead exactly when you were using it. It finds its own ammunition beside the victim now.
+- **Excalibur was a dead item.** The self-test's right-click probe caught it with neither a handler nor a passive declaration; its 255 Strength and Sharpness live in a held-item tick, and it is declared passive now.
+
+## 1.0.57
+
+### ⛓ Prison is now The Cell Block, and it has a second axis
+- **Heat.** Rich ore does not come for free any more. Every ore you mine adds Heat - nothing for stone, a point or two for coal and iron, five for diamond, ten for ancient debris - and it cools on its own, a point every second and a half. Past **45 Heat** the cell block notices you.
+- **Guards.** They spawn in your tunnels and hunt you, with bounty, health and damage scaling off your rank, and they get more numerous and quicker to arrive into full **lockdown** at 75. Put one down for a cash bounty, Heat **-15**, and progress on the Guard contract. Your record going quiet at 20 Heat calls the whole sweep off.
+- **You cannot die in here.** A lethal blow is intercepted exactly like an expedition fatal blow: you are dragged to **Solitary**, a real 5x5 boxed cell high above the mine, for 15 seconds of Blindness, Slowness and Mining Fatigue. Your mined haul is confiscated; your **stashed gear is untouched**, so nothing a player owns can be lost. It is a setback, not a wipe.
+- **Contracts.** Three jobs sit on the noticeboard in the Prison Menu - mine ore, slay inmates, take down guards, or sell a haul - each paying bonus cash and refreshing when claimed. Reroll the board for cash if you do not like the work.
+- **Break-out.** Every now and then a **loose brick** works free of your mine wall. Break it and a 26-block tunnel opens with guards flooding in behind you and a glowstone exit at the far end: reach it inside 45 seconds and you walk free with a jackpot, a Heat wipe and a line in the newspaper. Fail, and the tunnel is sealed back **block for block** and your Heat jumps 25.
+- **The Prison Menu is a control board now.** Six rows showing your Heat meter, the guards currently on you, break-out status, all three contracts with progress bars, and the usual sell / rank / upgrade / convert / travel buttons. Selling launders Heat, so the haul you were carrying is also the thing that gets the dogs off you.
+- **A fishing pond that paid nothing.** `onFishCatch` existed, was documented as paying $30-$80 a catch, and was **never called from anywhere** - the pond was decorative. It is hooked to the reel-in now, jackpot catches included.
+- **An arena exploit that printed money.** The wave ticker ran for every player in the prison regardless of where they were, so starting the arena and walking back to the mine left an empty arena "clearing" wave after wave and paying the full bonus each time, forever. Waves now only advance while you are actually standing in the arena, leaving abandons the run, and no free payout is issued.
+
+### ☄ Expeditions are rolled, not repeated
+- **Anomalies.** Every run opens with one, announced on arrival and echoed in the action bar: **Rich Veins** (ore pays double), **Blood Moon** (kills pay double, and there are far more of them), **Gilded Caches** (chests pay double), **Unstable Reality** (collapses 30% sooner, everything pays half again), or plain **Stable Reality**. Two trips into the same site no longer play the same way.
+- **Site events** every 30-60 seconds: **ORE RUSH** seeds a real vein in the floor near you, **SUPPLY DROP** lands a rich loot chest, **SWARM** floods the halls, **SENTINEL** sends a mini-boss, and **BLACKOUT** takes your sight away and lets the dark do the rest. Each announces itself in chat and in the action bar.
+- **A run summary card.** Mobs slain, ores mined, chests opened, distance explored, minutes survived, your anomaly - and a **C/B/A/S rating** against the site's expected haul, with a real bonus paid on A and S. The card also prints on an empty-handed escape, because knowing the run was worth nothing is still information.
+- The action bar now carries anomaly, threat tier, the active event and the escape hint alongside loot and time.
+
+### 🧪 Three new self-test assertions
+- No contract can pay for work that was not done, a contract slot that does not exist cannot be claimed, and rerolling is never free.
+- A survivable hit inside prison is never intercepted, so a scratch cannot jail you and confiscate your ore.
+- Every anomaly has a name, a description, non-zero loot multipliers and a timer multiplier that never extends a run.
+- The fishing mixin originally injected a non-returning callback into `retrieve`, which **failed to apply and broke server startup outright**. The self-test caught it before it shipped.
+
+## 1.0.56
+
+### 🛠 Four new raid bosses, with their full item sets
+- **⚙ The Clockwork King** - called by a **Clockwork Core**. His armour *is* his machinery: every live turret, blade, piston and drone is worth a tier of Resistance, and tearing one off chips his real health and opens a window. Kill the arsenal or hit a wall. Drops his Loot Box, Trophy, **Mech-Scrap**, the **Clockwork Gauntlet** (every 4th landed hit winds Overdrive and drives a piston ram through whatever is in front), the **Mechanical Heart** (self-repair that only ticks while you are *not* being hit) and **Automaton Armor** (plating plus fireproofing).
+- **✨ The Starbound Magister** - called by an **Astral Compass**. A wandering fight with **no arena at all**: she keeps her distance and blinks away when you close. From 60% she banks Astral Energy - each point widens, quickens and hardens her spells - and at six she **overloads**, detonating it all and dropping her guard for five seconds. So the fight rewards interrupting her instead of out-poking her. At 25% she goes to Starfall: marked meteors, a Gravity Well, an Astral Dash, and **Celestial Collapse**, a telegraphed last spell she is spent after. Drops her Loot Box, Trophy, **Magical Essence**, the **Starpiercer**, the **Astral Mantle** and the **Magister's Codex** (three real spells: Star Bolt, Gravity, Meteor).
+- **🟯 The Void Shaper** - called by a **Void Anchor**. He does not shoot fireballs: he rips blocks out of the world as floating displays and hurls them, and **the block decides the blow** - stone is heavy with huge knockback, magma burns, ice slows, ore flies fast, logs throw you far, leaves shatter into fragments. Ender Pull, Block Wall, Ender Step and Void Slam round him out, and at 40% he hoists five to eight blocks into orbit and **loses control** of all of them at once. Drops his Loot Box, Trophy, **Voidsteel Scrap**, the **Void Reaver**, the **Colossus Plate** and the **Shaping Sigil**.
+- **👑 The Emerald Sovereign** - called by the **Sovereign's Crown**. He fights with subjects: a **Bell Toll** that staggers you and slows you, **Royal Decrees** that summon **Royal Guards**, a **Royal Tribute** that taxes vitality (never items), and at 50% **Sovereign's Judgement**, a beam you have to walk out of. His court is his armour - clear it and he opens up. Drops his Loot Box, Trophy, **Royal Tribute**, the **Royal Contract** (summons a real Royal Guard that fights for you), the **Sovereign's Bell** (staggers nearby hostiles, empowers nearby villagers) and the **Emerald Seal** (cheaper trades, emeralds from hostile kills, and a Royal Tribute buff for five emeralds).
+- All four have custom item art, item definitions, model data, crafting recipes and recipe advancements, and appear in **/ff give**, **/raidboss help** and the boss codex names.
+- **⚙ The King is built out of blocks.** Twelve **block displays** bolt his armour onto him - an iron visor and a lamp for an eye, an iron chestplate over a glowing core, deepslate shoulder plates on iron brackets, back plating, a hip carriage and iron legs - laid out in *his* frame so the whole suit turns with him. The suit is gated on the same number as his Resistance shield, so **stripping his machines visibly blows his armour off plate by plate**, and when he rebuilds he bolts it back on. His machines get chassis blocks too (dispenser, trapdoor, piston head, observer) riding them, so a turret reads as a turret instead of as a shulker. None of it has a hitbox or deals damage - it is the state of the fight made visible. Plating is tagged, so an orphaned piece left by a crash is swept up within 15 seconds instead of standing over an empty field forever.
+
+### 🩹 Fixes
+- **Art for every new item is real.** 28 new textures plus their model JSONs, and all seven loot-box families' dispatch entries are generated, so none of them render as the vanilla item they are built on.
+- **A loot box that did nothing on right-click.** The four newest boxes were being swallowed by the boss-gear branch before the loot-box branch could see them, so clicking one returned `PASS` - dead in the hand. The self-test's right-click probe caught it.
+- **No-AI bosses now actually move.** A no-AI puppet never runs its own physics step, so driving one with `setDeltaMovement` leaves it hovering in place; the Magister and the Void Shaper are moved by position each tick, exactly like the Clockwork machines.
+- **Leaves can be thrown.** The void-shaping eligibility test used `isSolidRender`, which is false for leaves - so the documented "leaves shatter into fragments" attack was unreachable. It now tests the *collision* shape, which is what "a full block" actually means.
+
+## 1.0.55
+
+### ⏳ The Pocket-Watch cannot stop a Time Lord
+- **He refuses it, and then proves the point.** Against him the watch no longer freezes the world: the tick freeze is dropped, no player is pinned, and the bubble only stills the **mobs** around you. He walks straight through it, laughs - *"You stopped time with a trinket?"* - and a beat later answers with *"Let me show you how it is done"*, stopping time himself so you can watch a real stop from the wrong end of it.
+- Everyone else in the bubble is left alone too, so nothing about the rest of the fight pretends to be paused.
+- **A refused watch is a quiet one.** Three things followed from the same mistake - that a bubble he walked through was still a stopped moment. His blows were being *banked* and handed back as a single combined hit (the exact burst the bank exists to prevent), arrows that never stopped moving were getting the i-frame bypass, and the stop's "time resumes" stinger fired while his own stop was still running. None of it happens now: only a stop that actually holds the world banks damage, only a stop that is really holding projectiles tags them, and a refused watch ends silently. The bubble also outlasts his retort, so its cleanup can no longer wake the mobs while he is still holding them.
+
+### 🎁 Loot boxes pay the people who earned them
+- **The Scarlet Devil and Time Lord boxes go straight into the inventory of every player who fought**, instead of a single box on the floor for whoever happened to be standing nearest when the body dropped. Each participant gets a delivery line telling them how many arrived.
+
+### 🩸 A Blood Revenant takes nothing from you
+- **It wears copies. You keep your gear.** The servant used to confiscate your whole inventory so `/claim loot` could hand it back, and that contract kept breaking - it fought Nice Keep Inventory, split stacks with the grave system, and made you kill your own corpse to get your tools back. Now it loots *nothing*: it wears a look-alike of your armour and weapon, **drops nothing**, and whatever you were carrying stays with you. It works with Nice Keep Inventory on or off.
+- **A claimed death no longer swallows anything - this one was losing inventories.** The claim cancelled *every* drop so the servant could carry the real stacks. Once the servant stopped carrying them, that cancellation had nothing left to give them back, so a player killed in the King's blood phase or by the Scarlet Devil silently lost their **entire** inventory. The hold is gone: a claimed death is now an ordinary death, so Nice Keep Inventory keeps what it keeps and the rest falls where it fell.
+- **The servant still looks like the person it was raised from.** Vanilla clears each slot the instant it has dropped it, so the kit is now captured at the very first drop of the death - the last moment the whole inventory exists - and the servant dresses from that. The capture is cosmetic and never writes back, so it cannot duplicate or consume a real item.
+
+### ☠️ The Wither, harder and cleaner
+- **The nuke is a real storm: ~40 skulls per player**, plus a carpet around the boss so the blast zone is not a safe spot. Supercharged and King variants scale it higher again.
+- **Wither wreckage always rebuilds.** Every block it carves now enters the shared Explosion Rebuild queue **unconditionally** - not gated behind the `Explosion Rebuild` toggle, which previously meant an admin turning player explosions off also condemned every arena the Wither had visited to permanent craters.
+
+### ⚔️ Raid art remade, player raids readable
+- **Every raid texture is redrawn** - the loot box, the raiders' upgrader, the Warlord's Cloak and Trophy - while the **Warlord's Axe** and the **Captain's Horn** are left exactly as they were.
+- **A live raid readout in the action bar**, once a second: which wave you are on out of how many, how many raiders are still standing, then how many bosses remain and how long the fight has run. The *"no defenders"* countdown rides the same line, so the one piece of raid state nobody can afford to miss is impossible to miss.
+- **Broadcasts are scoped to the raid's own dimension.** The abandonment warning used to be server-wide, telling a player mining two dimensions away about a raid they had never seen.
+
+## 1.0.54
+
+### 🩸 Her three legendaries actually work
+- **The Grimoire speaks in the action bar.** Cast, cooldown, spell-switch and "nothing in reach" all report to the overlay bar, so cycling spells mid-fight no longer floods chat.
+- **Its spells land.** Blood Spears resolved its target through the *player* list only, so aiming at a mob cancelled the entire volley on the next tick - it now finds anything living by id. Blood Rain only looked for `Monster`s, so over a field of ordinary mobs it drained nothing; it now drinks from every living thing in range that is not yours. Bloodsuck falls back to the nearest target when the crosshair is a degree off.
+- **The bats are a swarm.** Night Swarm's bats were ordinary bats with no owner and no target, so they flapped off into the night. Each one now hunts the caster's nearest enemy, bites it, and drifts back to the caster when the field is clear.
+- **The Blood Prism is a ritual duel.** Channelling now roots you where you stand: move or take a single hit and the channel breaks. The drain pulses the target's health away, and if their health reaches zero they die there and then.
+- **A player killed by the ritual owes nothing.** Their inventory is copied before the kill and written straight back - the death is real, the walk back is real, and no item is lost. The servant that rises wears only a *copy* of their armour, holds no gear, and drops nothing.
+- **A Revenant can never bite its owner.** Its vanilla goals could set the wrong target between our ticks; a damage gate now refuses any hit from a servant or bat aimed at its own master, and the tick loop clears such targets outright.
+- **Servants are named for who they were.** "Blood Revenant of <victim>", mobs included, so a raised cow is unmistakable.
+
+### ⏳ A frozen volley lands as a volley
+- **Pocket-Watch projectiles ignore invulnerability frames.** Everything hanging in the bubble is tagged while time is held, and those arrows punch through the 10-tick i-frame window as they land - stop time, empty a quiver, and every arrow counts.
+
+## 1.0.53
+
+### 🩸 The Scarlet Devil, finished
+- **Three legendary weapons, not one.** Her loot box now rolls exactly three legendaries - the **Scarlet Fang** (a real diamond spear: it thrusts, and every hit drinks a share of the damage), the **Scarlet Grimoire** (casts her own move set; sneak to cycle spells) and the **Blood Prism** (bleeds a mob *or a player* into a blood servant of yours). Her Trophy and the Bloodsoaked Core stay out of the legendary pool, because a trophy and a forge material are not weapons.
+- **One forge material instead of two.** The Crimson Essence did the same job as the Bloodsoaked Core and only made the drop table confusing; she drops Cores only now.
+- **Her health bar actually moves.** It was created at summon time and never once told what her health was, so it sat full no matter how much she bled or drank. It is driven every tick now.
+- **She no longer heals too much.** Her bite drinks a small capped share of the bite, the blood rain drinks a capped share of what it drained, and neither can hand her a whole health segment.
+- **She no longer hides inside blocks.** The unstick ran only in the baseline-movement branch, so the swoop - the one move that drives her through terrain - could park her inside a wall until the fight happened to reach that branch. She is unstuck every tick and mid-swoop.
+- **Blood Revenants give your gear back.** A servant captured its victim's gear from the *live* inventory, but by the time a death is reported vanilla has already emptied every slot - the only surviving copy is the keep-inventory snapshot, which the death handler deliberately leaves for the hand-off. Servants now take their gear (armour, held items and all) out of that snapshot, so `/claim loot` is never empty, and a servant left behind by a despawned boss still hands everything back.
+- **The "she can't be summoned again" state is gone.** A fight whose phantom had already vanished is swept on the next summon instead of blocking the summoner forever.
+- **Her textures and models render.** The item definitions that make a chest / glass bottle / diamond spear draw *her* art had been deleted from the pack; they are regenerated, and the pack ships them.
+
+### ⏳ The Time Lord's finale, action bar and free launches
+- **Stop, in the action bar.** Everyone caught in a time stop now sees a live countdown in their action bar for its whole duration.
+- **His 1% finale.** At the last percent he stops trading blows, floats clear and **glows** (so you can find him through terrain), then walks a thick aging beam across every player in turn. Fail to land one clean hit on him in time and the years catch up all at once: you fall where you stand and a skeleton wearing your name takes your place. Land a hit and you are released instantly. Either way the fight then resolves - he is spent, and his death ceremony (with its loot) plays out.
+- **Being launched no longer costs you the fall.** Every move of his that throws a player now marks them, and their fall damage is zeroed until they land.
+- **The Pocket-Watch is a real stop now.** It uses the server tick freeze, so arrows and thrown items **hang in mid-air** and resume when time does, while the wielder walks through the frozen moment. Everyone else in the bubble is pinned. And **every point of damage dealt inside it is banked**, then delivered in one blow when the stop lifts - you can no longer be bursted down during your own watch.
+
+### ☠️ The Wither, reworked properly
+- **Skull Rain works.** Its meteors were cast at the world-surface heightmap, so in any arena that was not under open sky they spawned inside the ceiling and died there. They now spawn in the lowest *open* column above their target and arrive as a real barrage.
+- **The Wither Nuke is a skull storm.** Instead of a single blast at its own body, the sky opens and skulls rain across the whole arena - around each player and around the boss - so standing still is the only way to be hit by all of them. The explosion itself is smaller now, because the storm is the damage.
+- **The skull shield no longer breaks the fight.** It used to park the boss in place for ten seconds and left the health bar frozen (vanilla only writes bar progress from its own AI step). It is five seconds, it moves normally through it, and the bar is refreshed by hand.
+- **Its loot box is guaranteed.** Whatever path ends the death animation, the rewards are now granted - a death captured by `/kill` or an interrupted sequence used to vanish with no loot at all.
+- **Two new moves:** **Grave Burst** (a forward cone of skulls) and **Wither Wail** (a rooted, withering scream with darkness on top), and the nuke is no longer phase-2-only, so a normal fight can actually see it.
+
+### 📦 Item art
+- **Every custom item definition is back in the pack.** The generated `assets/minecraft/items/*.json` overrides had been removed from the working tree, which is why the Time Lord's summon item, legendaries and loot box, and the Scarlet Devil's whole set, kept rendering as the vanilla items they are built on. Regenerated, included in the mod jar, and the resource-pack zip rebuilt with the current metadata.
+
+## 1.0.52
+
+### ⏳ The Time Lord's time stop is a real stop now
+- **The world freezes, and you do too.** The stop already froze the server tick rate, which is what hangs mobs and projectiles mid-air - but players are client-driven, so they kept walking and swinging. Every participant is now **pinned in place** for the length of the stop, mid-air players included, and cannot move, attack, use an item, open a block or mine while frozen.
+- **He is not frozen with it.** The world stops, so his own AI would have too - a boss that stands still is a boss that does nothing. While time is stopped he now crosses the gap and strikes directly, so the stop is something he does *to* you rather than a pause he sits through.
+- **The knockback lands when time resumes.** The damage you take inside a stop is banked, and the moment it releases you are shoved away from him, scaled by how much you were hit and hard-capped so it can never turn into a launch.
+- **No more launching.** The old stop applied **Jump Boost 128**, which is not a "no jumping" flag on this version - it is a rocket. That is what threw players above the clouds mid-stop, and why the boss then despawned: they had left the arena. Player pinning replaces it, so a mid-air stop now holds you exactly where you were.
+- **The arrows stopped one-shotting.** Volley damage was dialled back and the crit flag removed (arrow damage also scales with arrow speed, so the base is capped), and the phase-two ring now fires sixteen lighter arrows instead of twenty-four heavy ones.
+- **More time to spend.** Three new moves join the rotation: **Chrono Bombs** (countdowns underfoot that go off together), an **Aging Ray** that hitscan-ages its target, and **Rewind** - below half health he once per fight steps back through his own timeline to heal and blink away.
+- **He says each line once.** Identical lines inside a short window are dropped, and the death ceremony's two speeches announce exactly once each instead of repeating every ten ticks.
+
+### 🎁 Loot boxes: the new boxes actually open
+- **The Time Lord and Scarlet Devil Loot Boxes were missing from the menu's box-name and box-consume tables**, so opening one claimed *"You don't have a King Wither Skeleton Loot Box anymore"* - a box nobody had. Both families are recognised now, and the Scarlet box spins its own table (Scarlet Fang, Trophy and Bloodsoaked Core as the legendaries) instead of falling through to the Wither pool.
+
+### 🗂️ The resource pack was invalid, so no custom item looked custom
+- **The companion pack shipped without a `pack.mcmeta`.** The client rejects a pack with no metadata, which is why every custom model - the bosses' items and the Time Lord Loot Box included - kept rendering as the vanilla chest / bottle / crystal it is built on. Since 1.21.9 the format is declared as a `min_format` / `max_format` range rather than a single `pack_format`; the pack now carries the correct 26.2 metadata (format 88), and `tools/build_resourcepack.py` writes it and rebuilds the zip so it can never be lost again.
+
+### 🪂 Sonic Boom no longer cancels your elytra
+- **The launch marked the glider as standing on the ground**, and a fall-flying player who is on the ground has their flight cancelled - so the move that was supposed to be a burst of speed folded your wings instead. It now only sets the velocity.
+
+### ⌚ Pocket-Watch cooldowns
+- **60 seconds for the 5-second stop, 80 seconds for the 10-second one** - replacing the old 3- and 5-minute waits - and the item lore reads the real numbers.
+
+## 1.0.51
+
+### 🩸 The Scarlet Devil - a new endgame raid boss, summoned by the **Scarlet-Blood**
+- **Craft the Scarlet-Blood** from 4 Ghast Tears + 4 Redstone Blocks ringing a Glass Bottle, then right-click it: the scarlet mist rolls in, the sky reddens, and she rises out of a pool of her own blood.
+- **Bloodsuck.** Her diving bite is heavy and heals her for a share of the damage it lands - a blocked or whiffed bite drinks nothing, and the heal pops over her head so the lifesteal is visible.
+- **Dying inside her arena does not scatter your gear.** Her blood claims the body: a bone servant rises wearing the victim's armour and carrying their weapon, hunting everyone still in the arena, and destroying it returns everything through `/claim loot`. Nice Keep Inventory stands down for exactly that fight, so the grave system and the servant can never both own the same inventory.
+- **She laughs when she kills you** - "AHAHAHAHAHA! Say hello to your new body." - heals herself, and raises the servant in the same beat.
+- **Phase two at half health: blood rain.** The sky bleeds for ten seconds at a time; every exposed player in the arena is drained and withered, and she drinks a share of what the rain takes. The rest of the move set is a full rotation - the swoop, thrown blood spears that leave her essence behind, a blinding Night Swarm of bats, and taunts.
+- **A proper arrival and a proper death.** Her spawn ceremony (mist, reddened sky, her first line) and her death ceremony (a last uncontrolled rain, one final speech, a crimson implosion) are both played out - and she refuses to simply fall: the killing blow is cancelled and the ceremony runs instead, with loot granted once at the end. Drops are her Loot Box (a second one for a full phase-two clear), the Scarlet Devil's Trophy, Bloodsoaked Cores, Crimson Essence, and the **Scarlet Fang**, whose on-hit lifesteal is the same bloodsuck she uses.
+- **Everything ships with it**: textures, models, item definitions, the crafting recipe and its recipe-book unlock, `summon_scarlet` / `kill_scarlet` advancements, her own Loot Box family in the loot-box GUI, `/raidboss help scarlet`, `/ff give` aliases, and the regenerated companion resource-pack zip. `items.use.invoke` proves the vial summons a real fight and that the self-test tears it down again; `commands.raidboss.pages` covers her aliases.
+
+### 🛒 Chest shops: a sales ledger, and a warning before you sell out
+- **Every trade is recorded.** Each shop keeps its last 60 trades - what, how many, for how much, to whom and when - from both directions: a customer buying out of a buy shop, or selling into a sell shop.
+- **A Sales Ledger screen** opens from the shop settings. **Recent Sales** lists them newest-first with buyer, amount and "4m ago"; **Top Sellers** aggregates the whole ledger per item so you can see what actually moves. Clearing the history is two clicks, and it never touches your prices, stock or mode.
+- **Out-of-stock alerts.** When a buy shop's line sells its last unit, the owner gets a chat warning - silenced for five minutes per item so one hot line cannot spam you, and skipped entirely while the owner is offline.
+- **Turn it on and off** with the RESTOCK ALERTS button in the settings GUI or `/chestshop alerts`, and `/chestshop ledger [n]` prints the history in chat for owners who would rather read it there.
+- **The preference and the history both persist** in `chestshops.json`, and `shop.lifecycle` now proves it headlessly: it records both directions, checks the totals and the best seller, round-trips a ledger entry through its own JSON, and asserts the alerts toggle survives a save/load.
+
+### 🤝 Guilds: leaving asks first, and five skills instead of none
+- **`/guild leave` no longer drops you out of a guild on a single typo.** It states what leaving costs and waits: `/guild leave confirm` goes through, `/guild leave cancel` backs out without doing anything, and the guild menu's Leave button follows the same path.
+- **Five guild skills**, one rank per guild level, each shown in the skills menu with its exact effect: **Wisdom** (+5% skill XP per rank), **Might** (+4% damage to mobs), **Rally** (+5% damage to raid bosses), **Ward** (-4% damage taken from mobs) and **Fortune** (+5% earned cash). A rank can be refunded for a fee, which returns the point to the pool.
+
+### ⚡ `/ff event` actually happens now
+- **The old odds were one event per ~10 hours of play** - a roll every 30 minutes at 5% - which is why a whole evening could go by with none. It now rolls every 5 minutes at 35%, with a 10-minute cooldown after each event: an average gap of about twenty minutes.
+- **Two new events**: **XP Frenzy** (double skill XP) and **Phantom Swarm** (the skies fill with phantoms).
+- **Events change the game, not just the chat.** The multipliers the events advertise are now wired into the paths that matter: **Merchant Festival** boosts sell prices, **XP Frenzy** doubles skill XP, **Gold Rush** doubles ore drops, and **Blood Moon / Double Trouble** raise mob damage. The old banner promised modifiers that no code ever read.
+
+### 🔧 A server setting can no longer flip itself off when someone rejoins
+- **The cause was an op's client re-uploading its own config on every connect.** The client kept a local mirror of the server's settings and, on join, pushed its copy back for anyone with OP - so the stale local value for Explosion Rebuild won every time an op left and rejoined. Joining now only *asks* for the server's snapshot (a read-only request) and mirrors it locally; nothing is ever written back on connect.
+- **It cannot happen silently again.** When a config push does change something, the server logs it *and* tells the pusher and every other online op exactly which keys changed and to what. A setting flipping is now always attributable.
+
+### 🛒 Chest shops: placed like signs, closeable, unbreakable, deletable
+- **Sneak-right-click places the shop, like a sign on a wall.** Right-click *or* sneak-right-click a chest with a Buy/Sell Sign and the shop is placed on that chest. Sneak-right-clicking a placed shop chest reopens its settings, and sneak-right-clicking anything that is not a chest hands the click back to vanilla - so a shop sign is never a sign you cannot place.
+- **Buy → Sell → Closed, from one button.** The owner GUI's MODE button now cycles all three states instead of only buy/sell, and a **closed** shop stops all trading while keeping its prices, currency, stock and protection - so a shop can be parked without being rebuilt. Closed shops show no particles and, for everyone but the owner, behave as an ordinary chest again (claim checks included) rather than opening a trade window that would refuse every click.
+- **Shop chests cannot be broken.** Deleting the shop is what turns the chest back into an ordinary, breakable chest - so there is always a way out for the owner, and never one for a thief.
+- **DELETE SHOP is in the owner GUI**, behind a two-click confirm that shows what is about to be lost (prices and settings - never the chest or its contents). `/chestshop toggle` and `/chestshop delete [confirm]` do the same from chat.
+- **`shop.lifecycle`** proves the whole thing headlessly: it places a real chest, sneak-right-clicks it with a real Buy Sign through the real dispatch, and asserts the shop was recorded under the right owner; cycles buy → sell → closed and back, asserting a closed shop really stops trading and loses its claim exemptions; asserts a live shop chest is protected from breaking; and asserts deleting leaves a breakable chest behind. Verified to bite: forcing the sneak click to pass fails the build.
+
+## 1.0.50
+
+### 💥 Explosion Rebuild now covers the wreckage a boss makes
+- **Boss craters used to land in a private list.** The wither's slam and nuke craters are carved one block at a time by `WitherReworkManager`, which kept its own `removeBlock` queue - invisible to everything else. So Explosion Rebuild covered TNT and `level.explode(...)`, but the wreckage a boss actually made rode a second, hidden queue. Boss carving now goes through the *same* rebuild queue as an explosion: same delay, same config switch, same restore path, same frozen columns - and a crash mid-fight cannot strand it any more.
+- **A bare `/explosionrebuild` used to *flip the switch*.** Running it just to read the setting silently turned the feature off, which is exactly how "explosion rebuild is broken" gets reported. It now reports: ON or OFF, what triggers a rebuild, that it never touches claims, and how many blocks are queued right now. `/raidcooldown` and `/NiceKeepInventory claimother` had the same trap and now report too; `on` / `off` are the only things that change anything.
+- **Proven, not assumed.** `ffSelfTest` gained `explosion.rebuild-boss-source`: it builds a stone shelf in the air, detonates a real `level.explode(zombie, ...)` next to it, and asserts that every block the blast removed was queued, was put back, that the queue drained, and that **no item entity dropped** (the duplication bug). It then runs a real wither carve and asserts that one queues and restores too. The build now fails if boss wreckage ever stops rebuilding again.
+
+### 💥 Explosion Rebuild, take two - it was off, and my first proof was too weak
+- **It defaulted to OFF.** A server that never opened the config had no blast recovery at all, so TNT, creepers, blood revenants and every kind of nuke left permanent holes. It is now **ON unless an admin turns it off** (matching raid cooldown and the wither rework), and if a config file explicitly says otherwise, startup logs one clear line saying so, with the command to change it.
+- **My previous test proved the wrong half.** It used a test-only flush that skips the five-second delay, so it never exercised the code that actually runs in game. The check now ages the queue and then calls the **real tick**, and separately asserts that a blast is *not* queued while the feature is off - so a queue that captures but never drains now fails the build.
+- If your `config.json` still says `explosion_rebuild: false` (a very likely leftover from the bare command that used to flip the switch), run `/explosionrebuild on` once - it will report the state before and after.
+
+### 🤖 Duel bots no longer hit you through the ceiling
+- **Their reach was 2D.** A bot's mace leap is a horizontal arc, and the landing smash was gated on horizontal distance alone - so a bot standing on the ground connected with a player eight blocks above it. The smash and the leap start now both check the vertical gap too, which is what a real player's reach does.
+- **The mace smash was being eaten by the light-attack pacing window.** A single heavy falling hit was treated like the third click of a spam combo and discarded. A falling mace swing now always lands.
+
+### 💨 Sonic Boom actually fires now
+- **The trigger was too strict to ever register.** It demanded more than 1.7 blocks/tick *and* a standing elytra, but a firework glide sits right at that edge - which is exactly why it never seemed to work. Charging now starts above 0.5 blocks/tick of gliding and completes in 14 ticks (8 for follow-ups).
+- **No more 60-second lockout.** The rule is now *once per flight*: after a boom, folding your wings or landing re-arms it, so a long trip can boom again and again - just never twice inside one glide. A 1.5s guard stops a double-fire.
+- **It is genuinely faster than normal.** The launch now holds you at 3.4 blocks/tick along your look direction for about a second (a boosted firework glide is ~1.5-2.0), keeping a quarter of your old momentum so it cannot be aimed backwards, and it flags the client so the speed actually sticks. You get an action-bar call when it fires and when your wings re-arm it.
+
+### 🎟 The lottery now gets bigger the more people play
+- **A crowd bonus on top of the pot.** Every ticket adds to the pot as before, and the house now also pays a participation bonus: $25 per ticket sold, $2,500 per *different* player holding one, plus a squared crowd term - so the same 40 tickets from 8 players are worth far more than 40 tickets from one whale.
+- **You can see the maths.** The lottery window shows the pot, the live jackpot, the crowd bonus, how many players are in, what a purchase does to the jackpot, and the exact cost of each ticket. The draw announces the crowd bonus separately.
+- **`/lottery` is reachable from `/menu`.** The hub button was already there and now shows the pot, the jackpot, the players-in count and your own tickets; `/ff help menu` lists the lottery (and the bank, gems, expeditions, cosmetics, recipes and leaderboard) instead of pretending the menu is only the first half of itself.
+
+### ⏳ The Time Lord is a proper `/raidboss` entry
+- `/raidboss help` lists him, `/raidboss help timelord` (or `time_lord`, `rift`, `spacetime`) opens a recipe page in the GUI, and the boss list has his token at the end of the row - with the real recipe (4 Clocks + 4 Echo Shards ringing an Amethyst Shard), what he does, and what he drops. The endgame hint that used to occupy that slot moved into the info book.
+- **The Elder Warden was in the help GUI but not in the command.** `/raidboss help sculk` answered "Unknown boss" even though the GUI had a page for it. It is a listed boss now, with a console page of its own.
+- **One list of boss names, used by both paths.** The in-game lookup and the console fallback had two hand-written alias chains that could (and did) drift apart. They now share a single table, and an unknown boss returns a failing command result instead of a silent success - so a script or command block can tell the difference.
+- **Locked in by `commands.raidboss.pages`.** Every canonical boss - `king`, `slime`, `golem`, `mindbinder`, `snow`, `sculk`, `timelord` - is resolved through the *real* command, both in game and from console, plus every alias the command advertises, and the canonical list is deliberately kept separate from the command's own table: dropping a boss from that table fails the build instead of quietly dropping out of the test with it. (That last part was a genuine first-attempt bug in the check: iterating the very list it validates made a removal invisible.)
+
+### ✅ Two more headless gates, both verified to bite
+- **`admin.toggles.report-not-flip`** runs the bare admin toggles (`/explosionrebuild`, `/raidcooldown`, `/NiceKeepInventory claimother`) through the real dispatcher and fails the build if any of them changes a setting. Checked by re-introducing the flip and watching it fail with `bare admin command(s) changed a setting instead of reporting it: [explosionrebuild]`.
+
+### ⛏ The guild mine says what everything costs
+- Every tier card now states its **cost, what it pays per interval and per hour**, what the upgrade gains you over your current mine, and whether you can afford it - with your balance and the shortfall right there on the card instead of only in chat after a failed click.
+- The info book shows your balance, what this mine earns an hour, and exactly **how much more stock is needed** before the next payout, plus a plain-language reminder that the mine fills itself and deposits are optional.
+- Clicking a tier you cannot build now **tells you why** (already built, or build the previous level first) instead of silently doing nothing, and a successful build confirms what you just bought and what it pays.
+
+## 1.0.49
+
+### ⏳ The Time Lord - a new raid boss, summoned by the **Space-Time Rift**
+- **Craft the Space-Time Rift** from 4 Clocks + 4 Echo Shards ringing an Amethyst Shard. Right-click it and the air **tears open** - a vertical rift of portal sparks and end rods - and the Time Lord rises out of it.
+- **He actually stops time.** The world freezes for real (`setFrozen` on the server tick rate) - mobs, redstone, everything - while the fighter is locked in place, mid-air if the stop caught them jumping. He taunts, then time resumes. That is the one dangerous API in the fight, so it is fenced four ways: every stop is bounded and has a wall-clock deadline, he only ever unfreezes what he froze, a daemon thread queues the release so the world thaws even if the tick handler stops, and the freeze is a no-op during the self-test.
+- **Abilities**: safe **blink** (ray-traced, never into a wall, lava or the void, capped at 12 per fight so he cannot teleport-spam), **rift volleys** that fling random junk through tears in the air (the arrows carry the junk as their pickup item, so a survivable volley literally rains random objects), and a **halo of five arrows** that appear around you and snap inward one at a time.
+- **Phase 2 - the grand stop.** At a third health he holds one long stop, rings you with 24 arrows drawn in the frozen air, tells you *"I will hold this moment forever,"* then resumes time and fires the entire ring at once.
+- **Custom death.** The killing blow is cancelled: he tries to stop time one last time, the rift opens, flickers, and refuses to hold - *"My power... it is not... held..."* - and the moment takes him. He always drops a **Time Lord Loot Box** (two in phase 2).
+
+### 🕰 The three Time Lord legendaries (Loot Box)
+- **Pocket-Watch** - right-click to stop time for everything around you (5s, Version II 10s). **Sneak-right-click with a Netherite Ingot in your off hand to reforge it to Version II.** Long cooldown: 3 min, or 5 min for II. This one deliberately does *not* use the global tick freeze - a server-wide stop cannot exempt its own wearer, so it would freeze you too and do nothing. It suspends every other creature individually instead, so you keep acting.
+- **Chrono Shard** - rewinds you to where you stood five seconds ago *and* to the health you had then, so getting knocked from 20 hearts to 8 can be undone. 60s cooldown.
+- **Hourglass of Haste** - 8s of Speed II, Haste II and Jump Boost, then the bill comes due: 3s of Slowness II. 90s cooldown.
+
+### 🧬 New enchantment: **Aging**
+- Every hit ages the target. At **5 stacks** the years catch up at once - a burst of damage plus Slowness - and the stacks are spent. Stacks decay after 6 seconds. **Bosses cap at 4 stacks**, so a boss can never be cheese-loop-burst by an infinite stack engine. Drops from the Time Lord and spins in his loot box.
+
+### 🔧 Fixes
+- **Every spawner was recorded as owned by the literal name "unbound".** The display fallback (`spawnerOwnerName` returns `"unbound"` when no name is stored) was being read by the record-writing path, so a spawner item carrying an owner UUID but no name re-bound itself with the placeholder - and the placeholder became the real owner name, permanently. The display form and the stored form are now separate methods, records are self-healed on load (owner known, name missing), and names are kept in a cache inside `spawners.json` that refreshes from the online players, so the repair survives restarts and works for owners who are offline.
+- **`/ff restore` opened the wrong screen** - the soulbound/snapshot `RestoreMenu` instead of the recovery preview-and-confirm GUI. Bare `/ff restore` now opens the recovery GUI (in-game) or prints its preview (console), `/ff restore confirm` runs it, and the old screen moved to an explicit `/ff restore self`.
+- **Backpack and bundle contents could be wiped by dying.** Contents were only written back to the item when the menu closed, so the item in your inventory was stale the whole time the menu was open - dying (where the death path copies the item before the menu closes) saved a pack missing everything added since it was opened. Both menus now persist on every content change, making the item the single source of truth.
+- **The Wormhole Potion was a flat black blob.** A potion item renders from its `potion_contents`; without it the client has no colour or overlay to draw. It now carries a purple custom colour on a water base (no stray effects - the warp is the mod's own logic).
+- **`/ff boss wipe`** - ends every tracked fight now: the Time Lord's boss is discarded, his bar removed and any frozen tick rate **released**, then all remaining boss bars are cleared. Unlike `/ff boss clear`, which only forgets the bars.
+
+### 🔨 The Item Forge could not upgrade anything it was supposed to
+- **Fixed: no armour or weapon legendary could be upgraded at all.** The forge checked rune fusion *before* the upgrade branch, and "socketable" means any weapon or armour piece - so a Slime Boots (or a Wither Crown, a Glacier Cloak, a Warlord's Axe...) with its set's upgrade material in the material slot was read as a botched rune attempt and refused with *"Weapons and armor take a Rune in the material slot"*. It now recognises its own upgrade materials and falls through to the upgrade, and rune fusion on a legendary still works when the material really is a rune.
+- **Forge legendaries also shift-click into the forge again.** They were only routed to the target slot if they were "enchantable targets", which the unbreakable ones (Slime Boots) are not, so the only way in was dragging by hand.
+- **Locked in by a new gate.** `ffSelfTest` now carries `forge.legendary-upgrades`: every upgradable legendary is forged through the real API from its own tier up to **Tier III** with its own material, and the build fails if any of them comes back empty. That check is what turned this from a guess into a proof - and it immediately flagged a second thing, the *Multidimensional Army* being handed out at Tier III (which is intended, and now documented in the check).
+
+### ⚔ Enchantments the mod means to have
+- **Impaling hits anything in water.** Vanilla's condition was `#minecraft:sensitive_to_impaling` (aquatic mobs only), so impaling a drowned that was standing in a lake did nothing. The condition is now "the target is in water", and Impaling can also go on swords and the mod's melee weapons - not just tridents.
+- **Infinity works on crossbows**, and **Breach works on swords and axes** as well as maces.
+- **Protection types combine.** Vanilla makes Protection, Fire Protection, Blast Protection and Projectile Protection mutually exclusive; `exclusive_set/armor` is now empty, so one chestplate can carry all four. (Damage enchantments - Sharpness, Smite, Bane, Breach - were already freed the same way.)
+- These are datapack overrides shipping as `data/minecraft/enchantment/*.json` plus the mod's own item tags; a wrong tag reference makes the whole enchantment fail to load, which is exactly what the first attempt did until the tags were added and the datapack was verified loading clean.
+
+### 🔧 Fixes found while building him
+- **The Wither Loot Box rendered as the King's box.** Both are chest items and both claimed `custom_model_data 4550005`, so the resource pack could only ever resolve one of them. The Wither box now has its own id and its own ashen texture.
+- **The Elder Warden Loot Box had no model entry at all** - it rendered as a plain chest. Added to the chest definition.
+- **Loot boxes could be placed as real chest blocks.** `isNonPlaceable` was missing four of the boxes (including the Wither, Elder Warden and Time Lord boxes), which would have turned a box into an unreachable chest block.
+- **The other loot boxes and the Upwards Hopper were missing from `/ff give`.** Four handled item types had no catalog entry at all, so an admin could not hand them out.
+- **Recipes can no longer produce a different item than the code expects.** `ffAuditSources` now cross-checks every crafting recipe's `custom_data.ff` type and `custom_model_data` number against `ModItems.java`. If they drift, the crafted stack is an item no code recognises - which is exactly how a craftable token ends up "not working".
+- **The item right-click surface is now asserted, not eyeballed.** The self-test requires every custom item type in the `/ff give` catalog to be either registered with a right-click handler or explicitly declared passive, so a new item cannot ship as a dead item that does nothing. A second gate compares the declared predicate list against the predicates `onUseItem` actually tests, so the table cannot drift out of step with the dispatch chain.
+- **The self-test now literally clicks every item.** `items.use.invoke` drives the real right-click chain on a headless player (Fabric's fake player, which carries a dummy connection so chat and menus do not throw) and fails the build for any item whose click nothing claims. It does not assume one shape of "right-click": it tries a plain click, a sneak click, a click with a **socketable in the other hand** (a rune clicked bare is *supposed* to do nothing), and the worn-gear poses - **worn in each armour slot, empty hand, sneak** and **empty-hand sneak right-click on a block** - because the mask, shroud, sculk sense and Warlord's Rage fire from the armour slot through the block path, not from the hand. An item only passes by resolving the click or by being listed as passive or as deliberately deferring to vanilla (the two bows, whose right-click is the vanilla draw). Current result: **55 items invoked - 44 acted, 9 refused with their own reason (cooldown / condition, which is a working handler), 2 defer to vanilla, 0 dead, 0 threw.** Everything the probe summons or drops is swept afterwards - including ending any fight the Space-Time Rift started and releasing the time stop - so the check never leaves the world it measures changed.
+- **Two items were lying about having a right-click.** *Warlord's Axe* (its Rage is on-hit and per-tick) and the *Raiders Item Upgrader* (an Item Forge material, "NOT a block") sat in the handler table claiming a click that nothing implemented - which is exactly how a "handled" item hides a dead one. Both are now declared passive, and the new probe is what caught them. It also proved itself: with the Hourglass dispatch temporarily neutered, the gate failed with `items.use.invoke -> item(s) did nothing when right-clicked: [hourglass_of_haste]`.
+- **`ffAuditSources` now scrubs iCloud conflict copies first.** A resurrected `chair 2.json` inside `src/` used to fail the audit for the wrong reason.
+- **The Vanilla clock dial is preserved.** The Clock's item definition dispatches on the in-game time; the override embeds the vanilla definition verbatim as its fallback, so ordinary clocks keep their dial. The overrides for all four new base items are generated by `tools/make_item_definitions.py`, and the new textures by `tools/make_time_lord_textures.py`, so the art and the dispatch tables are reproducible.
+- **The bundled resource pack was rebuilt** (`fortuneandfavors-resourcepack.zip`) with the 14 new files (5 models, 6 textures, 2 item definitions).
+
+## 1.0.48
+
+### 🧪 The mod now tests itself (run this before every release)
+- **`./gradlew ffAuditSources`** - a second-long static audit, wired into `check` so it also gates `build`. It fails on: any shipped datapack JSON that does not parse, any crafting recipe whose recipe-book **unlock advancement** is missing or vice versa (the recipe would be invisible in the book), any **menu class that no code opens** (an unreachable feature), and any command `/ff help` advertises that is not actually registered.
+- **`./gradlew ffSelfTest`** - boots a headless dev server, asserts the runtime surface, writes `build/ff-selftest.json`, and **fails the build** if anything is broken. 16 checks: every item in the `/ff give` catalog (real, named, unique alias - no unreachable or ambiguous items), every **claim / spawner / machine recovery path** (the preview counts one line per recoverable record, a seeded record is detected and then the file is restored byte-for-byte, and applying twice merges nothing the second time), data-file integrity plus "writes are enabled" for every manager, the join-time **registry fingerprint** (non-empty and stable, so it can never reject a legitimate join), the documented command surface (and no registered command that is an empty shell), and every recipe unlock actually loading.
+- **Removed a dead menu.** `ForgeMenu` (the old "Boss Forge", superseded by the placeable Item Forge) still compiled but nothing had opened it for several versions - 305 lines of a feature that looked present and was not. The audit task now fails if any menu becomes unreachable again.
+
+### 🎵 Backpack Jukebox now actually plays
+- **Fixed the silent jukebox.** The music was being killed on the very next tick whenever the pack carrying the disc was in the **off hand** (or open in a menu) - the "is it still there?" check only ever looked at the main inventory. Hands, the off hand and the open backpack menu are all checked now, and a short grace window absorbs transient states so the song survives menu swaps and dimension travel.
+- **No more silent failures**: the server sends the track as a **sound-event id** the client resolves from the plain sound registry (the old datapack song lookup could fail quietly), failures are logged, and the client **re-starts a song that the engine ever drops** instead of going dead.
+
+### ☠ The Wither - a much bigger, louder fight
+- **New attack: WITHER NUKE.** It roots itself, telegraphs the blast radius with a growing ground ring, then detonates - a boss-sized explosion, a launch shockwave out to 22 blocks, heavy wither and a lingering hazard pool in the crater.
+- **Five more moves**: **Soul Nova** (a 360° ring of skulls), **Skull Rain** (skulls called down onto every nearby player, with a marked impact zone), **Wither Drain** (a sustained soul-fire beam that damages, withers and heals the boss), **Soul Pull** (reels players in, then bursts) and **Shred Blink** (teleports behind its target and bites). Ability cooldowns were tightened so it cycles faster.
+- **Better VFX everywhere**: a permanent soul-fire/smoke aura (thicker in phase 2), a rotating purple ring once supercharged, a bigger arrival show (expanding rings + a harmless lightning crown), a longer death ceremony with a rising spirit spiral and lightning at the star, and lightning around the body.
+- **Normal wither name**: the entity is just **"Wither"** ("Wither King" when promoted) - the Ascended branding only appears in the boss bar and announcements. Fight identity is now tracked with **entity tags** instead of parsing the display name (which used to re-adopt a reloaded fight as a KING).
+- **Supercharge it with a Trophy**: offering a **boss trophy** (King Wither Skeleton Trophy, Boss Trophy, ...) mid-fight supercharges it - +25% max HP, more armor, more speed, shorter cooldowns, at least 60% health back, a purple aura, lightning rings and a purple boss bar. The **Wither Skeleton Skull** king promotion is unchanged (summon window only).
+
+### 🎁 Wither Loot Box
+- The Wither now **drops its own Wither Loot Box** (two for the King). It spins the wither legendary pool - **the three wither legendaries: Wither Skeleton Blade, Crown and Staff** - with its own menu title, and `/ff give witherloot` hands one out for testing.
+
+### ⛏️ Excavator is honest now
+- **Excavator double-drops and auto-smelt only fire on naturally generated blocks** - placing a block and re-mining it no longer farms free perk procs.
+
+## 1.0.47
+
+### ⬆ Upwards Hopper (exclusive shop, $7,500)
+- **A shop-only machine with NO crafting recipe**: looks like a hopper, behaves the opposite. It **pushes items UP** into the container above, pulls **down** from the container it points into, and overflows **side-to-side like a normal hopper**. Two stacked upwards hoppers circulate instead of jamming.
+- Right-click it for its info/effects; sneak-right-click to pick it up like any machine.
+
+### 🪧 Chest shops modernized
+- **Buy & sell signs now glow** with enchanted glint, richer lore (shop ID + the chest shop's live settings) and a clearer "owner + right-click to configure" line.
+- **Re-clicking your own existing shop sign no longer errors** - it now reopens the config menu, so changing prices is a single click instead of sign demolition.
+- The **SELL button in the shop menu shows the live total** you're about to receive, and sell stacks carry a price-hint lore line.
+
+### 🏰 Guilds: ranks, mail & the score fix
+- **PvE and PvP score now actually increase.** The score calls sat deep inside one giant entity-death handler, so any exception in boss/revenant/raid code above them silently skipped both (and duels skipped them entirely). Guild scoring is now isolated in its own guarded hooks and **duel kills count**.
+- **Guild ranks added**: **Founder / Officer / Member** with a golden crown, name prefix, and roster display. Officers can invite; **only the founder promotes or demotes** via `/guild promote|demote <player>`.
+- **Guild Mail added**: officers and the founder can send items + a note to members via `/guild mail <member> [subject]` (sends the item you're holding). Recipients claim attachments from the **Mail button in the guild menu** (or `/guild mail`) - attachments wait safely in the mailbox even offline, and mail expires after 7 days.
+- **Stab Shot milestone is now recurring**: every **30 guild PvE score** a member personally earns grants *them* one Stab Shot straight to their inventory (or their guild mailbox if offline). The one-time PvP-30 founder reward is unchanged, and the guild skills menu shows live progress toward the next reward.
+
+### 🪑 Chair seat fixed
+- Sitting no longer floats you **on top of** the chair - the seat stand was spawning too high. You now sit properly *inside* the chair (and the old bogus height-limit popup that came with it is gone).
+
+### 💰 Expeditions nerfed
+- **Chests pay out exactly ONCE per run** - looting the same chest repeatedly (or re-entering and re-opening it) is dead; looted chests are renamed "Looted Chest" and remembered.
+- **Chests are scarcer**: loot-chest rooms dropped from 25% to 5% of rooms (exactly one chest), treasure rooms 5% (one rich chest), cache/fountain rooms halved; the big-hall rich chest went from two to one.
+- **Per-run chest cap: $25,000** from chests alone. Once hit, further chests pay nothing (ores and mob kills are uncapped), and the HUD still counts everything you've earned.
+- **Void expedition chest payouts cut** (~100-2500 per chest, rich chests x2) - it used to print money.
+
+### ⚔️ Enchanting fixes
+- **Removed the offhand tome quick-fuse** ("hold a tome and right-click with the weapon in your other hand") - it hijacked right-clicks and could eat your weapon (one player lost a crossbow this way). Tome fusion now happens only in the **Item Forge** or on an **anvil**.
+- **Revolver now truly supports Infinity**: with Infinity fused onto the revolver, the cylinder never consumes arrows - it synthesizes bolts when you're out, so all 6 shots fire every reload cycle.
+
+### ⚠ Dangerous Mining Zones rework
+- **Zones are now richer and worth the risk**: each zone is **seeded at generation** with bonus deepslate ore veins baked into its walls (coal through diamond/emerald, with a small **ancient debris** chance) plus a few soul torches so the pocket is visible. Up to **3 zones** now roll per start (was 2), with a fallback pool so a start without sealed pockets can still get a zone instead of silently spawning nothing (a warning is logged if all else fails).
+- **Better payouts**: zone ore sells are up from 70% to a **55% double-drop** chance plus a **bigger cash bonus** (⅕ of the ore's value, was ⅐) and a small **mining XP kicker** on top.
+- **Deadlier mobs**: cap raised to 8 hostiles (was 6), spawns 2-3 at a time, and the mix is nastier - **cave spiders and witches** join the roster, with a **30% chance of tier-2 variants** (was tier 1-2 at 50/50). Zone mobs that wander out are swept back so tiered mobs don't leak into normal caves.
+- **Zone placement is smarter**: zones never spawn inside **land claims**, never overlap each other, and sit deeper (Y -8 to -32).
+
+### 🚫 Anti-dupe: zones only pay on natural ore
+- **Placed blocks no longer pay the dangerous-zone bonus.** Every player-placed block is tracked (creative included), so the old exploit of **placing diamond/emerald ore inside a zone and re-mining it** for infinite bonus cash and drops is gone. Placed ore inside a zone breaks normally - it just pays nothing extra.
+- The bonus now **only applies to ore blocks** (all overworld + nether ores and ancient debris). Stone, deepslate and everything else mined inside a zone pays nothing extra, so the zone is a real gamble on real ore.
+- Creative mode never pays the bonus (matching Mining Pity's rule).
+
+### 📉 Skills are harder to level
+- **XP curve is steeper**: each level now needs `25 + 45×level` XP (was `20 + 40×level`) - early levels are only slightly slower, but **levels 8-10 take noticeably longer** (total to 10: ~2,275 XP vs ~1,820, +25%).
+- **The permanent ×1.5 XP bonus is gone.** It's now a **fast-start bonus that fades out**: ×1.5 at skill level 0, shrinking to ×1.0 by level 4.
+- **XP-boost upgrades were nerfed across the board**: Prospector, Sow & Reap, Timber, Schmoozer and Arcane Focus now give **+15/30/45% XP** (was +25/50/75%, or +20/40/60% for Schmoozer).
+
+## 1.0.45
+
+### 🪑 Chairs
+- **Chairs are no longer craftable** - the 2-plank recipe is gone. Chairs are still obtainable from the **shop** (Exclusive, $150) and `/ff give chair`.
+
+### 🐛 Ascended Wither fixes (bug & performance audit)
+- **King promotion can no longer be used as a free mid-fight heal** - the right-click window was inverted, accepting offers *after* the fight started (skull consumed, full heal, ×1.5 HP) and rejecting them during the actual summoning show. It now only works while the summon animation is running, as intended.
+- **Re-adopted withers are no longer auto-promoted to KINGs**: a wither whose chunk unloaded and re-adopted on return was detected by max-HP (>300), which every Ascended Wither satisfies - silently making every resumed fight a King with a full heal. Detection is now by custom name; re-adopted fights keep their current health instead of healing to full.
+- **Domain soul-sand restore fixed**: the arena ring was placed one block above where restore looked, so the carpet stayed forever (and could smother builds). Placed/removed positions now match exactly, and the ring uses soul soil (no mob-spawning) while player soul sand inside the ring is never eaten.
+- **Death sequence is now fully invulnerable**: /kill or void damage during the 7s death animation bypassed the gate and fired vanilla death on top of it (double nether star + loot).
+- **Anti-burrow rebuild restores block entities** - carved chests/furnaces/spawners come back with their contents instead of as empty husks; rebuilds survive chunk unload/reload instead of being silently dropped; blocks built into the hole meanwhile are respected; and the claim check now happens before capture.
+- **Orphaned Wither Knights are swept** - a crash mid-fight left named, persistent, armoured knights standing around forever; they're tagged and cleaned up like the animation displays.
+- **Underground fights spawn knights/mist at the arena level** instead of on the (possibly 40+ blocks away) surface heightmap.
+- **Performance**: wither-mist pools and homing skulls tick once per server tick instead of once per concurrent fight (double-ticking doubled wither stacks and particles with two fights live); per-ability log spam demoted to debug; early-exit also covers pools/seekers/transforms; display spawn/death animations actually animate now (final transform is applied on a later tick instead of overwriting the start transform same-tick).
+
+### 📚 Loot balance
+- **Custom enchant tomes no longer spawn in generated chests** - every randomly generated chest (dungeons, mineshafts, temples, strongholds, everything) used to roll a hidden tome pool, flooding exploration with enchant books. Tomes are now exclusive to their intended sources: **librarians**, boss drops, the forge, loot boxes and `/ff give`.
+
+## 1.0.44
+
+### 💀 The Ascended Wither (reworkable Wither boss fight)
+- **New Wither boss fight, toggle in `/ff config` ("Reworked Wither", **default ON**) - every summoned Wither is now the **Ascended Wither**: 600 HP, higher armour, and a move set instead of fly-around-and-shoot. Admins who prefer the vanilla fight flip it off in the admin menu; the toggle persists in config.json and reverts future withers instantly.
+- **Moves (phase 1)**:
+  - **Bedrock Charge** - locks on and plows straight through terrain (vanilla block destruction rules + claim protection still apply).
+  - **Burst** - nova knockback to escape melee combos.
+  - **Skull volleys** with occasional **homing seeker skulls** that steer after you - keep moving.
+  - **Anti-burrow skulls** - a piercing blue skull shreds up to 4 layers of soft *or hard* cover (dirt, stone, obsidian) toward you, punishing cheap bunkers. Every carved block is **restored ~6s later**, so the arena heals itself.
+  - **Wither Knights** - wither-skeleton waves summoned by phase 2 (4 per wave for the King, named/armoured).
+  - **Active side heads** - the left/right heads independently spit lingering **wither-mist pools** that wither anyone standing in them.
+- **Phase 2 (below 50%)**: the Wither **ascends** (temporarily immune to projectiles), then **slams down** onto its target's position - shockwave knockback, wither, and a shallow crater (rebuilt by Explosion Rebuild if on). Knights waves start here.
+- **The parry (30% HP)**: once per fight the Wither raises a **skull shield** that reflects arrows and bolts back at their shooters for 10 seconds - switch to blades.
+- **Domain Expansion** (phase 2, occasionally): a soul-sand sanctum. Everyone inside is **withered for real** - the domain's wither bypasses the **wither skeleton crown** (crown regen-strip is suspended inside the sanctum, so even crown wearers wither) - plus the boss's own dark damage, a soul-sand ground ring, and **any withered player damaged near the Wither feeds it** (2× for the King - don't stay withered!).
+- **The King fight**: while a summoning Ascended Wither is rising (**~13s window - watch for the hint**), **right-click it holding a Wither Skeleton Skull** to offer it - a **KING** takes over: ×1.5 HP, faster, harder-hitting, bigger skull fans, Royal Wither Knight waves, and it **siphons healing from players still suffering wither** near it (don't stay withered!). Balanced for survival: no potion/food drain, no gear destruction, and its death drops extra wither skeleton skulls + **Wither Essence** alongside the nether star.
+- **Cinematics**: a longer **summon animation** (soul-fire spiral, rising soul-sand pillars, shrinking cocoon shell, title card), a custom **death sequence** (soul pillars, a much **bigger explosion**, then a rising nether-star **item-display ceremony** with a light beam before the real star drops).
+- **Wither Skeleton Skulls can no longer be used as beacon payment** (they're the King's offering now).
+- Toggle lives in `/ff config` (the admin menu) and persists in config.json; disabling reverts future withers to vanilla instantly. Crash-safe: animation displays are tagged and swept if the server dies mid-show.
+
+## 1.0.43
+
+### ⚡ Server performance boost (tick loop overhaul)
+- **/ff perf (OP)**: a live profiler for the mod itself. Shows the server's MSPT/TPS plus every Fortune & Favors tick system sorted by how much of the tick budget it eats (avg + worst 5s spike, color-coded). `/ff perf off` stops it entirely (zero overhead) - so "the server feels laggy" now has a first answer instead of guesswork. The profiler rides the mod's existing safety wrapper, so nothing else had to change to get per-system numbers.
+- **Per-player tick handlers are gated on the gear that needs them.** The possessed-mask, mindbinder-shroud and sculk-sense ticks (each a nearby-entity scan) now run only for players actually wearing that piece; the death/bounty compass ticks only for players actually holding one. On a normal SMP (nobody in boss gear) this removes up to **5 entity scans × 20/s × every online player** that previously ran unconditionally.
+- **Legacy weapon reapply is gated on material** (sword/axe tag) before touching the item's custom data - previously every player's held item had its whole NBT tag copied 20×/s to check for a Legacy enchant that was almost never there.
+- **Wall-clock schedulers poll once a second instead of every tick**: contracts, player raids, lottery draw check, bank interest, the newspaper and the weekly leaderboard rollover all did date/time parsing 20×/s for events that fire at most once per day/week. The lottery, newspaper and challenges were additionally doing a full string rebuild per tick; now one `System.currentTimeMillis()` compare.
+- **Boss entity lookup no longer scans every dimension every tick.** Each active boss remembers its level (self-populating cache with a full-scan fallback), and the boss-bar player-add scan runs 1×/s instead of 20×.
+- **Tab-list dimension-change detection is allocation-free**: identity-compares the dimension key instead of building and comparing two strings per player per tick.
+- **Custom-enchant checks got a fast negative path**: `has()` for the many level-1 enchants answers from a containment check, and the Legacy weapon test checks the material tag before reading any custom data. These run inside every combat, projectile and per-player tick path.
+- Everything is behavior-preserving: same effects, same cadence for anything a player can notice, same fail-safe wrappers. Run `/ff perf` before and after on a busy server to see the difference (the mod's own share of the tick typically drops to well under a millisecond when nobody is wearing special gear).
+
+## 1.0.42
+
+### 🧹 Floating popup leak fixed (the "Sticky!" stacking bug)
+- **The bug**: proc popups ("§aSticky!", "§7Seismic!", "§c♥ +4", ...), possessed-mask price labels ("§a$12"), and grave name labels are real floating-text entities. They were spawned **without any marker**, so when the server crashed or was force-quit (before their 1.5s expiry sweep ran) they were saved into the world — and on reload nothing owned them anymore. Every crash stacked a few more, forever. On an SMP with fights and mask users this piles up into thousands of ticking text displays and visible server lag.
+- **Every popup is now tagged at spawn** (`ff_display` + `ff_display_tmp` for ephemeral ones; grave labels get `ff_display` only) — no TextDisplay the mod spawns is anonymous anymore.
+- **A stale-display sweep runs at startup and every 5 minutes**, discarding:
+  - tmp-tagged popups that the live systems no longer track (crash leftovers, and mask labels whose wearer logged out mid-glow — a second leak found while fixing this one);
+  - tagged grave labels whose player-head skull is gone (e.g. removed with worldedit);
+  - **untagged strays from older builds**, recognized by their exact old popup texts + the old spawn pattern, so your current world's existing pile gets cleaned without touching admin decor or vanilla displays.
+- Live popups and mask labels are tracked in memory, so the sweep can never blink an actively-shown popup; if a mask-wearer returns to a mob whose orphaned label was swept, the mask-sense system now **adopts the surviving label** instead of stacking a duplicate.
+- Sweep results are logged (`Discarded N stale floating-text display(s)`), so you can see how many were eating your TPS.
+
+## 1.0.41
+
+### 🗡 Lunge is now the vanilla spear + vanilla lunge enchant
+- The Lunge Spear is now exactly what it was always supposed to be: a **vanilla `minecraft:[material]_spear`** (wooden → netherite) enchanted with the **vanilla `minecraft:lunge`** enchantment. No trident, no custom tome enchant.
+- The mod's signature move is unchanged and now keys off the real thing: **right-click a vanilla spear with `minecraft:lunge` on it while wearing an elytra** to dash in your look direction (2.5s cooldown, spear SFX + spark ring / cloud trail / end-rod streak / sonic boom / gust VFX, Sky Spears + Spear Rampage advancements).
+- **Any spear works** — wooden, stone, copper, iron, golden, diamond, netherite — as long as it carries `minecraft:lunge` (enchanting table, anvil, or loot; 26.2 ships the enchantment and the `#minecraft:enchantable/lunge` → `#minecraft:spears` tag natively).
+- **The custom `ff_lunge` tome enchant is removed**: no more Lunge tomes from bosses, loot chests, librarian trades, or the recipe/creative menus.
+- **`/ff give lunge` / `lungespear` / `spear`** now hands out a **netherite spear with Lunge III** (vanilla item, vanilla enchantment tooltip).
+- Existing old tridents/tomes with the custom `ff_lunge` tag go quiet — they no longer trigger the dash; craft/enchant a real spear instead.
+
+## 1.0.40
+
+### 🏷 Tags & Titles fixes
+- **New "Show Tags & Titles" toggle in the /tags menu** (row 1, next to the position setting): flip it and your tag and title disappear everywhere - chat and the tab list - for everyone. Per-player, saved per player, and the tab list refreshes instantly.
+- **The server-wide Tags feature toggle actually turns tags off now**: it used to leave stored/custom tags visible (only titles and the Owner fallback hid), so "tags off" looked half-broken. Now everything cosmetic disappears when it's off, and the change applies to the tab list immediately. Only the bounty-system ☠ WANTED marker stays - that's gameplay info, not cosmetics.
+- **Creator title/tag overlap fixed**: if the mod creator has an older title active, it no longer renders next to the automatic "Creator of Mod" tag - the tag is the canonical one and any old title is suppressed, so you can't get `[Old Title] Poorboy7890 [Creator of Mod]` anymore.
+
+## 1.0.39
+
+### 🛋 /ff afk
+- **`/ff afk`** marks you away - the tab list shows a gray **`[AFK]`** marker on your name (next to your title/tag/dimension icons). Run it again to clear.
+- **Auto-trigger**: stand completely still (no movement, no turning) for **5 minutes** and you're marked AFK automatically.
+- **Auto-clear**: move, turn, or type a chat message and the marker vanishes instantly (and the tab list refreshes right away).
+- Fully server-side, session-only - logging out clears it, and vanilla clients see the marker with no extra mods.
+
+## 1.0.38
+
+### 💥 Sonic Boom (elytra speed)
+- **Port of the Sonic Boom mod you played with** (it was built for 1.21.8; it's now part of Fortune & Favors on 26.2, fully server-side so vanilla clients see and hear everything).
+- Glide at **~1.7+ blocks/tick with an elytra** for just over a second and you break the sound barrier: a **thunderclap heard for blocks** (warden boom sound), a **shockwave ring** + spark ring + air burst, and a **one-second forward launch** in your look direction.
+- The boom then needs **60 seconds to recharge**; the first one ever awards the **Sonic BOOOOM!** advancement (once per player).
+
+## 1.0.37
+
+### 🧭 Waypoints save the moment you set them
+- Waypoints (and last-death records) were only written to the world file on the 2-minute autosave sweep, so a crash or quick quit could lose them. Every set / remove / clear now writes **immediately** to the world's `wormhole_waypoints.json` - they live in the world's own data folder, so they are per-world and survive restarts.
+
+### 🎒 Backpack features are now forged in, not built in
+- **Nothing comes with a fresh backpack anymore.** The Workbench, Ender Chest and Jukebox toolbar buttons are only present after the matching Item Forge fusion, and unfused packs show a grayed "Not installed" placeholder telling you what to fuse:
+  - Backpack + **Crafting Table** → Workbench button
+  - Backpack + **Ender Pouch** → Ender Chest button
+  - Backpack + **Jukebox** → Jukebox button (new fusion - the Item Forge routes jukeboxes into the material slot)
+
+### 🎧 Jukebox stereo fix
+- Your own disc music used to play hard-panned to one side (the sound's position was being fed world coordinates while flagged listener-relative). It now plays dead center and follows you by definition. Nearby players' boombox playback is unchanged.
+
+### 🎒 The backpack is now a real base-on-the-go
+- **Workbench must be built in**: the Workbench button no longer works on every backpack. Fuse a **Crafting Table** into the backpack in the **Item Forge** (backpack + table, table is consumed) and the pack permanently gains a built-in Workbench - its lore says so too.
+- **Workbench actually opens the crafting GUI**: the old button silently failed because the vanilla crafting menu closes itself unless it was opened next to a real crafting table. The backpack's crafting menu now works anywhere - a full 3x3, no table needed.
+- **Jukebox! MUSIC on the go**: the "??? Coming soon" placeholder is now a **Jukebox**. Click it with a music disc on your cursor - the disc disappears into the pack and the song starts playing, **following you** (full volume wherever you walk). It **never breaks or restarts** - when the song ends it seamlessly loops again. Click the jukebox empty-handed to **get the disc back** and stop the music. The disc is stored inside the backpack, so it survives relogs (music resumes when you reopen the pack), and closing the backpack never stops the show. Works with every vanilla + datapack disc; needs the mod's client for sound (vanilla clients just see the jukebox).
+- **Boombox broadcast**: the jukebox is a real speaker now - players who come within ~32 blocks of the owner hear the same song as a positional sound that tracks the owner with linear volume falloff. Walk out of range and it fades away (with a little hysteresis so the edge doesn't flicker); walk back in and the song picks up. Every boombox in range plays at once, and ejecting/stopping the disc silences the whole audience.
+- **Toolbar shift-click fix**: toolbar buttons (and the loaded disc) can no longer be shift-clicked out of the menu, closing a small dupe hole.
+
+### 🔧 26.2 launch crash fixed
+- The 1.0.36 build **crashed on startup** on 26.2: the Moonwalk enchant's mixin still injected into `getEffectiveGravity` with the old `(LivingEntity, ...)` handler shape, which killed the whole mod during mixin application ("Invalid descriptor ... Expected (CallbackInfoReturnable)V"). The handler now matches 26.2's no-arg method. Verified: dev server and client both boot with zero mixin errors.
+
+### 📜 /ff give menu catch-up
+- The item catalog (and `/ff give`) now includes everything that had fallen behind: **Repairing Membrane** (`/ff give membrane`), all four **Mystery Keys** (`commonkey`/`rarekey`/`epickey`/`legendarykey`) and the **Golden Apple Head** (`goldenapplehead`). The **Death Compass** (`deathcompass`) and **Bounty Compass** (`bountycompass`) were verified present.
+
+## 1.0.36
+
+### ⚔️ Legacy, runes, restore & lunge fixes
+- **Legacy bows nerfed**: full-power on release is gone - bows now charge 10% faster instead, so the draw animation plays properly and tap-spam is no longer instant max damage. The -30% damage tradeoff stays on swords and axes.
+- **Legacy works on fishing rods now**: rods were excluded from the enchant's applicable items, so the tome could never be applied. Fixed - the rod's faster bobber + knockback effects now actually trigger.
+- **Lunge spear removed**: there is no special crafted spear anymore - it's a normal trident with the **LUNGE** enchant (that was always what triggered it). The recipe, give alias and references are gone; `/ff give lunge` now hands out the LUNGE tome.
+- **Moonwalk fixed**: the old velocity nudge was being overwritten every tick by vanilla elytra physics. Gravity is now reduced directly while fall-flying with MOONWALK on the chestplate (25% per level), so the glide actually floats.
+- **Runes work in the Item Forge**: runes were falling through the slot router into the wrong slot and never reached the material slot, so fusion silently failed. They now route to the material slot and fuse exactly like the rune menu does (weapon runes only on weapons, armor runes only on armor).
+- **/ff restore no longer wipes inventories**: it used to clear the player's whole inventory first, then refill from a possibly stale snapshot - which nuked items picked up since the last snapshot and everything graves had just returned. Restore is now additive: snapshot items merge back into free slots or stack onto matching stacks, and nothing currently held is ever removed.
+
+## 1.0.35
+
+### ⛏️ Mining pity: creative-proof + cleaner VFX
+- **Creative mode no longer triggers pity drops** - survival/adventure players only, so creative is no longer a free resource faucet.
+- **Better, lighter VFX**: the pity pop is now a compact puff of dust in the dropped item's own color (iron gray, diamond cyan, emerald green, etc.) + a few gold sparks + a soft chime, replacing the three overlapping particle showers.
+- **Bug fixes**: placed-block tracking is now keyed by dimension + position, so a block you placed in the Overworld can no longer suppress a pity drop for a natural block at the same coordinates in the Nether/End. The placed-block map also self-prunes during heavy build sessions so it stays bounded.
+
+## 1.0.34
+
+### 🔮 Four new runes + armor rune sockets
+- **Rune of Reach** (+1 block melee reach while held) and **Rune of Lifesteal** (heal 1 heart on every hit) join the weapon lineup — seven weapon runes in total.
+- **Rune of Warding** (+3 armor, +1 toughness) and **Rune of Fortitude** (+2 max hearts) are the first **armor runes** — they socket into helmets, chestplates, leggings and boots and apply while worn.
+- The **Rune menu** grew to a 9x5 layout with a weapon-rune row and an armor-rune row; socketing, the right-click fuse, the Item Forge and the new **Bastion** achievement all support armor pieces.
+- New runes drop from bosses (Warden can drop Reach/Warding/Fortitude, Mindbinder can drop Lifesteal), Mystery Chests and raids; all four are in `/ff give` and the give catalog.
+- `all_runes` (now "all seven weapon runes") description updated; new **all_armor_runes** advancement.
+
+## 1.0.33
+
+### ⚔️ Duels: replay-mod friendly + bot fixes
+- The duel arena now **pre-generates every chunk** in the arena bounds before the fight starts, so the duel dimension fully exists server-side from second zero — replay/recording mods (ReplayMod, Flashback) no longer see a hollow, unloaded dimension.
+- **Bots take bow damage now.** Bot damage is intercepted before the vanilla invulnerability-frame gate, so arrows and other projectiles actually land instead of being swallowed by the melee-spam hurt cooldown.
+- **Bots stop cheating:** their melee is throttled by a per-bot tick window (no more machine-gun hits), and their strafe speed is capped to sane values.
+
+### 🏆 Custom enchant tomes in the wild
+- Every custom enchant tome can now be found in **randomly generated loot chests** (dungeons, temples, mineshafts…) — rarer tomes are weighted lower, Legacy is extra rare.
+- **Librarians (level 3+) sell random tomes** for emeralds on restock — one tome offer per restock, priced 24–40 emeralds.
+- Tome levels scale up to each enchant's max (Legacy is always level I).
+
+### 🎮 /ff is now an OP command hub
+- Bare `/ff` opens the **FF Admin Hub**: a GUI with every admin subcommand — Give Items, Config, Events, Restore, Gems, Vanish, Backup, Title, test bosses, Compass FX toggle, Claim Soulbound, Leave Realm, Help and Version. Each button runs the exact same command as typing it. Non-OPs get pointed to /menu instead.
+
+### 🕹 Other fixes & additions
+- **Playtime stats**: the Streak menu now shows your **total time on the server** and **first-join date** (tracked server-side, survives crashes/restarts).
+- **Bounty Compass** (craft: compass + redstone ring, or `/ff give bountycompass`) — a flame-thread points at the **highest-bounty player within 20,000 blocks** and right-click announces their exact position.
+- **Sculk Fruit** from the Elder Warden (also `/ff give sculkfood`) — restores hunger, 10s of sculk sight + regeneration.
+- **Legacy enchantment** is complete: swords/axes swing instantly but deal **30% less damage**, bows fire full-power instantly (spam-friendly), fishing rods cast a faster bobber that **knocks back** on hit.
+- **Death Compass FX toggle**: `/ff compassfx` (or the Admin Hub button) silences the grave-pulse tracking beam/beacon per player.
+- **Random teleport now reaches 1,000 blocks** from the wormhole potion.
+- **Tab-list name color fixes**: prefixes/colors now refresh on death and on dimension change, so your color never sticks after you leave a realm.
+- **Raid spawns polished**: raiders spawn on the surface near the player with a safe spawn-height search (solid ground + 2 air blocks), never stuck underground or inside blocks.
+- **Recipe fixed**: the Bounty Compass craft matches its lore.
+
+## 1.0.32
+
+### ☠ Death Compass
+- **A compass that remembers where you died** — craft it (compass + 4 soul sand in a cross), buy it from the **Gem Shop** (6 gems), or `/ff give deathcompass`.
+- **Hold it to track your grave**: a soul-flame thread reaches from your hand toward your last death location (through walls), and your action bar shows the distance + direction (e.g. "☠ Grave 132m NW"). Works across dimensions — it tells you which world the grave is in.
+- **Right-click for a sonar ping**: a soul-fire burst + end-rod beacon column marks the grave so you can see it across the map, the exact coords are announced in chat, and a bell + respawn-anchor sound plays. 5s ping cooldown.
+- **It goes quiet once you retrieve your grave** — claiming your grave clears the record. Death locations now **survive server restarts** too (saved alongside the wormhole waypoints), so the compass still works after a restart.
+- **Grave Hunter** advancement for your first ping.
+- 100% server-side: the tracking, particles and sounds all emit from the server and auto-sync to every client.
+
+### 🎒 Backpack workbench row
+- Every backpack now has a **toolbar row** under its storage: a **Workbench** button (portable 3×3 crafting table — works anywhere, no table needed) and an **Ender Chest** button (opens your shared ender chest wherever you are).
+- A **"??? Coming soon"** placeholder sits next to them — more backpack features are on the way.
+- Tiers 1–4 gained a full extra row (storage unchanged); the max-tier 6-row pack keeps its size and hosts the buttons at the end of its bottom row.
+
+## 1.0.31
+
+### 🗡 Lunge Spear is a normal spear with the Lunge enchantment
+- The Lunge Spear is no longer a special tagged item — it's a **regular trident enchanted with the mod's new Lunge enchantment** (`Lunge I`, shown in its lore like every other custom enchant).
+- The enchantment is what makes the lunge work: hold any **trident with Lunge** and **right-click** while wearing an elytra to dash in your look direction (2.5s cooldown, works gliding or on the ground). It still plays the **spear lunge SFX** (riptide whoosh + trident throw) and the spear VFX (spark shockwave ring, cloud trail, end-rod streak, sonic boom tip, gust burst).
+- The recipe now crafts a normal trident carrying Lunge I (phantom membrane + trident + phantom membrane), `/ff give lungespear` hands out the same item, and the enchantment is fully server-side — the server's use-item hook owns the move, so vanilla clients behave identically.
+
+## 1.0.30
+
+### 🪑 Chairs fixed + the Chair Menu
+- **Sitting works again** (and no more bogus "height limit" popup): the seat is no longer a zero-size marker stand (the classic position glitch), it's a small invisible stand with its Y clamped below the build limit — sitting near the top of the world can't trigger the build-height message anymore.
+- **Shift-right-click works again** — the old use-block hook returned early on sneak-clicks, so the pickup branch was never reached. Sneak-right-clicking a chair now opens the new **Chair Menu**.
+- **Chair Menu** (owner-only): shows the owner card (who owns it + exact position), a **Pick Up** button that returns the chair as an item (ejecting anyone sitting on it first), and **9 wood variants** — click Oak/Spruce/Birch/Jungle/Acacia/Dark Oak/Mangrove/Cherry/**Pale Oak** to restyle the placed chair in place, keeping its facing. The current style is highlighted with a glint.
+- The block still can't be mined — pickup is the only way to move it, so the item can never be lost.
+
+### 🌪 Wormhole combat lock
+- Taking any damage **combat-tags you for 3 seconds** — while tagged, every wormhole action (opening the window, warping to waypoints/respawn/death/random, requesting a player warp, even setting waypoints) is refused.
+- **Fully silent as requested**: no chat spam, no timers while you wait. The only feedback is when you *try* to warp while tagged — the wormhole window closes and one action-bar line tells you how long is left (e.g. "⚔ Combat tag - wormhole locked for 2.4s").
+
+### 🔮 Runes fixed and honest
+- **Fixed "using one rune blocks the rest"**: socketing (Rune Menu, Item Forge, and the two-hand quick-fuse) now consumes exactly one rune — the old path double-consumed a stack and could leave the menu in a state where nothing else could be applied.
+- **Rune fusion in the Item Forge**: put any sword/axe in the forge with a rune in the material slot to fuse it (same "one of each rune per weapon" rule, duplicates refused).
+- **Descriptions now match reality**: the Haste rune really adds **+8% attack speed** (the lore claimed 5%), and every rune card spells out the "one of each rune fits per weapon, they all stack" rule so the system is finally self-explanatory.
+
+### 🗡 Lunge Spear rework
+- **You lunge with the spear, not your jump** — the double-jump trigger is completely removed. Hold the new **Lunge Spear** (trident-style item, craftable: phantom membrane + echo shard + stick) and **right-click** while wearing an elytra to dash in your look direction (works on ground and while gliding, 2.5s cooldown).
+- **Spear sound**: riptide whoosh + trident throw instead of the elytra glide noise.
+- **Spear VFX**: electric-spark shockwave ring, cloud trail behind the dash, end-rod streak along your aim, sonic boom at the tip and a gust burst.
+- Get it from `/ff give lungespear`, the recipe, or the Recipe menu.
+
+### 🏆 12 new advancements
+- **Take a Seat** (sit on a chair), **Interior Designer** (restyle a chair into another wood), **Socket Sorcery** (fuse your first rune), **Full Rune Set** (all five runes on one weapon), **Sky Spears** (first spear lunge), **Spear Rampage** (lunge straight up), **Lucky Streak** (win the weekly lottery), **Bank Heist Insurance** (upgrade your bank), **Vault Tycoon** (max bank level 5), **Wayfarer** (set all 3 wormhole waypoints), **Key Master** (open a Mystery Chest), **Duel Champion** (win a PvP duel).
+
+### 📰 Smarter newspaper
+- **Weekly lottery sales**: when the pot is drawn, the paper reports how many tickets were sold for the pot and who made the **biggest buy-in**.
+- **Bank interest day**: the paper reports the **biggest interest payout** of the day (amount + who + their rate).
+- **More real interactions reported**: duel wins (mode + winner), guild **mine upgrades** (guild, level, cost), **bank upgrades** (player, level), alongside the existing boss kills, bounties, and auction stories.
+
+## 1.0.29
+
+### 🏦 Bank rework — one upgrade, five clear levels
+- **The whole bank is one upgrade now** (levels 1–5): each level raises the money vault, the XP vault, AND daily interest together — no more three separate upgrade tracks.
+- **Level 1 stores way less** ($50k cash / ~level 16 XP, down from $250k / ~level 30) and **upgrades cost far less**: $10k → $50k → $250k → $1M (was $25k → $2.5M across three tracks).
+- **Interest gets *better* with every level**: 0.5% → 0.75% → 1% → 1.5% → 2% per day, with the daily cap rising $500 → $200k. Still capped, so even maxed vaults grow slowly.
+- **UI rebuilt from scratch** — one tidy card layout: money row (deposit/withdraw half or all + meter), XP row (10 levels/all + meter), and a single **Upgrade Bank** button with the full level table on the help item. Old bank accounts and upgrades carry over (best tier kept).
+
+### 🛒 Gem Shop fixes
+- **Fixed the Mystery Key**: buying one now grants a *real* Mystery Key (opens the Mystery Chest menu) instead of a plain tripwire hook that did nothing.
+- **Fixed Tag Recolor**: it now actually resets your tag color to the default green (it used to hand you a plain name tag).
+
+### 🎰 Lottery seed pot
+- The weekly lottery now **starts with a $50,000 pot** (server-funded), and every new week's pot is topped back up to that seed — jackpots are never empty again.
+
+### ⛏️ Guild mine rebalance
+- Mine upgrade costs slashed: **$25k → $75k → $250k → $750k → $2.5M → $10M** (was $100k → $250M). The expensive tiers are actually reachable now.
+
+### 🎒 Shop cleanup
+- **Removed the Bundle from the Exclusive shop** — it was a reskinned backpack. It's still craftable (2 planks) and upgradeable at the Item Forge.
+
+## 1.0.28
+
+### 🛠 Crash fix: Cloth Config is now truly optional
+- **Fixed a startup crash** (`NoClassDefFoundError: me/shedaniel/autoconfig/ConfigData`) on installs without Cloth Config — the mod jar only *suggests* cloth-config, but the client entrypoint loaded its classes unconditionally, so any instance (like a minimal test profile) without it crashed on launch.
+- All config values now live in a plain state class that never touches Cloth; the config file (`config/fortuneandfavors.json`) is loaded/saved by the mod itself in the exact same format, so settings survive with or without Cloth installed.
+- **With Cloth Config present nothing changes**: ModMenu still gets the full Cloth screen, server settings still push to the server (ops only), and the OP join auto-push still fires once per join.
+- **Without Cloth Config**: no crash, client FX toggles still work from the shared file, and ModMenu simply shows no config button.
+
+## 1.0.27
+
+### 🔒 Config security (Cloth Config / ModMenu)
+- **Server settings can now only be changed by ops on that server.** Saving the config screen on a server where you don't have OP no longer touches the server at all — previously a save *could* send a config packet the server would apply, and a non-admin save also triggered a useless "not applied" request round-trip.
+- **OP auto-push**: if you're an op, your locally saved server settings (NKI, features, timers…) are **automatically applied when you join your server** — change NKI on in Cloth Config, join with OP, and it's on. Regular players joining never push anything.
+- Two ops can't bounce configs at each other: the auto-push fires only once, on join, and the server broadcast afterwards never re-pushes.
+- Client FX toggles (overlays, flashes, poses) keep working for everyone — those were always local-only.
+
+### ✨ Waypoint setting VFX
+- Setting a wormhole waypoint now plays a **purple portal-dust ring** that spirals outward around you, with **reverse-portal sparkles** climbing above it and a **respawn-anchor charge sound** — matching the existing warp effects.
+
+## 1.0.26
+
+### 🏦 The Bank (`/bank`, `/menu → Bank`)
+- **Two safe vaults**: a **money vault** and an **XP vault**, both stored server-side so **death and raids can never touch them**.
+- **Meters everywhere**: both vaults show a live progress bar — deposits stop exactly at capacity, so you can never overfill.
+- **Interest that can't snowball**: banked cash earns **daily interest** (~every 20 real hours) at a small rate that **tapers as your vault fills** — a $1M vault earns roughly $150/day no matter what, so 1M can never become 1B. The payout is also capped by your **interest cap**.
+- **Upgrades**: **vault capacity** ($25k → $100M in 5 tiers, paid in cash), **interest cap** ($1k → $15k/day, paid in cash) and **XP capacity** (≈ level 30 → level 120, paid in XP levels).
+- **Lossless XP**: the vault stores raw XP points using vanilla's exact level curve — deposit 5 levels, get 5 levels back. Deposit/withdraw by 5 levels or everything, on both vaults.
+- Interest is paid even while you're offline; the window explains every rule inline.
+
+### 🪑 The Chair
+- A **simple, cheap furniture block**: craft it from **2 oak planks** (vertical), buy it in the shop's Exclusive category ($150), or `/ff give chair`.
+- **Right-click to sit** — you actually sit on the seat, facing away from the chair's back. Sneak to get up.
+- **Sneak-right-click to pick it up** — you always get the exact Chair item back. The block **can't be mined**, so the server-side item can never be lost to a bad break; the pickup is the only way to move it.
+- Only the owner can pick it up. Chairs survive server restarts (they're tracked like every other machine), anyone who relogs while seated is re-seated, and anyone sitting on a chair is politely ejected when it's picked up.
+
+### 👋 A warmer welcome
+- The **first-join welcome menu** is refreshed: the intro now mentions the bank and XP vaults, includes a tip about the new Chair, and gained a direct **"Open Your Bank"** button so new players can protect their first earnings immediately.
+
+### 📚 Also
+- `/bank` opens the bank directly; the bank and chair are in `/ff help` (new `bank` topic) and the `/menu` hub gained a Bank button.
+- The chair is in the **Recipe menu** (`/menu → Recipes`).
+
+## 1.0.25
+
+### ⚙️ One config: Cloth Config only
+- **OneConfig removed** — Fortune & Favors now has a single config screen built on the **Cloth Config API** (ModMenu → Fortune & Favors, or the `client`/`server` categories). The bundled OneConfig screen was overriding Cloth's in ModMenu and the two configs fought over values; OneConfig is gone entirely (dependency, screen, and sync code stripped) so what you see is what applies.
+- **Raid Cooldown toggle added** — the last server option missing from the config screen (`raid_cooldown`) is now exposed alongside auction minutes, boss minions, backups and the rest, and round-trips through the server-sync payload.
+
+### 🎟 Weekly Lottery (`/lottery`)
+- **A server-wide jackpot**: buy tickets for **$100 each** (`/lottery` GUI, `/lottery buy <n>`, or the new button in `/menu`), max 100 per player per week.
+- **Draws every Monday at midnight EST** — one weighted winner takes **75% of the pot**, **25% rolls over** so the jackpot keeps growing; if nobody buys in, the whole pot carries to next week.
+- **Reported by the newspaper**: the draw is announced in chat and in the paper's new **LOTTERY** section (winner + jackpot), with the current pot shown on every other edition. Payouts go straight to the winner's balance, so it works even if they're offline.
+- Tickets, the pot and the draw state persist in `lottery.json` with the mod's normal autosave/backup handling.
+
+### 🥷 Admin vanish (`/ff vanish`)
+- **Stealth toggle** (OP): while vanished you are **removed from everyone's tab list**, become **invisible** in the world, and everyone sees you **leave the game**; run it again to reappear (they see you join). **Chat is muted while hidden** so you never blow cover. Perfect for scouting, staff supervision, or a quiet prank.
+- **Invisible to every targeting/tracking system** — not just the tab. A vanished player is excluded from `@a`/`@p`/`@s`/name selectors, `/tp` and `/execute`, every `EntityArgument.player()`-based command (`/duel`, `/balance <p>`, `/bounty`, `/trade`, `/guild invite`, boss/raid target resolution), the `/list`/online-name list, and the tab list — so nobody can look you up, teleport to you, or challenge you while hidden. Your own commands still work (self is always selectable), and all server housekeeping loops still reach you so effects, particles and saving keep running.
+- **Fully safe while hidden**: a vanished player takes **zero damage** (player attacks, mobs, fall, fire, void, TNT), and **mobs never pick them as a target**. So vanish is genuinely invisible *and* invulnerable.
+- **Armor (and its tell) removed**: while hidden your **armor is unequipped and stashed** so the ghost armor layer can't flicker around you and give your position away. It's kept safe on your own player — everything re-equips the instant you unvanish (or drop the game), so nothing is ever lost.
+
+
+## 1.0.24
+
+### ❄️ Ice Queen's realm can open again
+- **"The Snow Queen / Ice Queen's realm refused to open" fixed** — the `fortuneandfavors:snow_queen_realm` dimension was referenced in code but its `dimension` + `dimension_type` files were never bundled, so `server.getLevel(SNOW_REALM)` returned null and the portal silently cancelled. The realm's `dimension/snow_queen_realm.json` (void/flat generator, snowy biome) and `dimension_type/snow_queen_realm.json` (bright overworld-style sky, skylight, no ceiling) are now bundled, mirroring how the duel arena was fixed.
+
+### 📚 Creative tomes: every level, no fake ones
+- The creative menus (Fortune & Favors tab + Combat tab) now carry **every real level** of each custom enchant: the original five tomes at **I–V**, Sharpshooter / Recoil / Hunter's Mark / Heavy Bolt / Fragility / Combo at **I–III**, and single-level enchants (**Chainfire, Sniper, Revolver, Berserker**) at **I only** — no more meaningless Sniper II/III or Revolver II/III (their effects don't scale, so those levels were removed everywhere, including `/ff give`).
+- **Bolt Bringer is finally in the menus** — it's a real (registry) enchantment from the `boltbringer.json` datapack, so it never showed up with the NBT-based tomes. It's now in both creative tabs and `/ff give` (`boltbringer`, `boltbringer1-3`) as genuine enchanted books **I–III**. Because it's a real enchantment, it already works in anvils and the enchanting table natively.
+
+### ⚒ Custom enchants now work in anvils
+- Put any custom tome (original five or CC combat enchants) in an anvil with a sword/axe/mace/trident/bow/crossbow (either slot order) and it fuses like a vanilla enchanted book — small level cost (1–3), tome consumed on take, rename still applies. The pointless "custom tome + vanilla enchanted book" merge is blocked so the tome isn't eaten for nothing.
+
+### 🧿 Sculk Medallion is craftable at last
+- The Elder Warden's **Sculk Infused Medallion** now has its real crafting recipe (it was help-text-only, like the boss tokens): 4 echo shards + 4 gold blocks around a sculk sensor. Crafted medallions are byte-identical to `/ff give sculk_medallion` and summon the Elder Warden normally.
+
+### 🎒 Backpack recipe verified
+- Confirmed the backpack recipe matches the in-game item exactly (same type, tier, name, lore, skin) — it was never wrong, just poisoned by the stale duplicate files the 1.0.23 clean build removed.
+
+### 🛡 The jar can never ship stale duplicate files again
+- This project lives in iCloud Drive, which keeps resurrecting old `"name 2.json"` conflict copies into the build output (the clean build fixed it once; the next incremental build re-shipped them). The jar task now **excludes any `name <number>.<ext>` file outright**, verified by re-poisoning the build dir and confirming the jar stays clean — so a recipe/advancement/dimension datapack can never be silently broken by them again.
+
+## 1.0.23
+
+### 🛠 Boss crafting recipes actually craft (backpack & co. fixed too)
+- **All 5 boss summon tokens now have real crafting recipes** (they only existed as help text before — there were no recipe files, so you could never craft them):
+  - **Withering Memory** — coal corners + bone edges around a wither skeleton skull
+  - **Gelatinous Crown** — 8 slime blocks around a golden helmet
+  - **Boulder Baby** — 8 stone bricks around an iron block
+  - **Ominous Eye** — 4 eyes of ender around an ender pearl
+  - **Cryogenic Core** — 8 snow blocks around a diamond
+- Crafted tokens are **byte-identical to `/ff give` tokens** (same custom data, model, name, lore, glint) — the mod recognizes them and they summon the boss normally.
+- **Fixed the recipe-datapack killer**: the jar was shipping **104 stale duplicate files with spaces in their names** (`backpack 2.json`, `wool_to_string 3.json`, `fabric.mod 4.json`, ...) left over in the build output from old copies. Minecraft's `Identifier` rejects spaces, which could poison the whole recipe/advancement/dimension load — that's why the backpack, wool→string, distant memory shard, and everything else "didn't work". A clean build now ships **zero** stale files; all 8 recipes are confirmed in the jar.
+- Mod version bumped to 1.0.23 (jar was still 1.0.12 while the changelog had moved on).
+
+## 1.0.22
+
+### 🎒 Expedition chests pay cash — no items inside
+- Expedition loot chests no longer hold physical items. Opening one instantly pays a **random cash amount from that expedition's lowest-to-highest range** (Deep Mine $500–$1.5k → Boss Lair $3k–$10k, rich chests pay 3×) into your secured loot, multiplied by the type multiplier as before.
+- **Fixes the loot-spill bug**: when a new expedition regenerated a site, the new chest replaced the old one and dropped its contents on the floor. Empty chests mean nothing can ever spill again.
+- Chests are marked (Rich Loot Chest / Looted Chest) so each one pays out once; legacy chests from before this update still convert their leftover items to cash.
+
+### 📚 Custom enchant tomes now live in the creative menu
+- All **15 custom enchantment tomes** (Chainfire, Sniper, Revolver, Sharpshooter, Recoil, Hunter's Mark, Heavy Bolt, Curse of Fragility, Combo, Berserker + Life Steal, Sticky, Seismic, Mind Wrack, Frostbite) now appear as **grabbable items in the Combat creative tab**, alongside `/ff give` which still works.
+- They're NBT-decorated enchanted books (not new item IDs), so they render perfectly for vanilla clients and can't trip the datapack item-model crash.
+
+### 📖 Custom enchant tomes get descriptions (and actually work)
+- **Fixed: `/ff give` CC-enchant tomes (Chainfire, Sniper, Revolver, Sharpshooter, Recoil, Hunter's Mark, Heavy Bolt, Fragility, Combo, Berserker) couldn't be fused** — the forge/quick-fuse only recognized the original five tomes, so those books were useless. The forge, quick-fuse shortcut, Item Forge slot, and death-protection now all accept both tome families, and CC enchants apply onto weapons exactly like the originals (I–III, with proper max-level and Tome Saver handling).
+- **All custom enchant tomes now show a description** in their lore — `/ff give` books, creative books, and boss drops tell you what the enchant does (e.g. "Fires 4 extra arrows. Can't pair with Infinity.", "Deals +24% damage at long range.").
+- Fixed lore refresh bugs that duplicated the Chainfire and Recoil lines when re-applying enchants.
+- CC-enchant tomes now have a sell value in shops, consistent with the original tomes.
+
+### 🧭 Fortune & Favors creative tab (client-side)
+- New **"Fortune & Favors" creative tab** holding all 15 custom enchant tomes as grabbable items. Brand-new creative tabs aren't part of the server registry sync in 26.2, so the tab is registered client-side — vanilla clients don't see it (they still get the tomes in the Combat tab from the server-side addition).
+
+### 🌙 Day/night cycle no longer snaps back
+- The old per-tick watchdog force-re-enabled the daylight and weather cycle game rules every 10 seconds whenever they were off. That fight (with owners, other plugins, or `/time` commands) is what made the clock stutter and snap back after setting night. The mod **never sets the time of day** — the only interference was this watchdog.
+- The watchdog is gone. Instead the mod checks the cycle rules **once at server start** and repairs them if they were left off (e.g. legacy state from the old arena-clock freeze), then never touches them again mid-session. Setting night now sticks, and the weather cycle is left alone too.
+- Verified the Snow Queen's storm only affects her own realm (weather data is per-dimension) and that all custom dimensions share the overworld clock correctly via the 26.2 timeline system.
+
+## 1.0.21
+
+### 🏠 Claim protection — enforced at the source, fail-closed
+- **New `ServerPlayerGameModeMixin`**: claim rules are now enforced directly inside the vanilla break/interact methods, independent of the Fabric event layer. If the event chain is skipped, broken, or silently swallows an error, claimed land is still protected — and on any unexpected error the action is **denied** (fail-closed) instead of allowed.
+- The mixin covers breaking, block/fluid placement, and opening containers (non-shop chests, barrels, hoppers...) — shop chests stay openable by customers.
+- **PvP is hardened the same way** (`PlayerAttackMixin` on `Player.attack`): attacking a player inside a claim with PvP disabled is cancelled at the source, independent of the event layer.
+- **Claim denial messages are throttled** (one per 2 seconds per player) so the event layer and the mixin can both enforce the same rule without spamming chat.
+
+### ⚡ Tab list refreshes instantly
+- Equipping/unequipping a title or tag, recoloring, or changing your Title & Tag position now **broadcasts a tab-list update immediately** — other players see the change the moment it happens instead of waiting for the periodic refresh. Wired into the /tags menu and `/tag set|color|clear`, `/ff title`.
+
+## 1.0.20
+
+### 🏷️ Tags & Titles menu — chase what you haven't got yet
+- **Locked titles now show as grayed-out cards** in the /tags menu with their unlock condition and live progress (e.g. "Duelist: win 10 duels (currently 4)"), so you can see every title that exists and how close you are.
+- **All milestone tags shown with live progress** — "Veteran: day 9/14", "Centurion: day 45/60" — owned tags stay clickable to equip, locked ones show exactly what's left.
+- **Menu expanded to 9×6** to fit the full title catalog; the creator's exclusive title stays first.
+
+### ↔️ Title & tag position — your choice
+- New per-player **Title & Tag Position** setting (compass card in the /tags menu, cycles Default / Before / After):
+  - Default: `[Title] Name [Tag]` (as before)
+  - Before: `[Title] [Tag] Name`
+  - After: `Name [Title] [Tag]`
+- Applies everywhere your name renders — chat and the tab list — and persists per player in `display_prefs.json`.
+- **Fixed a latent bug**: `tags.json` was saved but never loaded, so tags/owned tags reset every server restart. It's now loaded at startup.
+
+### 🌙 Day/night cycle spam fixed
+- The duel arena used to freeze its clock by turning `doDaylightCycle`/`doWeatherCycle` off — but MC 26.2 game rules are **server-global**, so that froze the overworld's clock too, and the watchdog re-enabled it every 10 seconds, spamming the log. The arena clock freezing is gone (the void arena has constant light, so it never mattered) and the watchdog now warns **once per incident** instead of every 10 seconds.
+
+### ⚔️ UHC duels no longer disable regen for the whole server
+- UHC duels used the same global-gamerule trick to disable natural health regen — during any active UHC fight, **nobody on the server regenerated**. Natural regen is now blocked **per player** via `NaturalRegenMixin`: only the fighters in an active UHC duel are affected; everyone else (and spectators) regenerates normally. The global `naturalRegeneration` gamerule is never touched anymore.
+
+## 1.0.19
+
+### ⚔ Player raids raid YOU now (no village needed)
+- **Bell + Bad Omen works anywhere** — the old "no village close enough" block is gone. Ring a bell with Bad Omen (or use a Raid Banner) and the raiders come hunting the player, wherever you stand.
+- **Custom wave system**: 4-6 escalating waves of pillagers → vindicators → ravagers → witches → evokers spawn around the fight and are told to target the player. No vanilla village raid, no villagers, no village raids being hijacked.
+- **Custom minibosses at the end**: after the final wave the Warlord + Elder Evoker + Illusioner + Raid Captain + Evoker Lieutenant descend (existing boss bar, participation rewards and speed bonuses all still apply).
+- Raids now work underground too — raiders and bosses spawn at the fight's elevation instead of the surface.
+- Vanilla villager raids are completely untouched (no minibosses, no suppression).
+
+### 🏟️ Prison: combat zone actually works + zone-aware menu
+- **Arena waves auto-spawn**: the arena used to pay out its reward every few seconds and never start wave 2. Now each wave is rewarded exactly once and the next wave drops automatically after 10s, all the way to wave 10.
+- **Zone-aware Prison Menu**: opening the star in the combat zone shows sword upgrade + rank up + convert + **Return to Mine** + leave; at the fishing pond it shows the rod + rank up + convert + Return to Mine; in the mine you get the normal mining layout.
+- **Sword upgrades**: buy Iron → Diamond → Netherite prison swords (Sharpness scales 1→3, never breaks) with prison cash, from the combat-zone menu.
+- **Fishing rod**: entering the pond hands you an enchanted rod (Lure III, Luck of the Sea III, Unbreaking III, unbreakable). Catches pay $30-$80, and 1-in-20 "treasure" catches pay 5x.
+- **Return to mine**: a menu button (and chat message) teleports you back to your ore floors from the arena or pond.
+- **Map polish**: mine floors now have a full ceiling light grid; the pond got a raised stone rim, corner lantern posts, scattered lily pads, underwater glow and a wooden dock.
+
+### 🎒 Expedition fixes (part 2)
+- **Dispensers removed** — no more inventory-loads of arrows and loot scattered everywhere (trap rooms now use pressure plates + TNT only).
+- **No more beacons** in treasure rooms (sea lantern markers instead).
+- **Mob-den spawners are unbreakable** and properly configured per expedition type — you can't pick them up.
+- **Rooms can't seal off**: every chunk now has aligned center doorways so adjacent chunks always line up.
+- **Vault Guardian spawns on the entrance pad** — no more suffocating in a wall.
+- **Enemies no longer spawn on the roof**: spawn points are picked inside generated maze air.
+- **Glowstone exit pad always works** — returning to it escapes instantly, and a rare second exit pad can generate deep in the maze.
+- **Rewards nerfed**: mob kill cash halved, chest stacks smaller, mini-boss bonus halved.
+- **Mob variants are rare again** (~1 in 16 instead of every spawn) and no name tags anywhere.
+- **More rooms**: big halls, pillar halls, mob dens, cache rooms, plus a rare exit pad.
+
+### ⚔ Sword blocking — 1.8 directional
+- Blocking now reduces melee damage **only from the front** (the direction you're facing), like 1.8 — back/side hits do full damage.
+
+### 💎 Gem shop
+- Phantom membranes replaced by **Repairing Membrane**: put any item or armor in the Item Forge with one and it repairs to full durability. Only sold **1 at a time** per buy (was 4).
+
+### 📋 Dynamic contracts
+- Completed jobs no longer count toward the 8-contract cap — done contracts stop blocking new ones.
+
+## 1.0.18
+
+### ⚔ Sword blocking actually works again
+- **Blocking is back**: swords lost the `blocks_attacks` component in the 1.0.13 rework, so right-click never entered the blocking state and the 50% reduction never fired. `SwordBlockManager` now re-applies `blocks_attacks` to every held sword on tick (instant block, silent, no durability cost) — the vanilla blocking pose starts on right-click and the damage mixin halves melee hits again.
+- **The 50% mixin no longer skips melee**: it bailed out on `source.isDirect()`, which is exactly how every normal melee attack arrives — so blocking reduced nothing. It now reduces direct melee damage while still ignoring projectiles, fall, fire, and drowning.
+- **Distant Memory blocking never slows you**: the sword carries `use_effects` (full move speed, sprint allowed) so holding right-click to block keeps you at full speed; existing swords get it re-applied on tick.
+- **Attack while blocking**: left-click keeps swinging while holding right-click to block — for the Distant Memory sword and every other blade. Non-sword uses (bows, food) keep vanilla behavior.
+- **Gem shop / `/shop` verified elytra-free**: neither the gem shop nor the catalog sells elytra (End-exclusive, phantom membranes only).
+
+## 1.0.17
+
+### ⚔ Player raids — boss bar, 5 bosses, vex reinforcements, participation rewards
+- **Boss bar** shows combined HP of all raid bosses during the final phase, with live countdown of remaining bosses
+- **5 raid bosses** now spawn on victory instead of 3:
+  - §c§lRaid Warlord§7 (Vindicator, 150 HP, netherite armor, melee)
+  - §5§lElder Evoker§7 (Evoker, 120 HP, summons vex reinforcements every 20s)
+  - §9§lRaid Illusioner§7 (Illusioner, 100 HP, creates clones, bow user)
+  - §6§lRaid Captain§7 (Pillager, 90 HP, drops the special Raid Crossbow)
+  - §5§lRaid Evoker Lt§7 (Evoker, 100 HP, standard caster lieutenant)
+- **Elder Evoker** summons 2-3 vexes every 20 seconds with limited life (30s each)
+- **Raid Captain drops a special crossbow**: Quick Charge III + Multishot + Unbreaking III + Mending, named "⚔ Raid Crossbow"
+- **Participation tracking**: players who fight in more raid waves get up to +50% bonus cash at victory
+  - Participation counted every 5 seconds near the raid center during active waves
+  - Message shows your participation bonus percentage at victory
+- Boss bar updates in real time with combined HP and remaining boss count
+- All boss death VFX preserved and enhanced
+
+## 1.0.16
+
+### ⚔ Player raids reworked — dramatic VFX and multiple mini-bosses
+- **Three bosses spawn on victory** instead of just the Warlord:
+  - §c§lRaid Warlord§7 (Vindicator, 120 HP, netherite armor, melee)
+  - §5§lRaid Evoker§7 (Evoker lieutenant, 100 HP, caster fangs + summons)
+  - §6§lRaid Captain§7 (Pillager lieutenant, 80 HP, crossbow, iron armor)
+- All three must be slain to claim the victory reward
+- **Dramatic spawn VFX**: portal ring (60 particles), soul fire flames, large smoke, ender dragon growl + wither spawn + raid horn sounds
+- **Wave tracking**: each new wave triggers a raid horn sound + soul fire/smoke particles + chat announcement
+- **Ambient VFX**: crimson spores swirl around the raid center every 3 seconds, campfire smoke from the ground, angry villager particles on nearby players
+- **Raid horn** plays every 30 seconds during active raids
+- **Warlord death VFX**: end rod burst (30 particles), totem of undying (20), firework (15), explosion + challenge complete sounds
+- **Lieutenant death VFX**: end rod (15) + soul fire flame (10) + soul escape sound
+- **Victory VFX**: firework (50), totem (30), end rod (25), happy villager (20), challenge complete + firework blast sounds
+- **Defeat VFX**: large smoke (40), smoke (30), ender dragon death + wither death sounds
+- All raid announcements now have decorative border lines
+
+## 1.0.15
+
+### ⚡ Events reworked — dramatic visuals and 3 new event types
+- **Gold Rush**: ore blocks drop double items for 10 minutes
+- **Thunderstorm**: lightning strikes + electric particles engulf the world
+- **Double Trouble**: double mob spawns, double damage taken, double kill cash
+- Dramatic startup: ender dragon growl + wither spawn sounds, particle bursts per event type
+- Ongoing particle effects every 1.5s on every player during active events
+- Dramatic ending: firework particles + challenge complete sound + decorative borders
+- Warning particles during the last 10 seconds before an event ends
+- `/ff event` now lists all 7 event types
+
+### 🏟️ Prison combat arena
+- New combat arena room at the prison spawn platform with iron bar walls and glowstone floor
+- Wave-based survival: each wave spawns more mobs with scaling HP and armor
+- Cash rewards: 100 × wave² prison cash per wave cleared (wave 1 = $100, wave 5 = $2,500)
+- Mobs scale with wave: zombies, skeletons, spiders, pillagers, witches
+- Auto-progresses through 10 waves, then resets
+
+### 🧳 Expedition wandering supplier
+- A villager NPC spawns every ~3 minutes inside expeditions
+- Drops emergency supplies (bread, torches) on the ground nearby
+- Named "Expedition Supplier" — right-click to interact
+
+### 👹 Expedition mini-bosses
+- Mini-bosses spawn when the player is deep in the expedition (chunk radius ≥ 10)
+- Type-specific bosses: Broodmother (Deep Mine), Undying Champion (Monster Cave), Crystal Warden (Crystal Cavern), Void Reaper (Void), Vault Breaker (Boss Lair)
+- 5x HP, full iron armor, tier-5 rare mob variant (glowing)
+- Bonus reward: $5,000-$15,000+ loot value on kill (scaled by expedition multiplier)
+
+### 💰 Expedition rewards balanced
+- Mob kill cash increased 4x: zombies $200, skeletons $250, creepers $400, blazes $600, wither skeletons $800
+- Chest loot doubled: gold ingots 4-12 per chest, emeralds 2-7, rich chests get 2-5 diamonds
+- Expedition multiplier (1.5x-4.0x) still applies on top of all rewards at extraction
+
+## 1.0.14
+
+### 🏛️ Expeditions reworked — backrooms-style endless generation
+- **All expeditions now take place in the expedition dimension** (including Void — no longer in the Nether)
+- **Backrooms-style procedural generation**: dungeon chunks generate as you approach the frontier, creating an ever-expanding maze that feels endless
+- Each chunk is 8×8 blocks with doorways punched through walls — corridors connect infinitely
+- **Loot chests** scattered throughout: treasure rooms (rich chests + beacon), loot chest rooms (1-2 chests), and cache rooms (extra ore + chest)
+- Chest loot includes diamonds, gold, emeralds, ender pearls, blaze rods, golden apples, netherite scraps (Void), and more
+- **Trap rooms**: pressure plates triggering arrow dispensers, TNT pitfalls with tripwires
+- **Mob kills give cash**: zombies ($50), skeletons ($60), creepers ($100), blazes ($150), wither skeletons ($200), vindicators ($180), and more — scaled by expedition multiplier
+- **Unbreakable boundaries**: floor, walls, and ceiling cannot be broken to escape the expedition
+- Type-specific generation: stone (Deep Mine), cobblestone (Monster Cave), amethyst (Crystal Cavern), obsidian+blackstone (Void), deepslate (Boss Lair)
+- Type-specific ores: nether quartz/gold (Void), amethyst/diamond (Crystal Cavern), gold/diamond/emerald (Boss Lair)
+
+### 🏥 Prison rework
+- **3x cheaper upgrades**: pickaxe upgrades start at $1,500 (was $5,000), rank-ups start at $160 (was $500)
+- **Start with iron pickaxe** (was stone) — can mine iron and coal immediately
+- **Enchantment upgrades**: Efficiency I→V, Fortune I→III (from level 3), Unbreaking (from level 3)
+- **Better pickaxe progression**: Iron → Diamond (tier 3+) → Netherite (tier 6+)
+- **Mob spawners** on each mine floor — zombies spawn for combat
+- **Mob kill rewards**: $10-$2,000 prison cash per kill depending on mob type
+- **Fishing rewards**: $15-$40 per catch while in prison
+- **Expanded prison menu** (4 rows): mining, combat, and fishing activity info
+
+### 🐉 Dupe glitch fix — dragon egg teleport blocked
+- Created `DragonEggBlockMixin` that cancels vanilla dragon egg teleport behavior (the main dupe vector)
+- Audited grave claim system, hopper extraction, and item drop mixins — all secure
+
+### 🕐 All times changed from UTC to EST
+- Daily/weekly challenge resets, newspaper publishing, leaderboard resets, and daily streak resets all use EST (America/New_York) now
+- All user-facing text updated from "midnight UTC" to "midnight EST"
+
+## 1.0.13
+
+### ⚔ Sword blocking — 50% damage, directional, no projectile blocking
+- Sword blocking now reduces melee damage by **50%** (not 100%). Removed vanilla `blocks_attacks` component entirely.
+- Still takes knockback and shows hurt animation. Does NOT block projectiles.
+- **Distant Memory sword**: 5 damage, 1025 attack speed, can attack while blocking.
+
+### 💎 Gems + Gem Shop
+- **Gems** are a new balance-based currency separate from favor tokens. Shown in /balance.
+- Earned from raids, challenges, contracts, daily streaks, achievements.
+- **`/gemshop`** command + menu hub button — buy exclusive items: mystery keys, raid banners, elytra, dragon eggs, totems, netherite, and more!
+- Favor tokens remain as physical paper items (unchanged).
+
+### 💼 Jobs pay 5x more
+- All job rewards multiplied by 5x. Elder guardian: $600→$3,000. Zombie: $115→$575. Diamond ore: $300→$1,500.
+
+### 📋 Challenges menu fix
+- Challenges menu now loads the challenge pool before opening, fixing the "won't open" bug.
+
+### 📦 /deliver hopper fix
+- Closing the delivery menu with items in the hopper slot now returns them to inventory. If inventory is full, the menu stays open with a warning instead of dropping items.
+
+### 🔧 /ff restore reworked
+- `/ff restore [player]` now restores the player's **last pre-death inventory** (admin only). Snapshots are taken before every death and persisted to disk.
+
+### ✨ Mythic mobs glow
+- Mythic (tier 5) rare mob variants are now always visible and glowing.
+
+### ⛏ Prison reworked — cheaper, more fun, more to do
+- **Upgrades 3x cheaper**: pickaxe upgrade $5k→$1.5k at Lv1, rank-up $500→$160 at rank A.
+- **Start with iron pickaxe** (was stone) — can actually mine iron and coal from rank A.
+- **Better enchantment progression**: Efficiency I→V, Fortune I→III, Unbreaking at Lv3+.
+- **Mob spawners** added to mine floors (tier 1+) — kill mobs for prison cash!
+- **Mob kill rewards**: zombie $20, creeper $35, enderman $50, ravager $150, warden $2000.
+- **Fishing rewards**: $15-$40 prison cash per catch in prison.
+- **Expanded prison menu** (4 rows): sell, rank up, pickaxe upgrade, convert, combat/fishing/mining info, leave.
+- Max saturation, Nether Star in slot 9, block sell prices 5x.
+
+### 🏰 Expedition improvements
+- Mazes expanded to 12x12 with treasure rooms, trap rooms, cache rooms, and two exits.
+
+### 🌍 Other
+- Grave heads preserve player skins. Expedition mazes expanded with rooms.
+- **All time displays changed from UTC to EST** (America/New_York timezone for proper DST handling).
+- **Dragon egg dupe glitch fixed** — the vanilla onPlace teleport that lets players duplicate dragon eggs is now blocked.
+
+## 1.0.12
+
+## 1.0.12
+
+### 👟 Slime Boots bounce toggle
+- **Shift-right-click** the Slime Boots to toggle the bounce itself: ON (spring back on landing) or OFF (land flat, no fall damage) - no more sneaking every time you want a flat landing. Right-click still cycles jump boost (Off/I/II/III), and sneaking on landing still overrides the bounce.
+- Lore updated to explain the new toggle.
+
+### 🤫 Hidden elevators stay hidden
+- If a carpet sits on top of an elevator (secret base style), the teleport no longer fires the portal particles or the enderman teleport sound - the floor looks completely normal while still working.
+
+## 1.0.11
+
+### ⚔ Sword blocking — server-side, consistent, 50%
+- Ported the **Sword Blocking datapack** (Insperation folder) into the mod as pure Java: every sword you hold now gets the vanilla `blocks_attacks` component, so **all swords block everywhere** — same behavior always, not just in legacy duels. The component is re-applied on tick, so it survives syncs and newly-picked-up swords.
+- **Incoming damage reduced by a flat 50%** (base 0, factor 0.5 — the datapack's 0.9/0.9 blocked ~everything; you asked for half). Instant block, never disabled by axe hits, shield block/break sounds, 1 durability per blocked hit.
+- **You can block and swing**: holding right-click blocks, left-click keeps attacking — works for the Distant Memory sword and every other blade. The old 50% mixin now stands down when the component is present, so there's no double-reduction.
+
+### 🔔 Datapacks verified wired
+- **bell_find_raiders**: was only glowing raiders within 96 blocks; now glows **every** raider in the dimension for 3s (matching the "bell finds all raiders" datapack) — already executed from the Java bell hook on ring.
+- Orbital Strike Cannon (rods + tick loop), raid_victory (Warlord fanfare), and the sword blocking above are all bundled and live. elytra-lunge and the sword-enchantment compat are already in the mod.
+
+### ⛏ Elevator + carpet fix
+- Elevators now work with a carpet on top: standing on a carpet-covered elevator still triggers it, and a carpet-topped elevator is a valid destination.
+
+### 💰 `/spawners sellall`
+- Sells **every spawner-loot item in your inventory at once**, including each item's level multiplier (`/spawners sell` works too). Pays straight to your balance with a count + total.
+
+### 🏠 Claims GUI (`/claim`, `/claim menu`, /menu → Claims & Land)
+- The claim system finally has a proper GUI. `/claim` and `/claim menu` open **Claims & Land**, a framed overview showing every claim you own (position, size, admin count) — click any claim to jump straight into its permission screen.
+- Quick-action row: **Get Claimer**, **Claim Loot** (collect auction/chest-shop/boss payouts), **Claim Slots** (used/max + buy next slot with cost shown), **Claim border** (Full/Small/Off cycle), **Manage ALL claims** (one screen, whole-base policy), and **Recover claims** (OP only).
+- Standing inside a claim, the GUI shows a banner for it with a shortcut to manage it. `/claim give` still hands out a Chunk Claimer directly for the old behavior.
+- The /menu hub's "Claims & Land" button now opens the GUI instead of just silently dropping a claimer on you.
+- **Back navigation**: the claim permission screen now has a BACK button that returns to the Claims & Land overview, and the overview has a BACK button that returns to the /menu hub.
+
+## 1.0.10
+
+### 🐛 Hotfix: duel arena no longer blocks world load
+- The `fortuneandfavors:duel_arena` dimension type used the pre-26.2 schema (it was missing the now-required `has_ender_dragon_fight` key plus the new `attributes`/`default_clock`/`timelines` structure). That made the whole datapack fail registry loading, so **worlds wouldn't open** ("Failed to load level data or datapacks") — the world itself was never corrupted.
+- Rewritten against the vanilla 26.2 overworld dimension type (bright ambient light, no dragon fight, no mob spawning), and the mod version is bumped to 1.0.10 so the jar filename finally matches the changelog.
+- **`minecraft:exclusive_set/damage` now truly empty** — it was missing `replace: true`, so the vanilla entries (Sharpness/Smite/Bane/Impaling/Density/Breach) silently merged back in and the damage enchantments stayed mutually exclusive. Audited all 13 bundled JSONs against the 26.2 codecs (enchantments, recipes, tags, dimensions) — everything else checks out.
+
+### ⚔ Player Raids — cooldown + opt-in banner
+- **Raids can no longer chain endlessly**: each dimension shares a **2-hour raid cooldown** that starts when a raid is won, lost, or expires. The cooldown persists across restarts (`player_raids.json`).
+- **New opt-in item: the 🚩 Raid Banner** — right-click it near a village to ignite a Player Raid on demand (consumed on use, dropped by slain Raid Warlords, and available via `/ff give raidbanner`). It shows an error if raids are on cooldown or there's no village close enough.
+
+## 1.0.9
+
+### Bug fixes
+- **"First Mythic Spawn" record no longer says "the server"** — it credits the nearest player who saw it spawn (falls back to "a wandering adventurer").
+- **Elite/Ancient/Mythic mobs no longer glow through walls** — the permanent glowing effect is gone from variant mobs entirely, which also takes a load off the server and client.
+- **Special enemy variants are now actually rare** — spawn rates went from ~50% of all hostile mobs down to 15% total (Armored 10%, Cursed 3.5%, Elite 1.2%, Ancient 0.2%, Mythic 0.1%).
+- **UHC Duel now uses legacy 1.8 combat by default** (picking UHC from the Legacy menu, or directly, gives you 1.8-style combat; only the Modern submenu picks modern).
+- **"The arena refused to open" fixed** — the duel realm dimension files were missing entirely (empty folders), so the arena world never loaded. The `fortuneandfavors:duel_arena` dimension + type are now bundled.
+- **Orbital strike rods (`/ff give nuke` etc.) actually appear and fire** — the rods' NBT/names now match the bundled datapack exactly (`Orbital_Cannon:1010` + exact names), `/ff give` hands them to you directly instead of relying on a function call, and the datapack's tick loop is wired into `minecraft:tick` so thrown rods detonate.
+- **Sword blocking now works while HOLDING right-click** — the block window was 0.5s (tap-only); it now stays active until you release, for legacy duels and the Distant Memory sword.
+- **New `/ff restore <player>` (OP)** — returns every unclaimed grave item straight to that player's inventory (works with no argument for yourself). It was missing entirely before.
+
+### 🔮 Two new runes + rune GUI
+- **Rune of Swiftness** (+5% movement speed while held) and **Rune of Frost** (25% chance to slow enemies on hit) join the family, and drop from Mystery Chests (`/ff give runefrost` / `runeswiftness`).
+- New **`/runes` GUI**: shows your held weapon's socketed runes and all five rune types with your inventory count — click to socket straight from the menu.
+
+### 🎒 Expeditions
+- **Risk meter**: the more loot you secure, the deadlier the mobs that spawn (tiers scale 1-3 with heat). At high heat a **Mythic Hunter** can drop in to hunt you.
+- **New 5th expedition: 👑 Boss Lair** — a vault guardian seals the exit; you can't escape until you slay it, then the 4x cash-out opens. Found in `/expedition`.
+
+### ⚔ Player Raids
+- When a village raid is won, the **Raid Warlord** (a netherite-armored Ancient miniboss) descends holding the treasure — the victory payout now lands when the Warlord is slain, and the slayer gets broadcast across the server.
+
+## 1.0.8
+
+### Bug fixes
+- **Excalibur now actually one-shots.** The damage/strength mixins checked for a `✧`-star name, but the item is created with a `✦`-star — so the check never matched. It now matches any Excalibur name.
+- **Sculk Sensor Leggings no longer run on their own.** Vibration Sense now starts OFF, and only a shift-right-click toggles it (plain right-clicks while wearing used to flip it on/off accidentally).
+- **Explosion rebuild now really pulls you out.** The crater rescue used to run once per explosion at the first rebuild tick and only checked blocks you were *inside*; it now runs every half-second while rebuilds are pending and also lifts anyone standing at or below the top of a column being rebuilt — you get TP'd to the top.
+
+### ⚠ Dangerous Mining Zones
+- The server rolls 1-2 dangerous mining zones in deepslate caves near spawn each start: ores mined there pay bonus cash and can double-drop, but stronger tiered mobs spawn inside and red smoke marks the border. Entering warns you with a "DANGEROUS MINING AREA" actionbar. Sub-chunk sized - never a whole chunk.
+
+### 🎒 Expeditions (`/expedition`, `/menu → Expeditions`)
+- Four expeditions: ⛏ **Deep Mine**, 👹 **Monster Cave** (diamond-armored undead hordes), 💎 **Crystal Cavern**, 🌑 **Void Expedition** (Nether).
+- Each teleports you into a dangerous pocket with a time limit (10-16 min). Ores you mine go into a temporary expedition bag - leave the zone alive to cash out at the type's multiplier (1.5x-3x), or **die / run out of time and you lose everything**.
+- Running out of time triggers a collapse: smoke, damage, and for Monster Cave a full zombie swarm. Escaping broadcasts your haul to the server.
+
+### 🔮 Runes
+- Three socketable upgrades for swords and axes: ⚡ **Rune of Haste** (+5% attack speed), 🔥 **Rune of Flame** (25% chance to ignite on hit), 💎 **Rune of Fortune** (20% chance for bonus cash + XP per kill).
+- Hold a sword/axe in your main hand and the rune in your offhand, then right-click to fuse it in. Runes drop from Rare/Epic/Legendary Mystery Chests (and `/ff give rune`).
+
+### ✨ Persistent Cosmetics (`/cosmetics`, `/menu → Cosmetics`)
+- Titles, name colors and particle trails (flame, sparkle, hearts, ender, cloud) that drop from **Epic and Legendary Mystery Chests** and persist across resets in `cosmetics.json`.
+- Equip them in the new Cosmetics GUI - titles and name colors show in the tab list, trails follow you around.
+
+### 🏆 Weekly Leaderboard (`/leaderboard`, `/lb`, `/menu → Leaderboard`)
+- Four categories: Richest Players, Boss Slayers, Bounty Hunters, Hard Workers (jobs).
+- Every Monday 00:00 UTC the top 3 of each category are announced and paid **$50k / $25k / $10k**, then the week resets. The GUI shows current standings, your rank, and time until reset.
+
+### Menu Hub
+- Three new buttons: **Expeditions**, **Cosmetics**, and **Leaderboard** (now 22 features in one window).
+
+## 1.0.7
+
+### Menu Hub rebuilt (`/menu`)
+- Menu expanded to a 9x5 window with every feature in one place: Shop, Sell, Auction, Jobs, Tokens, Skills, Claims, Raid Bosses, Duels, Bounty, Guild, Deliveries, Mystery Chests, Server News, Daily Streak, Boss Codex, Challenges, First Ever Records, Tags & Titles, and Trading.
+- New GUIs behind the buttons: `NewsMenu` (today's paper), `CodexMenu` (boss kill histories), `StreakMenu` (login streak, duel wins, boss streak, bounty level, titles), `ChallengesMenu` (daily & weekly progress bars), `RecordsMenu` (first-ever hall of fame), `TagsMenu` (tag/title/records).
+
+### Server Newspaper (`/news`)
+- 45+ headline templates across four sections (Top Story, Economy, Bounty Board, Discovery) so the daily paper is never the same twice.
+- Real data still wins: boss kills, richest player, active bounties, guild wars, and first-ever records are mixed into the flavor stories.
+- `/news` now opens the newspaper GUI (and publishes if today's edition hasn't dropped yet).
+
+### Jobs (`/jobs`)
+- Five jobs per hour instead of three.
+- New job types: **Chop** (logs, with an axe) and **Farm** (crops, with a hoe) alongside Mine and Kill; bigger template pools for all four.
+- Trade jobs can now ask for 3 trades.
+- Job Board GUI rebuilt: progress bars, claimed/strikethrough states, glowing claim cards.
+- Actionbar nudge when a job completes mid-game, and a golden particle celebration + level-up sound when you claim one.
+
+### Guild Mine → `/mine`
+- The mine is now a full GUI: `/mine` (or `/guild mine`) opens it with live stock, progress to the $10k payout, production rate, and payout ETA.
+- Build/Upgrade button (founder only) with the exact cost shown - the old `/guild mine` text command could never actually build the mine, that's fixed.
+- Deposit buttons ($1k / $10k / $100k) plus a custom amount type-in prompt (`/mine <amount>` still works).
+- Upgrades no longer wipe your deposited stock.
+
+### `/changelog`
+- New command that prints the bundled changelog in chat (kept in sync with CHANGELOG.md).
+
+### Daily Rewards GUI (`/rewards`)
+- Daily login rewards moved from auto-granted chat messages into a proper calendar GUI: Day 1/3/7/14/30 milestones, current streak, freezes, and a big "Claim" button with a golden celebration VFX.
+- Rewards are now claimed instead of auto-granted - you get a chat nudge on login when one is waiting. Reachable from `/rewards`, `/daily`, or /menu → Daily Streak.
+
+### /ff help rebuilt
+- Help overview now splits into **For everyone** and **For admins (OP)** sections (the admin block only shows to OPs).
+- New topics for every feature: menu, guilds & wars & the mine, streaks & titles, challenges, codex, records & tags, newspaper, deliveries/contracts, mystery chests, duels, disasters, rare mobs, changelog - plus OP topics: config, economy/staff, and world tools.
+
+### Deliveries & Dynamic Contracts
+- Up to **8 contracts** can be live at once (shortages + urgent contracts share the cap).
+- Shortages now roll in every **4 hours** instead of once a day, so the market stays busy; shortage pool grew to 15 items.
+- **Fixed the "dropped items" bug**: closing the delivery window returns hopper items to your inventory - if your inventory is full it keeps the window open and warns you instead of dropping items on the floor. Hopper contents also survive window refreshes now.
+- The Job Board now shows live dynamic contracts with a shortcut to the delivery window, so "dynamic jobs" are visible in-game.
+
+### GUI polish pass
+- Consistent colored-glass frames across the menu hub, jobs, daily rewards, challenges, tags, records, news, codex, streaks, bounty board, guild mine, mystery chests, and the raid boss help.
+- **Bounty Board**: real player-head skins for online targets, online/offline status.
+- **First Ever Records**: themed icons per record (boss skulls, gold block for the first millionaire, nether star for the first mythic) and a record count.
+- **Daily Rewards**: 7-day rolling calendar with today/milestone/past/future states.
+- **Tags & Titles**: shows owned milestone tags as clickable cards - equip `[Veteran]` and future tags from the GUI (owned tags are persisted; day-14 now unlocks it permanently).
+- **Mystery Chests**: upgraded to a framed 9x4 window with your key count, per-tier "have key" states, and a celebration burst when a chest opens.
+- **Mystery Boxes**: reveal kept its rainbow ring, plus the shared celebration effect.
+
+### Mines → multiple tiers
+- The guild mine is now five named mines from cheap to expensive: **Coal → Iron → Gold → Diamond → Netherite Shafts** (Lv 1-5). The `/mine` GUI shows every tier with cost and production; click the next tier to build/upgrade it.
+
+### Jobs - way more
+- Mine pool grew 20 → 35, Kill pool 20 → 36, plus more Chop and Farm templates (crimson/warped stems, sweet berries, bamboo, kelp, drip leaves...).
+
+### First-join welcome GUI
+- New players get a one-time welcome screen with buttons straight to the menu hub, shop, jobs, daily rewards, and the wiki.
+
+### World events are admin-triggerable
+- `/ff event <blood_moon|mining_collapse|merchant_festival|monster_invasion>` (OP) starts an event on demand, `/ff event stop` ends it, `/ff event list` shows them, and `/ff event mythic` spawns a Mythic mob nearby for testing.
+
+### Celebration VFX
+- Job/reward claims now fire an expanding golden shockwave ring, sparkle orbit, note bursts, fireworks, and a mid-burst golden rain.
+
+## 1.0.6
+
+### Critical Fixes
+- **1.8 combat 1-dmg bug fixed** — `LegacySweepMixin` rewritten. The old mixin wrapped `getAttackStrengthScale(0.5F)` and returned 0 to suppress sweep, but that return value also gates main-hit damage, causing the 1-dmg bare-hand punch. The new approach lets the damage scale run naturally (the +100 attack speed modifier already makes it 1.0) and instead suppresses sweep by returning an empty entity list from `getEntitiesOfClass` during legacy duels.
+- **Anvil "Too Expensive" removed** — `AnvilMixin` caps repair cost at 39 (the vanilla hard cap) so items can always be combined as long as you have the XP.
+- **Mining pity system** — `MiningPity`: breaking naturally-generated stone (3%: raw iron/copper/redstone/lapis), deepslate (4%: raw iron/gold/diamond/emerald), tuff (2%: raw iron), or netherrack (3%: gold nuggets/quartz/netherite scrap) has a chance to drop bonus raw ores.
+- **Better multiplayer sleep** — `BetterSleepMixin`: only 50% of online players need to sleep to skip the night (rounds up, minimum 1).
+
+### Datapack Additions
+- `damage.json` exclusive_set emptied — Sharpness, Smite and Bane of Arthropods can now coexist on the same item.
+- `wool_to_string` recipe — white wool crafts into 4 string.
+- `boltbringer` enchantment registered in `data/fortuneandfavors/enchantment/` with its own exclusive_set tag and `ff_damage_weapons` item tag.
+- Enchantment compat files for `sharpness`, `smite`, `bane_of_arthropods` (supported items / exclusivity).
+- `bell_find_raiders` function — ringing a bell reveals all nearby raiders.
+- `raid_victory` function — raid victory cleanup/announcement hook.
+
+### New Manager: Streak Tracker (`streaks.json`)
+- Duel win streaks with milestones at 10 ("Duelist"), 25 ("Swordsman"), 50 ("Champion").
+- Boss kill streaks (4 kills without dying) → "Boss Slayer" title.
+- Bounty Hunter XP — 1 level per 5 bounties, level 20 → "Bounty Hunter" title.
+- Titles display in chat and the tab list via `TitleManager`.
+
+### Phase 1 — Daily Systems
+- **Daily Login Streak** — midnight UTC reset, streak progression, streak freezes (earned every 5 days, max 3, auto-used if you miss exactly 1 day). Milestones: Day 1 welcome, Day 3 $500, Day 7 Common Mystery Key + $5k, Day 14 "Veteran" tag + $15k, Day 30 "Dedicated" title + $50k.
+- **Dynamic Contracts** — urgent contracts (3+ players die to a boss → kill-it quest, $50k), shortage contracts (random resource shortages from a pool of 10 items), auto-broadcast, 24h expiry, persisted to `contracts.json`.
+- **Deliver Menu + `/deliver`** — 4-row GUI with the contract list, a hopper slot, and smart item matching against active contracts.
+- **Menu Hub expanded** — new buttons for Deliver, Daily Streak, Custom Tags, Boss Codex, Dynamic Contracts, Mystery Chests, Server Newspaper.
+
+### Phase 2 — World Dangers
+- **Server Disasters** — Blood Moon, Mining Collapse, Merchant Festival, Monster Invasion; 5% chance every 30 min, 10 min duration, 30 min cooldown, persisted to disk.
+- **Rare Mob Variants** — 6 tiers (Normal → Armored → Cursed → Elite → Ancient → Mythic) with weighted spawn rolls, stat multipliers, custom names, glow for Elite+, and rare drops per tier.
+- **Boss Codex** — per-boss profiles: first discovered, first defeated, total kills, fastest kill (with player name), deaths caused.
+- **First Ever Records** — permanent historical records (first boss kill, first millionaire, first mythic, etc.) announced globally.
+
+### Phase 3 — Goals & Cooperation
+- **Cooperative Achievements** — 8 achievements (United, Wolfpack, Flawless, Speed Demon, Unbreakable, Server Legend, First Million, Bounty Hunter) with cash/token/tag rewards.
+- **Daily & Weekly Challenges** — 9 daily + 5 weekly templates, auto-rotation at midnight / start of week, progress tracked per player.
+
+### Phase 4 — Social Features
+- **Server Newspaper** — auto-published at midnight UTC: Top Story (boss kills), Economy (richest player), Bounty Board, Discovery.
+- **Guild Wars** — `/guild declarewar <guild>` and `/guild peace <guild>`, enemy particles (angry villager above enemy players, visible only to the opposing guild), war kills tracked with double PvP score.
+- **`/tags` command** — shows First Ever records and your tag.
+
+### Phase 5 — Economy
+- **Mystery Chests** — 4 tiers (Common/Rare/Epic/Legendary), key system, weighted loot tables, cash + item rewards, `/menu → Mystery Chests`.
+- **Guild Mine** — 5 upgrade levels ($100k → $50M), periodic resource production scaling with level, `/guild mine` and `/guild mine <amount>`.
+
+### Config, Sync & Polish
+- **OneConfig per-server settings now sync** — server setting changes are broadcast to every online player so Cloth Config and OneConfig screens stay in sync, OneConfig server switches push changes to the server immediately, and the config manager no longer crashes when OneConfig isn't installed.
+- **Sculk abilities are togglable** — new "Sculk abilities" feature switch (config file, config menu, Cloth Config, OneConfig) that gates the Sculk Sensor Leggings' vibration sense and its shift-click toggle.
+- **Trading UI modernized** — player heads with names replace the plain panes, a live trade-value readout ("You're ahead / You're behind" with item + cash breakdown), cleaner accept states, and a summary book.
+- **Combat balance** — TNT explosions deal +50% damage, ender pearl teleport damage is reduced to 60%, and axes used in player-vs-player combat take extra durability.
+- **Elytra Lunge** — boost while gliding (look-direction dash with a 2.5s cooldown) via `ElytraLunge`.

@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_golem",
+  "display": {
+    "icon": {
+      "id": "minecraft:stone"
+    },
+    "title": {
+      "text": "Boulder Basher",
+      "color": "gold"
+    },
+    "description": {
+      "text": "Slay the Stone Golem.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

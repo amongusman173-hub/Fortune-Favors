@@ -1,0 +1,19 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550346.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/chunk_anchor"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:block/lodestone"
+    }
+  }
+}

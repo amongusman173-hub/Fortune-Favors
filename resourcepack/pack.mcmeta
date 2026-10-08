@@ -1,0 +1,13 @@
+{
+  "pack": {
+    "description": "Fortune & Favors - custom item art and boss music",
+    "min_format": [
+      88,
+      0
+    ],
+    "max_format": [
+      88,
+      0
+    ]
+  }
+}

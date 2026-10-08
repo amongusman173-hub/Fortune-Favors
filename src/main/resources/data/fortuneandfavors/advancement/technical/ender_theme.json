@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:music_disc_pigstep"
+    },
+    "title": {
+      "text": "Now Playing: Ender Dragon Theme",
+      "color": "light_purple"
+    },
+    "description": {
+      "text": "Minecraft - Ender Dragon Theme, by J. Rivers",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": true
+  },
+  "criteria": {
+    "played": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

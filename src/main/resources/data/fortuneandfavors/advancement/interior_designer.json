@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:cherry_stairs"
+    },
+    "title": {
+      "text": "Interior Designer",
+      "color": "gold"
+    },
+    "description": {
+      "text": "Restyle your chair into a different wood. Taste is a skill too.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

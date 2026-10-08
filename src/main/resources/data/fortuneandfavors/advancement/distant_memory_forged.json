@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:distant_memory_hint",
+  "display": {
+    "icon": {
+      "id": "minecraft:netherite_sword"
+    },
+    "title": {
+      "text": "Distant Memory",
+      "color": "light_purple"
+    },
+    "description": {
+      "text": "Forge the legendary blade from an Echoing Shard.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

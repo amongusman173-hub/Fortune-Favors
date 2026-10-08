@@ -1,0 +1,33 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550029.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/frozen_heart"
+        }
+      },
+      {
+        "threshold": 4550232.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/bloodsoaked_core"
+        }
+      },
+      {
+        "threshold": 4550242.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/mech_scrap"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/prismarine_crystals"
+    }
+  }
+}

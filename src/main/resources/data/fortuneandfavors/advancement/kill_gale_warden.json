@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_gale_warden",
+  "display": {
+    "icon": {
+      "id": "minecraft:netherite_sword"
+    },
+    "title": {
+      "text": "Nothing Is Moving Any More",
+      "color": "white"
+    },
+    "description": {
+      "text": "Defeat the Gale Warden - enjoy the stillness while it lasts.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550344.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/spawner_infuser"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:block/crafting_table"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:raid_betrayal",
+  "display": {
+    "icon": {
+      "id": "minecraft:totem_of_undying"
+    },
+    "title": {
+      "text": "Warlord's Betrayer",
+      "color": "red"
+    },
+    "description": {
+      "text": "Accepted the Warlord's offer and turned on your friends.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

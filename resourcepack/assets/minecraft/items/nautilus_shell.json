@@ -1,0 +1,33 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550300.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/heart_of_the_end"
+        }
+      },
+      {
+        "threshold": 4550328.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/gale_sigil"
+        }
+      },
+      {
+        "threshold": 4550330.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/abyssal_pearl"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/nautilus_shell"
+    }
+  }
+}

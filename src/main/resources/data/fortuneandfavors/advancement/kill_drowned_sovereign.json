@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_drowned_sovereign",
+  "display": {
+    "icon": {
+      "id": "minecraft:trident"
+    },
+    "title": {
+      "text": "The Water Goes Quiet",
+      "color": "dark_aqua"
+    },
+    "description": {
+      "text": "Defeat the Drowned Sovereign - and it will not stay quiet for long.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+	"schemaVersion": 1,
+	"id": "fortuneandfavors",
+	"version": "${version}",
+	"name": "Fortune & Favors",
+	"description": "Server-side SMP economy mod - vanilla clients need nothing to join: sell every block, a 5-category shop, auction house with custom prices, chest shops, trading, favor tokens + token redeemer, land claims with permissions, tags, and redstone helpers (auto-sell hopper, elevator).",
+	"authors": [
+		"Poorboy7890",
+		"by Poorboy7890"
+	],
+	"contact": {
+		"homepage": "https://modrinth.com/project/fortune-favors",
+		"sources": "https://modrinth.com/project/fortune-favors"
+	},
+	"license": "MIT",
+	"icon": "assets/fortuneandfavors/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.fortuneandfavors.FortuneFavorsMod"
+		],
+		"client": [
+			"com.fortuneandfavors.client.FortuneFavorsModClient"
+		],
+		"modmenu": [
+			"com.fortuneandfavors.client.config.FfModMenuApi"
+		]
+	},
+	"accessWidener": "fortuneandfavors.accesswidener",
+	"mixins": [
+		{
+			"config": "fortuneandfavors.mixins.json",
+			"environment": "*"
+		},
+		{
+			"config": "fortuneandfavors.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"cloth-config": "*",
+		"modmenu": "*"
+	},
+	"custom": {
+		"modmenu": {
+			"links": {
+				"modmenu.modrinth": "https://modrinth.com/project/fortune-favors"
+			}
+		}
+	}
+}

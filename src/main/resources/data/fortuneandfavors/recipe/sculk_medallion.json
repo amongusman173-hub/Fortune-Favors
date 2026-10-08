@@ -1,0 +1,53 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "EGE",
+    "GSG",
+    "EGE"
+  ],
+  "key": {
+    "E": "minecraft:echo_shard",
+    "G": "minecraft:gold_block",
+    "S": "minecraft:sculk_sensor"
+  },
+  "result": {
+    "id": "minecraft:echo_shard",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "sculk_medallion"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550040.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§8§lSculk Infused Medallion"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7A dark medallion pulsing with sculk energy."
+        },
+        {
+          "text": "§7It hums with the promise of something"
+        },
+        {
+          "text": "§7terrible lurking beneath the deep."
+        },
+        {
+          "text": "§8Craft it: 4 echo shards, 1 sculk sensor,"
+        },
+        {
+          "text": "§8and 4 golden blocks"
+        },
+        {
+          "text": "§c§lRight-click to summon the Elder Warden!"
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

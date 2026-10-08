@@ -1,0 +1,47 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "OEO",
+    "EPE",
+    "OEO"
+  ],
+  "key": {
+    "O": "minecraft:obsidian",
+    "E": "minecraft:ender_pearl",
+    "P": "minecraft:ender_eye"
+  },
+  "result": {
+    "id": "minecraft:ender_eye",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "void_anchor"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550260.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§5§l🟯 Void Anchor"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7It has been dragged through stone."
+        },
+        {
+          "text": "§7Right-click to throw it - the §5Void"
+        },
+        {
+          "text": "§5Shaper§7 follows it up."
+        },
+        {
+          "text": "§8Summons The Void Shaper."
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

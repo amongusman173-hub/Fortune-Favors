@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_puppeteer",
+  "display": {
+    "icon": {
+      "id": "minecraft:string"
+    },
+    "title": {
+      "text": "The Last String",
+      "color": "dark_purple"
+    },
+    "description": {
+      "text": "Defeat The Puppeteer - every string cut, every puppet still.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

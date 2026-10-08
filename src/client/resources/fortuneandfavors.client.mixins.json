@@ -1,0 +1,19 @@
+{
+	"required": true,
+	"package": "com.fortuneandfavors.client.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"BossHealthOverlayMixin",
+		"EquipmentLayerRendererMixin",
+		"HashedPatchMapMixin",
+		"HudMixin",
+		"ItemInHandRendererMixin",
+		"LocalPlayerMixin",
+		"LootBoxScreenMixin",
+		"MinecraftMixin",
+		"MultiPlayerGameModeMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

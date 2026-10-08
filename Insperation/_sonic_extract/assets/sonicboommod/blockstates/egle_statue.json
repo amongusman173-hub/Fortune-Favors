@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "sonicboommod:block/egle_statue",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "sonicboommod:block/egle_statue"
+    },
+    "facing=south": {
+      "model": "sonicboommod:block/egle_statue",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "sonicboommod:block/egle_statue",
+      "y": 270
+    }
+  }
+}

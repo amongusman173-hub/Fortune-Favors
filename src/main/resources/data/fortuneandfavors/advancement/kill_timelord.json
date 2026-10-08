@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_timelord",
+  "display": {
+    "icon": {
+      "id": "minecraft:amethyst_shard"
+    },
+    "title": {
+      "text": "Out of Time",
+      "color": "dark_purple"
+    },
+    "description": {
+      "text": "Defeat the Time Lord - his last stop fails and the moment takes him.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

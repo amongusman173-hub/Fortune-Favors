@@ -1,0 +1,47 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "L L",
+    "LSL",
+    "LLL"
+  ],
+  "key": {
+    "L": "minecraft:leather",
+    "S": "minecraft:string"
+  },
+  "result": {
+    "id": "minecraft:bundle",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "bundle",
+        "ff_bdtier": 1
+      },
+      "minecraft:custom_name": {
+        "text": "Bundle [Leather]",
+        "color": "aqua",
+        "bold": true
+      },
+      "minecraft:lore": [
+        {
+          "text": "A stitched carry-sack - right-click to open 9 slots.",
+          "color": "gray"
+        },
+        {
+          "text": "Upgrade it in the Item Forge with 8 of the",
+          "color": "gray"
+        },
+        {
+          "text": "next material's ingots (Iron Ingots).",
+          "color": "gray"
+        },
+        {
+          "text": "Non-placeable · Cannot be stacked",
+          "color": "dark_gray"
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

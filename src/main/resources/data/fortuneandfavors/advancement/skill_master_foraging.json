@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:skill_master",
+  "display": {
+    "icon": {
+      "id": "minecraft:oak_sapling"
+    },
+    "title": {
+      "text": "Master Forager",
+      "color": "dark_green"
+    },
+    "description": {
+      "text": "Reach level 10 in Foraging.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

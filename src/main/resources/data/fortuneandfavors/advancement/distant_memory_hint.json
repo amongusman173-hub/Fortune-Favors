@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:slay_warden",
+  "display": {
+    "icon": {
+      "id": "minecraft:book"
+    },
+    "title": {
+      "text": "Echoes of the Past",
+      "color": "gray"
+    },
+    "description": {
+      "text": "Learn the legend of the Distant Memory blade.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

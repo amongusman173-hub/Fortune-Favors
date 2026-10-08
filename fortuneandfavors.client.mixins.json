@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "com.fortuneandfavors.client.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"HudMixin",
+		"ItemInHandRendererMixin",
+		"LocalPlayerMixin",
+		"MinecraftMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

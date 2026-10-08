@@ -1,0 +1,50 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "ECE",
+    "CAC",
+    "ECE"
+  ],
+  "key": {
+    "E": "minecraft:echo_shard",
+    "C": "minecraft:clock",
+    "A": "minecraft:amethyst_shard"
+  },
+  "result": {
+    "id": "minecraft:clock",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "space_time_rift"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550210.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§d§lSpace-Time Rift"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7Right-click to tear a rift in time."
+        },
+        {
+          "text": "§7Something on the other side has been"
+        },
+        {
+          "text": "§7waiting a very long time to step through."
+        },
+        {
+          "text": "§8Summons §dThe Time Lord§8."
+        },
+        {
+          "text": "§8Not tradeable, not placeable."
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

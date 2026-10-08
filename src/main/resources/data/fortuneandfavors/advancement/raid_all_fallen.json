@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:raid_all_bosses",
+  "display": {
+    "icon": {
+      "id": "minecraft:bone"
+    },
+    "title": {
+      "text": "All Fell",
+      "color": "gray"
+    },
+    "description": {
+      "text": "Every participant in a raid fell in battle - the hoard is lost.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

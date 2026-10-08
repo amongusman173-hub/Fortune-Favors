@@ -1,0 +1,59 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "E E",
+    " C ",
+    "E E"
+  ],
+  "key": {
+    "E": "minecraft:echo_shard",
+    "C": "minecraft:sculk_catalyst"
+  },
+  "result": {
+    "id": "minecraft:echo_shard",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "distant_memory_shard"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550060
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "The Echoing Shard Of A Distant Memory",
+        "color": "light_purple",
+        "bold": true
+      },
+      "minecraft:lore": [
+        {
+          "text": "A crystallized fragment of a world that",
+          "color": "gray"
+        },
+        {
+          "text": "no longer exists. The air around it",
+          "color": "gray"
+        },
+        {
+          "text": "hums with forgotten echoes.",
+          "color": "gray"
+        },
+        {
+          "text": "Forge it with a Diamond Sword in the",
+          "color": "gray"
+        },
+        {
+          "text": "Item Forge to create a weapon of the past.",
+          "color": "gray"
+        },
+        {
+          "text": "Craft it: 4 echo shards + 1 sculk catalyst",
+          "color": "dark_gray"
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

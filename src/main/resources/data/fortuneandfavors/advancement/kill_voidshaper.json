@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_voidshaper",
+  "display": {
+    "icon": {
+      "id": "minecraft:end_crystal"
+    },
+    "title": {
+      "text": "Unmade",
+      "color": "light_purple"
+    },
+    "description": {
+      "text": "Defeat the Void Shaper - the ground he borrowed goes back where it came from.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

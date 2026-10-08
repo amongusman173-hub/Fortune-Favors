@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:oak_stairs"
+    },
+    "title": {
+      "text": "Take a Seat",
+      "color": "gold"
+    },
+    "description": {
+      "text": "Sit down on a Fortune & Favors chair. The comfort is real.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

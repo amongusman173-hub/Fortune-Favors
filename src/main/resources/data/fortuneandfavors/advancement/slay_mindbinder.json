@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_mindbinder",
+  "display": {
+    "icon": {
+      "id": "minecraft:ender_pearl"
+    },
+    "title": {
+      "text": "Shattered Mind",
+      "color": "light_purple"
+    },
+    "description": {
+      "text": "Slay the Mindbinder.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550201.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/evoker_spellbook"
+        }
+      },
+      {
+        "threshold": 4550205.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/illusioner_spellbook"
+        }
+      },
+      {
+        "threshold": 4550236.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/scarlet_grimoire"
+        }
+      },
+      {
+        "threshold": 4550255.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/magisters_codex"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/book"
+    }
+  }
+}

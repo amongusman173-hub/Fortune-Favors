@@ -1,0 +1,13 @@
+{
+  "type": "fortuneandfavors:snow_queen_realm",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "minecraft:snowy_plains",
+      "lakes": false,
+      "features": false,
+      "layers": [],
+      "structure_overrides": []
+    }
+  }
+}

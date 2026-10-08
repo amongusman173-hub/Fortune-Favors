@@ -1,0 +1,56 @@
+{
+  "anvil_cost": 8,
+  "description": {
+    "translate": "enchantment.fortuneandfavors.boltbringer"
+  },
+  "effects": {
+    "minecraft:post_attack": [
+      {
+        "affected": "victim",
+        "effect": {
+          "type": "minecraft:all_of",
+          "effects": [
+            {
+              "type": "minecraft:summon_entity",
+              "entity": "minecraft:lightning_bolt"
+            },
+            {
+              "type": "minecraft:play_sound",
+              "pitch": 1.0,
+              "sound": "minecraft:item.trident.thunder",
+              "volume": 5.0
+            }
+          ]
+        },
+        "enchanted": "attacker",
+        "requirements": {
+          "condition": "minecraft:entity_properties",
+          "entity": "direct_attacker",
+          "predicate": {
+            "minecraft:equipment": {
+              "mainhand": {
+                "items": "#fortuneandfavors:ff_damage_weapons"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "exclusive_set": "#fortuneandfavors:exclusive_set/boltbringer",
+  "max_cost": {
+    "base": 50,
+    "per_level_above_first": 0
+  },
+  "max_level": 3,
+  "min_cost": {
+    "base": 25,
+    "per_level_above_first": 0
+  },
+  "primary_items": "#fortuneandfavors:ff_damage_weapons",
+  "slots": [
+    "mainhand"
+  ],
+  "supported_items": "#fortuneandfavors:ff_damage_weapons",
+  "weight": 1
+}

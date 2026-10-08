@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:skill_master",
+  "display": {
+    "icon": {
+      "id": "minecraft:enchanted_book"
+    },
+    "title": {
+      "text": "Master Enchanter",
+      "color": "light_purple"
+    },
+    "description": {
+      "text": "Reach level 10 in Enchanting.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

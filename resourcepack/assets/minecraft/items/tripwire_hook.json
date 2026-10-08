@@ -1,0 +1,47 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550282.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/mystery_key_common"
+        }
+      },
+      {
+        "threshold": 4550283.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/mystery_key_rare"
+        }
+      },
+      {
+        "threshold": 4550284.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/mystery_key_epic"
+        }
+      },
+      {
+        "threshold": 4550285.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/mystery_key_legendary"
+        }
+      },
+      {
+        "threshold": 4550322.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/abyssal_chain"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/tripwire_hook"
+    }
+  }
+}

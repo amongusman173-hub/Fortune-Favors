@@ -1,0 +1,40 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550208.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/warlord_trophy"
+        }
+      },
+      {
+        "threshold": 4550231.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/scarlet_trophy"
+        }
+      },
+      {
+        "threshold": 4550241.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/clockwork_trophy"
+        }
+      },
+      {
+        "threshold": 4550343.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/token_redeemer"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:block/gold_block"
+    }
+  }
+}

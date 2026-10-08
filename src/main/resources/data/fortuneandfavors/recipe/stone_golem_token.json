@@ -1,0 +1,49 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SSS",
+    "SIS",
+    "SSS"
+  ],
+  "key": {
+    "S": "minecraft:stone_bricks",
+    "I": "minecraft:iron_block"
+  },
+  "result": {
+    "id": "minecraft:chiseled_stone_bricks",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "stone_golem_token"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550017.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§8§lBoulder Baby"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7A grumpy little rock with a face."
+        },
+        {
+          "text": "§7Throw it - it shatters on impact, and"
+        },
+        {
+          "text": "§8§lStone Golem§r§7 rises from the rubble!"
+        },
+        {
+          "text": "§8It is nigh indestructible while armored -"
+        },
+        {
+          "text": "§8make it stagger itself to strike true."
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

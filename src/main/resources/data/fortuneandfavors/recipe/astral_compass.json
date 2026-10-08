@@ -1,0 +1,47 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "ALA",
+    "LCL",
+    "ALA"
+  ],
+  "key": {
+    "A": "minecraft:amethyst_shard",
+    "L": "minecraft:lapis_lazuli",
+    "C": "minecraft:compass"
+  },
+  "result": {
+    "id": "minecraft:compass",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "astral_compass"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550250.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§b§l✨ Astral Compass"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7Its needle does not point north."
+        },
+        {
+          "text": "§7Right-click and the sky answers with"
+        },
+        {
+          "text": "§7the §bStarbound Magister§7."
+        },
+        {
+          "text": "§8She fights wherever you are."
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

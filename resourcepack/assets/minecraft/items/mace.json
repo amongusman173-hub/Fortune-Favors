@@ -1,0 +1,33 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550304.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/enderheart"
+        }
+      },
+      {
+        "threshold": 4550314.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/enderheart_awakened"
+        }
+      },
+      {
+        "threshold": 4550320.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/leviathans_grasp"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/mace"
+    }
+  }
+}

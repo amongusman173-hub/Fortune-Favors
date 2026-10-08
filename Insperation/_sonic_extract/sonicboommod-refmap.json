@@ -1,0 +1,18 @@
+{
+  "mappings": {
+    "net/ayoubmrz/sonicboommod/mixin/PlayerMovementMixin": {
+      "readCustomData": "Lnet/minecraft/class_1657;method_5749(Lnet/minecraft/class_11368;)V",
+      "tick": "Lnet/minecraft/class_1657;method_5773()V",
+      "writeCustomData": "Lnet/minecraft/class_1657;method_5652(Lnet/minecraft/class_11372;)V"
+    }
+  },
+  "data": {
+    "named:intermediary": {
+      "net/ayoubmrz/sonicboommod/mixin/PlayerMovementMixin": {
+        "readCustomData": "Lnet/minecraft/class_1657;method_5749(Lnet/minecraft/class_11368;)V",
+        "tick": "Lnet/minecraft/class_1657;method_5773()V",
+        "writeCustomData": "Lnet/minecraft/class_1657;method_5652(Lnet/minecraft/class_11372;)V"
+      }
+    }
+  }
+}

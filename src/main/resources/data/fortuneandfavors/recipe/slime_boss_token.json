@@ -1,0 +1,52 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SSS",
+    "SHS",
+    "SSS"
+  ],
+  "key": {
+    "S": "minecraft:slime_block",
+    "H": "minecraft:golden_helmet"
+  },
+  "result": {
+    "id": "minecraft:slime_ball",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "slime_boss_token"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550006.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§a§lGelatinous Crown"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7The Slime King's own head, torn free"
+        },
+        {
+          "text": "§7and still faintly squirming. Right-click"
+        },
+        {
+          "text": "§7to summon the §a§lSlime King§r§7!"
+        },
+        {
+          "text": "§cIf you die, the boss despawns."
+        },
+        {
+          "text": "§8Craft it: slime blocks surrounding"
+        },
+        {
+          "text": "§8a golden helmet"
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

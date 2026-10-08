@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/spear_in_hand",
+  "textures": {
+    "layer0": "fortuneandfavors:item/scarlets_fang_in_hand"
+  }
+}

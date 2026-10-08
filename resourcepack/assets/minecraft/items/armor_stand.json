@@ -1,0 +1,19 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550290.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/wooden_marionette"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/armor_stand"
+    }
+  }
+}

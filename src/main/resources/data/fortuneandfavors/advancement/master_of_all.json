@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:boss_codex_complete",
+  "display": {
+    "icon": {
+      "id": "minecraft:nether_star"
+    },
+    "title": {
+      "text": "Master of All",
+      "color": "gold"
+    },
+    "description": {
+      "text": "Reach level 10 in every skill.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

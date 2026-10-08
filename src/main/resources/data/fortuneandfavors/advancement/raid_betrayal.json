@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:raid_first_victory",
+  "display": {
+    "icon": {
+      "id": "minecraft:ender_eye"
+    },
+    "title": {
+      "text": "Betrayal",
+      "color": "red"
+    },
+    "description": {
+      "text": "A friend joined the Warlord and turned on you.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CBC",
+    "BWB",
+    "CBC"
+  ],
+  "key": {
+    "C": "minecraft:coal",
+    "B": "minecraft:bone",
+    "W": "minecraft:wither_skeleton_skull"
+  },
+  "result": {
+    "id": "minecraft:wither_skeleton_skull",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "raid_boss_token"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550004.0
+        ]
+      },
+      "minecraft:custom_name": {
+        "text": "§5§lWithering Memory"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7A fading shard of the King's dark"
+        },
+        {
+          "text": "§7recollection. Right-click to summon the"
+        },
+        {
+          "text": "§c§lKing Wither Skeleton§r§7!"
+        },
+        {
+          "text": "§cIf you die, the boss despawns."
+        },
+        {
+          "text": "§8Craft it: a wither skeleton skull surrounded"
+        },
+        {
+          "text": "§8by bone and coal"
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

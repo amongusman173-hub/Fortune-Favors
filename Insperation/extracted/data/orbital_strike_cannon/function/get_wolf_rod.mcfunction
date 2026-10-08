@@ -1,0 +1,1 @@
+give @s minecraft:fishing_rod[damage=60,custom_data={wolf_cannon:1010},custom_name={text:"Wolf Rod"}]

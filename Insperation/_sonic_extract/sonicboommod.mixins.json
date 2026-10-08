@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "net.ayoubmrz.sonicboommod.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "PlayerMovementMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  },
+  "refmap": "sonicboommod-refmap.json"
+}

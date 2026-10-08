@@ -1,0 +1,34 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550053.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/wardens_call"
+        }
+      },
+      {
+        "threshold": 4550202.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/captain_horn"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:condition",
+      "on_false": {
+        "type": "minecraft:model",
+        "model": "minecraft:item/goat_horn"
+      },
+      "on_true": {
+        "type": "minecraft:model",
+        "model": "minecraft:item/tooting_goat_horn"
+      },
+      "property": "minecraft:using_item"
+    }
+  }
+}

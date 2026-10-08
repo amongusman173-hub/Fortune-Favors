@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:slay_warden",
+  "display": {
+    "icon": {
+      "id": "minecraft:written_book"
+    },
+    "title": {
+      "text": "Codex Complete",
+      "color": "light_purple"
+    },
+    "description": {
+      "text": "Personally slay every boss: King Wither Skeleton, Slime King, Stone Golem, Mindbinder, Snow Queen, and Elder Warden.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550020.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/shattered_mind"
+        }
+      },
+      {
+        "threshold": 4550233.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/crimson_essence"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/phantom_membrane"
+    }
+  }
+}

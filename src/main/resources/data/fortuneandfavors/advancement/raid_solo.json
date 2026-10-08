@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:raid_all_bosses",
+  "display": {
+    "icon": {
+      "id": "minecraft:player_head"
+    },
+    "title": {
+      "text": "One-Man Army",
+      "color": "aqua"
+    },
+    "description": {
+      "text": "Win a player raid fighting all alone.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

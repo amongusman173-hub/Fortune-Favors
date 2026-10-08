@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_timelord",
+  "display": {
+    "icon": {
+      "id": "minecraft:bone"
+    },
+    "title": {
+      "text": "Dust to Dust",
+      "color": "dark_purple"
+    },
+    "description": {
+      "text": "Die to the Time Lord's aging beam - years you were never going to get.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

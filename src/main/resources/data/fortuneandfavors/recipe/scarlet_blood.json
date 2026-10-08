@@ -1,0 +1,50 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "ERE",
+    "RBR",
+    "ERE"
+  ],
+  "key": {
+    "E": "minecraft:ghast_tear",
+    "R": "minecraft:redstone_block",
+    "B": "minecraft:glass_bottle"
+  },
+  "result": {
+    "id": "minecraft:glass_bottle",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "scarlet_blood"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550230.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§4§lScarlet-Blood"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7A vial of blood that never clots."
+        },
+        {
+          "text": "§7Right-click to pour it out - the Scarlet"
+        },
+        {
+          "text": "§7Devil answers her own blood."
+        },
+        {
+          "text": "§8Summons the §4Scarlet Devil§8."
+        },
+        {
+          "text": "§8Not tradeable, not placeable."
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

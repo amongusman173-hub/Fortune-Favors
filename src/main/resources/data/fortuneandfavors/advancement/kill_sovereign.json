@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_sovereign",
+  "display": {
+    "icon": {
+      "id": "minecraft:bell"
+    },
+    "title": {
+      "text": "The Court Is Cleared",
+      "color": "dark_green"
+    },
+    "description": {
+      "text": "Defeat the Emerald Sovereign - nobody is left standing between you.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

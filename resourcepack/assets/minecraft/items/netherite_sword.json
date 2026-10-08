@@ -1,0 +1,82 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550002.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/wither_blade"
+        }
+      },
+      {
+        "threshold": 4550032.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/wither_cloak_sword"
+        }
+      },
+      {
+        "threshold": 4550243.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/clockwork_gauntlet"
+        }
+      },
+      {
+        "threshold": 4550253.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/starpiercer"
+        }
+      },
+      {
+        "threshold": 4550263.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/void_reaver"
+        }
+      },
+      {
+        "threshold": 4550280.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/excalibur"
+        }
+      },
+      {
+        "threshold": 4550295.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/last_remembrance"
+        }
+      },
+      {
+        "threshold": 4550302.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/voidfang"
+        }
+      },
+      {
+        "threshold": 4550312.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/voidfang_awakened"
+        }
+      },
+      {
+        "threshold": 4550325.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/skybreaker"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/netherite_sword"
+    }
+  }
+}

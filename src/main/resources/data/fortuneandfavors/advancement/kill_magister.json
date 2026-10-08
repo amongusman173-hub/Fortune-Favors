@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:summon_magister",
+  "display": {
+    "icon": {
+      "id": "minecraft:enchanted_book"
+    },
+    "title": {
+      "text": "Nothing Left Above You",
+      "color": "blue"
+    },
+    "description": {
+      "text": "Defeat the Starbound Magister - the sky is only weather again.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

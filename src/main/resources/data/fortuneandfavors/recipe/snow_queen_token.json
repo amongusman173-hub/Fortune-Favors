@@ -1,0 +1,46 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SSS",
+    "SDS",
+    "SSS"
+  ],
+  "key": {
+    "S": "minecraft:snow_block",
+    "D": "minecraft:diamond"
+  },
+  "result": {
+    "id": "minecraft:snowball",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "snow_queen_token"
+      },
+      "minecraft:custom_model_data": {
+        "floats": [
+          4550026.0
+        ]
+      },
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_name": {
+        "text": "§b§lCryogenic Core"
+      },
+      "minecraft:lore": [
+        {
+          "text": "§7The Snow Queen's heart, frozen mid-beat and"
+        },
+        {
+          "text": "§7still crackling with her storm. Right-click"
+        },
+        {
+          "text": "§7to summon the §b§lSnow Queen§r§7!"
+        },
+        {
+          "text": "§8Craft it: snow blocks surrounding a diamond"
+        }
+      ],
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

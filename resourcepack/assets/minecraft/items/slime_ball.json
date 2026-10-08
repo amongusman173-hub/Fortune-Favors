@@ -1,0 +1,33 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550006.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/gelatinous_crown"
+        }
+      },
+      {
+        "threshold": 4550007.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/slime_launcher"
+        }
+      },
+      {
+        "threshold": 4550012.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/mythical_gelatin"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/slime_ball"
+    }
+  }
+}

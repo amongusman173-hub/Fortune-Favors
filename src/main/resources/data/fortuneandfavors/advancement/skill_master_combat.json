@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:skill_master",
+  "display": {
+    "icon": {
+      "id": "minecraft:diamond_sword"
+    },
+    "title": {
+      "text": "Master Combatant",
+      "color": "red"
+    },
+    "description": {
+      "text": "Reach level 10 in Combat.",
+      "color": "gray"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

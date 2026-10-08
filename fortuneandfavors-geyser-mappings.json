@@ -1,0 +1,1582 @@
+{
+  "format_version": 2,
+  "items": {
+    "minecraft:amethyst_shard": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550207,
+        "bedrock_identifier": "fortuneandfavors:amethyst_shard_raiders_upgrader",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.amethyst_shard_raiders_upgrader",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550213,
+        "bedrock_identifier": "fortuneandfavors:amethyst_shard_chrono_shard",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.amethyst_shard_chrono_shard",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550252,
+        "bedrock_identifier": "fortuneandfavors:amethyst_shard_magical_essence",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.amethyst_shard_magical_essence",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:armor_stand": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550290,
+        "bedrock_identifier": "fortuneandfavors:armor_stand_wooden_marionette",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.armor_stand_wooden_marionette",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:barrel": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550281,
+        "bedrock_identifier": "fortuneandfavors:barrel_mystery_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.barrel_mystery_box",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:bell": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550274,
+        "bedrock_identifier": "fortuneandfavors:bell_sovereigns_bell",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bell_sovereigns_bell",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:blast_furnace": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550354,
+        "bedrock_identifier": "fortuneandfavors:blast_furnace_portable_furnace",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.blast_furnace_portable_furnace",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:blaze_rod": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550021,
+        "bedrock_identifier": "fortuneandfavors:blaze_rod_mindbinder_staff",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.blaze_rod_mindbinder_staff",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550028,
+        "bedrock_identifier": "fortuneandfavors:blaze_rod_ice_staff",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.blaze_rod_ice_staff",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550051,
+        "bedrock_identifier": "fortuneandfavors:blaze_rod_sculk_mage_staff",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.blaze_rod_sculk_mage_staff",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:bone": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550001,
+        "bedrock_identifier": "fortuneandfavors:bone_wither_staff",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bone_wither_staff",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550011,
+        "bedrock_identifier": "fortuneandfavors:bone_wither_essence",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bone_wither_essence",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550101,
+        "bedrock_identifier": "fortuneandfavors:bone_multidimensional_army",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bone_multidimensional_army",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:book": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550201,
+        "bedrock_identifier": "fortuneandfavors:book_evoker_spellbook",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.book_evoker_spellbook",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550205,
+        "bedrock_identifier": "fortuneandfavors:book_illusioner_spellbook",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.book_illusioner_spellbook",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550236,
+        "bedrock_identifier": "fortuneandfavors:book_scarlet_grimoire",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.book_scarlet_grimoire",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550255,
+        "bedrock_identifier": "fortuneandfavors:book_magisters_codex",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.book_magisters_codex",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:bow": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550030,
+        "bedrock_identifier": "fortuneandfavors:bow_frostbound_bow",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bow_frostbound_bow",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550303,
+        "bedrock_identifier": "fortuneandfavors:bow_starfall",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bow_starfall",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550303,
+        "bedrock_identifier": "fortuneandfavors:bow_starfall_pulling_1",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bow_starfall_pulling_1",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550303,
+        "bedrock_identifier": "fortuneandfavors:bow_starfall_pulling_2",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bow_starfall_pulling_2",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550303,
+        "bedrock_identifier": "fortuneandfavors:bow_starfall_pulling_0",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bow_starfall_pulling_0",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550313,
+        "bedrock_identifier": "fortuneandfavors:bow_starfall_awakened",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bow_starfall_awakened",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550313,
+        "bedrock_identifier": "fortuneandfavors:bow_starfall_awakened_pulling_1",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bow_starfall_awakened_pulling_1",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550313,
+        "bedrock_identifier": "fortuneandfavors:bow_starfall_awakened_pulling_2",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bow_starfall_awakened_pulling_2",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550313,
+        "bedrock_identifier": "fortuneandfavors:bow_starfall_awakened_pulling_0",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.bow_starfall_awakened_pulling_0",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:breeze_rod": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550331,
+        "bedrock_identifier": "fortuneandfavors:breeze_rod_gale_core",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.breeze_rod_gale_core",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:carved_pumpkin": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550292,
+        "bedrock_identifier": "fortuneandfavors:carved_pumpkin_puppeteers_mask",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.carved_pumpkin_puppeteers_mask",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:cauldron": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550358,
+        "bedrock_identifier": "fortuneandfavors:cauldron_irrigation_sprinkler",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.cauldron_irrigation_sprinkler",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:chest": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550005,
+        "bedrock_identifier": "fortuneandfavors:chest_king_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_king_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550010,
+        "bedrock_identifier": "fortuneandfavors:chest_slime_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_slime_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550018,
+        "bedrock_identifier": "fortuneandfavors:chest_golem_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_golem_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550019,
+        "bedrock_identifier": "fortuneandfavors:chest_raid_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_raid_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550023,
+        "bedrock_identifier": "fortuneandfavors:chest_mindbinder_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_mindbinder_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550025,
+        "bedrock_identifier": "fortuneandfavors:chest_wither_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_wither_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550027,
+        "bedrock_identifier": "fortuneandfavors:chest_snow_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_snow_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550050,
+        "bedrock_identifier": "fortuneandfavors:chest_sculk_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_sculk_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550211,
+        "bedrock_identifier": "fortuneandfavors:chest_time_lord_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_time_lord_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550235,
+        "bedrock_identifier": "fortuneandfavors:chest_scarlet_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_scarlet_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550245,
+        "bedrock_identifier": "fortuneandfavors:chest_clockwork_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_clockwork_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550256,
+        "bedrock_identifier": "fortuneandfavors:chest_starbound_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_starbound_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550266,
+        "bedrock_identifier": "fortuneandfavors:chest_voidshaper_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_voidshaper_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550276,
+        "bedrock_identifier": "fortuneandfavors:chest_sovereign_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_sovereign_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550291,
+        "bedrock_identifier": "fortuneandfavors:chest_puppeteer_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_puppeteer_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550324,
+        "bedrock_identifier": "fortuneandfavors:chest_drowned_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_drowned_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550329,
+        "bedrock_identifier": "fortuneandfavors:chest_gale_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chest_gale_loot_box",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:chiseled_stone_bricks": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550017,
+        "bedrock_identifier": "fortuneandfavors:chiseled_stone_bricks_boulder_baby",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.chiseled_stone_bricks_boulder_baby",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:clock": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550210,
+        "bedrock_identifier": "fortuneandfavors:clock_space_time_rift",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.clock_space_time_rift",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550212,
+        "bedrock_identifier": "fortuneandfavors:clock_pocket_watch",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.clock_pocket_watch",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550240,
+        "bedrock_identifier": "fortuneandfavors:clock_clockwork_core",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.clock_clockwork_core",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:compass": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550041,
+        "bedrock_identifier": "fortuneandfavors:compass_bounty_compass",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.compass_bounty_compass",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550042,
+        "bedrock_identifier": "fortuneandfavors:compass_death_compass",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.compass_death_compass",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550250,
+        "bedrock_identifier": "fortuneandfavors:compass_astral_compass",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.compass_astral_compass",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:composter": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550356,
+        "bedrock_identifier": "fortuneandfavors:composter_auto_planter",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.composter_auto_planter",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:crafting_table": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550344,
+        "bedrock_identifier": "fortuneandfavors:crafting_table_spawner_infuser",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.crafting_table_spawner_infuser",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:diamond_spear": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550234,
+        "bedrock_identifier": "fortuneandfavors:diamond_spear_scarlets_fang",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.diamond_spear_scarlets_fang",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550234,
+        "bedrock_identifier": "fortuneandfavors:diamond_spear_scarlets_fang_in_hand",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.diamond_spear_scarlets_fang_in_hand",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:diamond_sword": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550061,
+        "bedrock_identifier": "fortuneandfavors:diamond_sword_distant_memory_sword",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.diamond_sword_distant_memory_sword",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:echo_shard": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550040,
+        "bedrock_identifier": "fortuneandfavors:echo_shard_sculk_medallion",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.echo_shard_sculk_medallion",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550050,
+        "bedrock_identifier": "fortuneandfavors:echo_shard_sculk_loot_box",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.echo_shard_sculk_loot_box",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550054,
+        "bedrock_identifier": "fortuneandfavors:echo_shard_sculk_orb",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.echo_shard_sculk_orb",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550055,
+        "bedrock_identifier": "fortuneandfavors:echo_shard_sculk_essence",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.echo_shard_sculk_essence",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550060,
+        "bedrock_identifier": "fortuneandfavors:echo_shard_distant_memory_shard",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.echo_shard_distant_memory_shard",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550265,
+        "bedrock_identifier": "fortuneandfavors:echo_shard_shaping_sigil",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.echo_shard_shaping_sigil",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:emerald": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550272,
+        "bedrock_identifier": "fortuneandfavors:emerald_royal_tribute",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.emerald_royal_tribute",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:emerald_block": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550271,
+        "bedrock_identifier": "fortuneandfavors:emerald_block_sovereign_trophy",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.emerald_block_sovereign_trophy",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:end_crystal": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550261,
+        "bedrock_identifier": "fortuneandfavors:end_crystal_colossus_trophy",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.end_crystal_colossus_trophy",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:ender_eye": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550019,
+        "bedrock_identifier": "fortuneandfavors:ender_eye_ominous_eye",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.ender_eye_ominous_eye",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550260,
+        "bedrock_identifier": "fortuneandfavors:ender_eye_void_anchor",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.ender_eye_void_anchor",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:firework_star": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550275,
+        "bedrock_identifier": "fortuneandfavors:firework_star_emerald_seal",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.firework_star_emerald_seal",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:furnace": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550353,
+        "bedrock_identifier": "fortuneandfavors:furnace_super_smelter",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.furnace_super_smelter",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:glass_bottle": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550230,
+        "bedrock_identifier": "fortuneandfavors:glass_bottle_scarlet_blood",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.glass_bottle_scarlet_blood",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:goat_horn": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550053,
+        "bedrock_identifier": "fortuneandfavors:goat_horn_wardens_call",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.goat_horn_wardens_call",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550202,
+        "bedrock_identifier": "fortuneandfavors:goat_horn_captain_horn",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.goat_horn_captain_horn",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:gold_block": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550208,
+        "bedrock_identifier": "fortuneandfavors:gold_block_warlord_trophy",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.gold_block_warlord_trophy",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550231,
+        "bedrock_identifier": "fortuneandfavors:gold_block_scarlet_trophy",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.gold_block_scarlet_trophy",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550241,
+        "bedrock_identifier": "fortuneandfavors:gold_block_clockwork_trophy",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.gold_block_clockwork_trophy",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550343,
+        "bedrock_identifier": "fortuneandfavors:gold_block_token_redeemer",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.gold_block_token_redeemer",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:golden_helmet": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550270,
+        "bedrock_identifier": "fortuneandfavors:golden_helmet_sovereigns_crown",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.golden_helmet_sovereigns_crown",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:grindstone": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550347,
+        "bedrock_identifier": "fortuneandfavors:grindstone_repair_station",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.grindstone_repair_station",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:heart_of_the_sea": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550244,
+        "bedrock_identifier": "fortuneandfavors:heart_of_the_sea_mechanical_heart",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.heart_of_the_sea_mechanical_heart",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550323,
+        "bedrock_identifier": "fortuneandfavors:heart_of_the_sea_sovereigns_heart",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.heart_of_the_sea_sovereigns_heart",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:honeycomb": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550214,
+        "bedrock_identifier": "fortuneandfavors:honeycomb_hourglass_of_haste",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.honeycomb_hourglass_of_haste",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:hopper": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550340,
+        "bedrock_identifier": "fortuneandfavors:hopper_auto_sell_hopper",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.hopper_auto_sell_hopper",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550341,
+        "bedrock_identifier": "fortuneandfavors:hopper_upwards_hopper",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.hopper_upwards_hopper",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550348,
+        "bedrock_identifier": "fortuneandfavors:hopper_item_sorter",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.hopper_item_sorter",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550349,
+        "bedrock_identifier": "fortuneandfavors:hopper_super_hopper",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.hopper_super_hopper",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550350,
+        "bedrock_identifier": "fortuneandfavors:hopper_transfer_hopper",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.hopper_transfer_hopper",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550351,
+        "bedrock_identifier": "fortuneandfavors:hopper_checker_hopper",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.hopper_checker_hopper",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550352,
+        "bedrock_identifier": "fortuneandfavors:hopper_two_way_splitter",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.hopper_two_way_splitter",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550359,
+        "bedrock_identifier": "fortuneandfavors:hopper_overflow_hopper",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.hopper_overflow_hopper",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:iron_block": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550342,
+        "bedrock_identifier": "fortuneandfavors:iron_block_elevator",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.iron_block_elevator",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:iron_boots": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550009,
+        "bedrock_identifier": "fortuneandfavors:iron_boots_slime_boots",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.iron_boots_slime_boots",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:iron_chestplate": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550016,
+        "bedrock_identifier": "fortuneandfavors:iron_chestplate_stoneheart",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.iron_chestplate_stoneheart",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550031,
+        "bedrock_identifier": "fortuneandfavors:iron_chestplate_glacier_cloak",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.iron_chestplate_glacier_cloak",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:iron_helmet": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550022,
+        "bedrock_identifier": "fortuneandfavors:iron_helmet_possessed_mask",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.iron_helmet_possessed_mask",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:iron_leggings": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550052,
+        "bedrock_identifier": "fortuneandfavors:iron_leggings_sculk_sensor_leggings",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.iron_leggings_sculk_sensor_leggings",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:leather_boots": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550009,
+        "bedrock_identifier": "fortuneandfavors:leather_boots_slime_boots",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.leather_boots_slime_boots",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:leather_chestplate": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550203,
+        "bedrock_identifier": "fortuneandfavors:leather_chestplate_warlord_cloak",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.leather_chestplate_warlord_cloak",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550204,
+        "bedrock_identifier": "fortuneandfavors:leather_chestplate_evoker_cloak",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.leather_chestplate_evoker_cloak",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550206,
+        "bedrock_identifier": "fortuneandfavors:leather_chestplate_illusioner_cloak",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.leather_chestplate_illusioner_cloak",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:lodestone": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550346,
+        "bedrock_identifier": "fortuneandfavors:lodestone_chunk_anchor",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.lodestone_chunk_anchor",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:mace": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550304,
+        "bedrock_identifier": "fortuneandfavors:mace_enderheart",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.mace_enderheart",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550314,
+        "bedrock_identifier": "fortuneandfavors:mace_enderheart_awakened",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.mace_enderheart_awakened",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550320,
+        "bedrock_identifier": "fortuneandfavors:mace_leviathans_grasp",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.mace_leviathans_grasp",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:nautilus_shell": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550300,
+        "bedrock_identifier": "fortuneandfavors:nautilus_shell_heart_of_the_end",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.nautilus_shell_heart_of_the_end",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550328,
+        "bedrock_identifier": "fortuneandfavors:nautilus_shell_gale_sigil",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.nautilus_shell_gale_sigil",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550330,
+        "bedrock_identifier": "fortuneandfavors:nautilus_shell_abyssal_pearl",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.nautilus_shell_abyssal_pearl",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:nether_star": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550251,
+        "bedrock_identifier": "fortuneandfavors:nether_star_starbound_trophy",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.nether_star_starbound_trophy",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:netherite_axe": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550200,
+        "bedrock_identifier": "fortuneandfavors:netherite_axe_warlord_axe",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_axe_warlord_axe",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:netherite_chestplate": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550024,
+        "bedrock_identifier": "fortuneandfavors:netherite_chestplate_mindbinder_shroud",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_chestplate_mindbinder_shroud",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550246,
+        "bedrock_identifier": "fortuneandfavors:netherite_chestplate_automaton_armor",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_chestplate_automaton_armor",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550254,
+        "bedrock_identifier": "fortuneandfavors:netherite_chestplate_astral_mantle",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_chestplate_astral_mantle",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550264,
+        "bedrock_identifier": "fortuneandfavors:netherite_chestplate_colossus_plate",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_chestplate_colossus_plate",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550327,
+        "bedrock_identifier": "fortuneandfavors:netherite_chestplate_wardens_mantle",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_chestplate_wardens_mantle",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:netherite_helmet": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550003,
+        "bedrock_identifier": "fortuneandfavors:netherite_helmet_wither_crown",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_helmet_wither_crown",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:netherite_leggings": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550246,
+        "bedrock_identifier": "fortuneandfavors:netherite_leggings_automaton_armor",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_leggings_automaton_armor",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:netherite_scrap": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550262,
+        "bedrock_identifier": "fortuneandfavors:netherite_scrap_voidsteel_scrap",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_scrap_voidsteel_scrap",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:netherite_sword": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550002,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_wither_blade",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_wither_blade",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550032,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_wither_cloak_sword",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_wither_cloak_sword",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550243,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_clockwork_gauntlet",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_clockwork_gauntlet",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550253,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_starpiercer",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_starpiercer",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550263,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_void_reaver",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_void_reaver",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550280,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_excalibur",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_excalibur",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550295,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_last_remembrance",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_last_remembrance",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550302,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_voidfang",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_voidfang",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550312,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_voidfang_awakened",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_voidfang_awakened",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550325,
+        "bedrock_identifier": "fortuneandfavors:netherite_sword_skybreaker",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.netherite_sword_skybreaker",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:oak_sign": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550332,
+        "bedrock_identifier": "fortuneandfavors:oak_sign_sorter_tag",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.oak_sign_sorter_tag",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:observer": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550357,
+        "bedrock_identifier": "fortuneandfavors:observer_auto_harvester",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.observer_auto_harvester",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:paper": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550273,
+        "bedrock_identifier": "fortuneandfavors:paper_royal_contract",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.paper_royal_contract",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:phantom_membrane": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550020,
+        "bedrock_identifier": "fortuneandfavors:phantom_membrane_shattered_mind",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.phantom_membrane_shattered_mind",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550233,
+        "bedrock_identifier": "fortuneandfavors:phantom_membrane_crimson_essence",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.phantom_membrane_crimson_essence",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:prismarine_crystals": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550029,
+        "bedrock_identifier": "fortuneandfavors:prismarine_crystals_frozen_heart",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.prismarine_crystals_frozen_heart",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550232,
+        "bedrock_identifier": "fortuneandfavors:prismarine_crystals_bloodsoaked_core",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.prismarine_crystals_bloodsoaked_core",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550242,
+        "bedrock_identifier": "fortuneandfavors:prismarine_crystals_mech_scrap",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.prismarine_crystals_mech_scrap",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:prismarine_shard": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550237,
+        "bedrock_identifier": "fortuneandfavors:prismarine_shard_blood_prism",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.prismarine_shard_blood_prism",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:red_banner": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550033,
+        "bedrock_identifier": "fortuneandfavors:red_banner_raid_banner",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.red_banner_raid_banner",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:shield": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550008,
+        "bedrock_identifier": "fortuneandfavors:shield_slime_shield",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.shield_slime_shield",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:skeleton_skull": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550294,
+        "bedrock_identifier": "fortuneandfavors:skeleton_skull_empty_mask",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.skeleton_skull_empty_mask",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:slime_ball": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550006,
+        "bedrock_identifier": "fortuneandfavors:slime_ball_gelatinous_crown",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.slime_ball_gelatinous_crown",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550007,
+        "bedrock_identifier": "fortuneandfavors:slime_ball_slime_launcher",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.slime_ball_slime_launcher",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550012,
+        "bedrock_identifier": "fortuneandfavors:slime_ball_mythical_gelatin",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.slime_ball_mythical_gelatin",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:smithing_table": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550345,
+        "bedrock_identifier": "fortuneandfavors:smithing_table_item_forge",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.smithing_table_item_forge",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:smoker": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550355,
+        "bedrock_identifier": "fortuneandfavors:smoker_portable_campfire",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.smoker_portable_campfire",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:snowball": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550026,
+        "bedrock_identifier": "fortuneandfavors:snowball_cryogenic_core",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.snowball_cryogenic_core",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:stick": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550014,
+        "bedrock_identifier": "fortuneandfavors:stick_stone_staff",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.stick_stone_staff",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:stone": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550013,
+        "bedrock_identifier": "fortuneandfavors:stone_golem_core",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.stone_golem_core",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:stone_axe": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550015,
+        "bedrock_identifier": "fortuneandfavors:stone_axe_golem_fist",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.stone_axe_golem_fist",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:string": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550293,
+        "bedrock_identifier": "fortuneandfavors:string_marionette_strings",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.string_marionette_strings",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:trident": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550321,
+        "bedrock_identifier": "fortuneandfavors:trident_tidecaller",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.trident_tidecaller",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550326,
+        "bedrock_identifier": "fortuneandfavors:trident_gale_chakram",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.trident_gale_chakram",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:tripwire_hook": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550282,
+        "bedrock_identifier": "fortuneandfavors:tripwire_hook_mystery_key_common",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.tripwire_hook_mystery_key_common",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550283,
+        "bedrock_identifier": "fortuneandfavors:tripwire_hook_mystery_key_rare",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.tripwire_hook_mystery_key_rare",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550284,
+        "bedrock_identifier": "fortuneandfavors:tripwire_hook_mystery_key_epic",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.tripwire_hook_mystery_key_epic",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550285,
+        "bedrock_identifier": "fortuneandfavors:tripwire_hook_mystery_key_legendary",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.tripwire_hook_mystery_key_legendary",
+          "creative_category": "items"
+        }
+      },
+      {
+        "type": "legacy",
+        "custom_model_data": 4550322,
+        "bedrock_identifier": "fortuneandfavors:tripwire_hook_abyssal_chain",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.tripwire_hook_abyssal_chain",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:turtle_scute": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550301,
+        "bedrock_identifier": "fortuneandfavors:turtle_scute_dragon_scale",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.turtle_scute_dragon_scale",
+          "creative_category": "items"
+        }
+      }
+    ],
+    "minecraft:wither_skeleton_skull": [
+      {
+        "type": "legacy",
+        "custom_model_data": 4550004,
+        "bedrock_identifier": "fortuneandfavors:wither_skeleton_skull_withering_memory",
+        "bedrock_options": {
+          "icon": "fortuneandfavors.wither_skeleton_skull_withering_memory",
+          "creative_category": "items"
+        }
+      }
+    ]
+  }
+}

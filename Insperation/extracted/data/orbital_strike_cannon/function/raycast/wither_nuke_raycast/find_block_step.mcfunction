@@ -1,0 +1,1 @@
+execute positioned ^ ^ ^0.5 run function orbital_strike_cannon:raycast/wither_nuke_raycast/find_block

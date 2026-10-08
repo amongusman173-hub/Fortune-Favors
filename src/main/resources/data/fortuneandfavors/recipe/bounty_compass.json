@@ -1,0 +1,57 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " R ",
+    "RCR",
+    " R "
+  ],
+  "key": {
+    "R": "minecraft:redstone",
+    "C": "minecraft:compass"
+  },
+  "result": {
+    "id": "minecraft:compass",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "bounty_compass"
+      },
+      "minecraft:custom_name": {
+        "text": "Bounty Compass",
+        "color": "red",
+        "bold": true
+      },
+      "minecraft:lore": [
+        {
+          "text": "A compass that hungers for heads.",
+          "color": "gray"
+        },
+        {
+          "text": "Hold it: a flame-thread reaches toward",
+          "color": "gray"
+        },
+        {
+          "text": "the player with the highest bounty in",
+          "color": "gray"
+        },
+        {
+          "text": "range (20,000 blocks) and the distance",
+          "color": "gray"
+        },
+        {
+          "text": "shows on your action bar. Right-click",
+          "color": "gray"
+        },
+        {
+          "text": "to announce their exact position.",
+          "color": "gray"
+        },
+        {
+          "text": "Only tracks online players who aren't hidden.",
+          "color": "dark_gray"
+        }
+      ]
+    }
+  }
+}

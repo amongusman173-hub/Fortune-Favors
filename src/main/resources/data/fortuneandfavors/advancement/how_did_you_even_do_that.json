@@ -1,0 +1,25 @@
+{
+  "parent": "fortuneandfavors:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:fire_charge"
+    },
+    "title": {
+      "text": "How Did You Even Do That?",
+      "color": "red"
+    },
+    "description": {
+      "text": "Blaze fire, a 50-block snipe, a zombie hit while burning, a creeper blast, a shulker mauling below half health, then a fatal fall - all inside sixty seconds.",
+      "color": "gray"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "impossible": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

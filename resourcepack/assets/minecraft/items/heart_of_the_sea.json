@@ -1,0 +1,26 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "entries": [
+      {
+        "threshold": 4550244.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/mechanical_heart"
+        }
+      },
+      {
+        "threshold": 4550323.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "fortuneandfavors:item/sovereigns_heart"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/heart_of_the_sea"
+    }
+  }
+}

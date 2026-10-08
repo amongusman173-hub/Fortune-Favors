@@ -1,0 +1,1 @@
+execute as @e[type=fishing_bobber,tag=!spawned] run function orbital_strike_cannon:setup

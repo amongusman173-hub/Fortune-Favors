@@ -1,0 +1,49 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "OOO",
+    "OEO",
+    "OOO"
+  ],
+  "key": {
+    "O": "minecraft:obsidian",
+    "E": "minecraft:ender_pearl"
+  },
+  "result": {
+    "id": "minecraft:ender_chest",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "ff": "ender_pouch"
+      },
+      "minecraft:custom_name": {
+        "text": "Ender Pouch",
+        "color": "light_purple",
+        "bold": true
+      },
+      "minecraft:lore": [
+        {
+          "text": "A little pocket that hums with the void.",
+          "color": "gray"
+        },
+        {
+          "text": "Item Forge: put it in the material slot with",
+          "color": "gray"
+        },
+        {
+          "text": "a Backpack to link the pack to your ender",
+          "color": "gray"
+        },
+        {
+          "text": "chest - sneak-right-click the pack to open it.",
+          "color": "gray"
+        },
+        {
+          "text": "Consumed by the forge",
+          "color": "dark_gray"
+        }
+      ]
+    }
+  }
+}
