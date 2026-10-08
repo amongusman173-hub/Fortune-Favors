@@ -59,6 +59,14 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class ScarletGear {
 
+   // ------------------------------------------------------------------ colour
+   /** Fresh blood, the colour every Scarlet effect is drawn in. */
+   private static final int SCARLET = 0xC0102A;
+   /** Old blood, for the parts of an effect that sit in shadow. */
+   private static final int CLOT = 0x5A0612;
+   /** The glint on wet blood, for the brightest part of an effect. */
+   private static final int GLINT = 0xFF5A6E;
+
    // --------------------------------------------------------------- grimoire
 
    private static final String[] SPELL_NAMES = {"Bloodsuck", "Blood Spears", "Night Swarm", "Blood Rain"};
@@ -68,6 +76,8 @@ public final class ScarletGear {
    private static final double SPELL_RANGE = 22.0;
    private static final float BITE_DAMAGE = 9.0F;
    private static final float SPEAR_DAMAGE = 6.0F;
+   /** How fast a Blood Spear leaves the hand. */
+   private static final double SPEAR_SPEED = 2.2;
    private static final float RAIN_DAMAGE = 4.0F;
    private static final double RAIN_RADIUS = 14.0;
 
@@ -213,7 +223,7 @@ public final class ScarletGear {
       final UUID target;
       final ServerLevel level;
       final ServerPlayer caster;
-      final Vec3 origin;
+      Vec3 origin;
       int remaining;
       long next;
 
@@ -292,7 +302,9 @@ public final class ScarletGear {
       player.getCooldowns().addCooldown(held, ticks);
       bar(player, "§4" + SPELL_NAMES[index] + " §8| §7cast §8- §f" + SPELL_COOLDOWN_SECONDS[index] + "s");
       if (player.level() instanceof ServerLevel level) {
-         level.sendParticles(new DustParticleOptions(-65536, 1.1F), player.getX(), player.getY() + 1.0, player.getZ(), 24, 0.6, 0.7, 0.6, 0.02);
+         // The sigil the Grimoire draws under its reader on every cast.
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.6, 0.0, SCARLET);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 0.9, 0.0, GLINT);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.0F, 0.7F);
       }
       return null;
@@ -325,6 +337,11 @@ public final class ScarletGear {
       target.setDeltaMovement(target.getDeltaMovement().add(dx / d * 0.7, 0.3, dz / d * 0.7));
       target.hurtMarked = true;
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PHANTOM_BITE, SoundSource.PLAYERS, 1.2F, 0.9F);
+      Vec3 wound = target.position().add(0.0, target.getBbHeight() * 0.6, 0.0);
+      // The bite, then the blood drawn back along the line to the mouth that took it.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GOO_SPLASH, ParticleTypes.CRIMSON_SPORE, wound, Vec3.ZERO, 1.1, 0.0, SCARLET);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, wound, player.getEyePosition().add(0.0, -0.4, 0.0), 0.0, 0.0, GLINT);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, wound, player.getLookAngle(), 0.0, 0.0, SCARLET);
       blood(level, target.getX(), target.getY() + 1.0, target.getZ(), 24);
       return true;
    }
@@ -336,6 +353,9 @@ public final class ScarletGear {
          return false;
       }
       SPEARS.add(new Spear(target.getUUID(), level, player, player.getEyePosition(), 3, ServerClock.clock(level) + 5L));
+      // Three spears drawn up out of the caster's own blood before they are thrown.
+      Vec3 behind = player.getEyePosition().add(player.getLookAngle().scale(-0.6));
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.CRIMSON_SPORE, behind.add(0.0, 0.5, 0.0), new Vec3(-player.getLookAngle().z, 0.0, player.getLookAngle().x), 1.4, 16, SCARLET);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ARROW_SHOOT, SoundSource.PLAYERS, 1.2F, 0.7F);
       return true;
    }
@@ -379,7 +399,10 @@ public final class ScarletGear {
       }
 
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BAT_TAKEOFF, SoundSource.PLAYERS, 1.4F, 0.7F);
-      level.sendParticles(ParticleTypes.LARGE_SMOKE, player.getX(), player.getY() + 1.0, player.getZ(), 30, 1.4, 0.9, 1.4, 0.03);
+      // Night falls outward from the caster to the edge of the blind, and the swarm bursts out of it.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.LARGE_SMOKE, player.position().add(0.0, 0.4, 0.0), Vec3.ZERO, 12.0, 0.0, CLOT);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, ParticleTypes.LARGE_SMOKE, player.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 0.0, 1.0, CLOT);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, player.getX(), player.getY() + 1.0, player.getZ(), 30, 1.4, 0.9, 1.4, 0.03);
       return true;
    }
 
@@ -400,15 +423,26 @@ public final class ScarletGear {
          if (!(e instanceof LivingEntity le) || isAllyLiving(player, le)) {
             continue;
          }
-         le.hurtServer(level, level.damageSources().magic(), RAIN_DAMAGE);
+         // Credited to the caster, so what the rain kills counts as theirs. Plain magic() left
+         // every kill unowned - no kill credit, no loot looting, no feat.
+         le.hurtServer(level, level.damageSources().indirectMagic(player, player), RAIN_DAMAGE);
          le.addEffect(new MobEffectInstance(MobEffects.WITHER, 60, 0, false, false, true));
          drained += RAIN_DAMAGE;
          hits++;
+         if (hits <= 8) {
+            // A drop falls on each victim, and what it takes runs back to the caster.
+            Vec3 hit = le.position().add(0.0, le.getBbHeight() * 0.6, 0.0);
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.METEOR, ParticleTypes.CRIMSON_SPORE, hit.add(0.0, 7.0, 0.0), hit, 0.0, 6.0, SCARLET);
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, hit, player.position().add(0.0, 1.0, 0.0), 0.0, 0.0, GLINT);
+         }
       }
       if (drained > 0.0) {
          player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + (float) Math.min(8.0, drained * 0.35)));
       }
-      level.sendParticles(ParticleTypes.CRIMSON_SPORE, player.getX(), player.getY() + 6.0, player.getZ(), 120, 7.0, 1.0, 7.0, 0.3);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIMSON_SPORE, player.getX(), player.getY() + 6.0, player.getZ(), 120, 7.0, 1.0, 7.0, 0.3);
+      // The circle the rain falls inside, drawn on the ground at its true radius.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, RAIN_RADIUS, 50.0, SCARLET);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.CRIMSON_SPORE, player.position(), Vec3.ZERO, 8.0, 0.0, CLOT);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENDER_DRAGON_GROWL, SoundSource.PLAYERS, 1.0F, 0.6F);
       if (hits == 0) {
          bar(player, "§4Blood Rain §8| §7nothing in the downpour to drink");
@@ -481,6 +515,8 @@ public final class ScarletGear {
       // A visible tether, so both sides can see the channel and its direction.
       blood(level, player.getX(), player.getY() + 1.0, player.getZ(), 40);
       blood(level, target.getX(), target.getY() + 1.0, target.getZ(), 30);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, RITUAL_ANCHOR + 0.5, 40.0, SCARLET);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.CRIMSON_SPORE, target.position().add(0.0, target.getBbHeight() * 0.5, 0.0), Vec3.ZERO, 1.6, 0.0, GLINT);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WITCH_CELEBRATE, SoundSource.PLAYERS, 1.0F, 0.7F);
       bar(
          player,
@@ -525,6 +561,8 @@ public final class ScarletGear {
             continue;
          }
          Vec3 eye = target.position().add(0.0, target.getBbHeight() * 0.5, 0.0);
+         // Thrown from where the caster stands now, not from where they stood when they began.
+         s.origin = s.caster.getEyePosition().add(0.0, -0.2, 0.0);
          Vec3 dir = eye.subtract(s.origin);
          if (dir.lengthSqr() < 1.0E-4) {
             dir = new Vec3(0.0, -1.0, 0.0);
@@ -533,8 +571,12 @@ public final class ScarletGear {
             s.level, s.caster, new ItemStack(Items.REDSTONE), new ItemStack(Items.BOW)
          );
          arrow.setPos(s.origin.x, s.origin.y, s.origin.z);
-         arrow.setDeltaMovement(dir.normalize().scale(2.2));
-         arrow.setBaseDamage(SPEAR_DAMAGE);
+         arrow.setDeltaMovement(dir.normalize().scale(SPEAR_SPEED));
+         // An arrow hits for its speed times its base damage, so a base of SPEAR_DAMAGE at this
+         // speed was a 14-point spear. Divided back out, each spear hits for SPEAR_DAMAGE.
+         arrow.setBaseDamage(SPEAR_DAMAGE / SPEAR_SPEED);
+         com.fortuneandfavors.net.FfVfx.shape(s.level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, s.origin, eye, 0.0, 0.0, SCARLET);
+         com.fortuneandfavors.net.FfVfx.shape(s.level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.CRIMSON_SPORE, s.origin, dir.normalize(), 0.0, 0.0, GLINT);
          arrow.setCritArrow(false);
          arrow.pickup = net.minecraft.world.entity.projectile.arrow.AbstractArrow.Pickup.DISALLOWED;
          s.level.addFreshEntity(arrow);
@@ -640,8 +682,13 @@ public final class ScarletGear {
             // instead of hoping a vanilla goal fires.
             double dist = mob.distanceToSqr(foe);
             if (dist > 3.0) {
-               Vec3 toward = foe.position().subtract(mob.position()).normalize().scale(dist > 100.0 ? 0.42 : 0.3);
-               mob.setPos(mob.getX() + toward.x, mob.getY(), mob.getZ() + toward.z);
+               // Walked, not slid: the old step moved the body by setPos, straight through walls
+               // and out over drops. The path is asked for twice a second; only when there is no
+               // path at all does it fall back to the straight-line step it used to take.
+               if (servant.ticksLeft % 10 == 0 && !mob.getNavigation().moveTo(foe, dist > 100.0 ? 1.4 : 1.15)) {
+                  Vec3 toward = foe.position().subtract(mob.position()).normalize().scale(0.3);
+                  mob.setPos(mob.getX() + toward.x, mob.getY(), mob.getZ() + toward.z);
+               }
                mob.setYRot(faceYaw(mob, foe));
             } else if (ServerClock.clock(level) >= servant.nextAttack) {
                servant.nextAttack = ServerClock.clock(level) + 20L;
@@ -650,9 +697,8 @@ public final class ScarletGear {
             }
          } else if (owner != null) {
             // Idle: heel on the owner instead of wandering off.
-            if (mob.distanceToSqr(owner) > 100.0) {
-               Vec3 toward = owner.position().subtract(mob.position()).normalize().scale(0.35);
-               mob.setPos(mob.getX() + toward.x, mob.getY(), mob.getZ() + toward.z);
+            if (mob.distanceToSqr(owner) > 100.0 && servant.ticksLeft % 10 == 0) {
+               mob.getNavigation().moveTo(owner, 1.2);
             }
             if (servant.ticksLeft % 100 == 0) {
                bar(owner, "§4Blood Revenant §8| §f" + (servant.ticksLeft / 20) + "s§7 of service left");
@@ -705,12 +751,10 @@ public final class ScarletGear {
          Vec3 to = target.position().add(0.0, target.getBbHeight() * 0.5, 0.0);
          Vec3 dir = to.subtract(from);
          double len = dir.length();
-         if (len > 0.01) {
-            Vec3 unit = dir.normalize();
-            for (double d = 0.0; d < len; d += 0.35) {
-               Vec3 point = from.add(unit.scale(d));
-               levelParticle(ritual.level, point);
-            }
+         if (len > 0.01 && ritual.ticksLeft % 4 == 0) {
+            // One beam cue every few ticks. The old tether sent a particle packet for every third
+            // of a block, every tick - sixty packets a second on a long channel, for one line.
+            com.fortuneandfavors.net.FfVfx.shape(ritual.level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, to, from, 0.0, 0.0, SCARLET);
          }
          if (targetIsPlayer) {
             bar((ServerPlayer) target, "§4BEING DRAINED §8| §f" + Math.max(0, (int) Math.ceil(target.getHealth() / 2.0)) + " ❤ §7- hurt them or run");
@@ -723,8 +767,16 @@ public final class ScarletGear {
          ritual.nextPulse = now + pulseTicks(ritual.tier);
 
          float drain = Math.max(1.0F, target.getMaxHealth() * drainShare(ritual.tier));
+         if (drain >= target.getHealth() + target.getAbsorptionAmount()) {
+            // This pulse would kill. Finish the ritual instead of landing it, because the finish is
+            // what holds a player's inventory before they die: a pulse that killed on its own
+            // dropped everything on the floor, which is exactly what the ritual promises not to do.
+            it.remove();
+            completeRitual(caster, ritual, target);
+            continue;
+         }
          ritual.drained += drain;
-         boolean landed = target.hurtServer(ritual.level, ritual.level.damageSources().magic(), drain);
+         boolean landed = target.hurtServer(ritual.level, ritual.level.damageSources().indirectMagic(caster, caster), drain);
          target.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 60, 0, false, false, false));
          blood(ritual.level, target.getX(), target.getY() + 1.0, target.getZ(), 10);
          ritual.level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.GENERIC_DRINK, SoundSource.PLAYERS, 0.8F, 0.6F);
@@ -743,16 +795,13 @@ public final class ScarletGear {
       }
    }
 
-   private static void levelParticle(ServerLevel level, Vec3 point) {
-      level.sendParticles(ParticleTypes.CRIMSON_SPORE, point.x, point.y, point.z, 1, 0.03, 0.03, 0.03, 0.0);
-   }
-
    private static void failFx(Ritual ritual) {
       LivingEntity target = resolveLiving(null, ritual.level, ritual.target);
       double x = target != null ? target.getX() : ritual.anchor.x;
       double y = target != null ? target.getY() : ritual.anchor.y;
       double z = target != null ? target.getZ() : ritual.anchor.z;
-      ritual.level.sendParticles(ParticleTypes.POOF, x, y + 1.0, z, 24, 1.0, 1.0, 1.0, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(ritual.level, ParticleTypes.POOF, x, y + 1.0, z, 24, 1.0, 1.0, 1.0, 0.05);
+      com.fortuneandfavors.net.FfVfx.shape(ritual.level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.SMOKE, new Vec3(x, y + 0.2, z), Vec3.ZERO, 1.8, 0.0, CLOT);
       ritual.level.playSound(null, x, y, z, SoundEvents.FIRE_EXTINGUISH, SoundSource.PLAYERS, 1.0F, 0.8F);
    }
 
@@ -771,6 +820,10 @@ public final class ScarletGear {
       };
 
       blood(level, target.getX(), target.getY() + 1.0, target.getZ(), 80);
+      Vec3 body = target.position();
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.CRIMSON_SPORE, body, Vec3.ZERO, 9.0, 0.0, SCARLET);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.CRIMSON_SPORE, body.add(0.0, 0.3, 0.0), Vec3.ZERO, 5.0, 0.0, CLOT);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GOO_SPLASH, ParticleTypes.CRIMSON_SPORE, body.add(0.0, 1.0, 0.0), Vec3.ZERO, 2.2, 0.0, GLINT);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), ModSounds.BOSS_DEATH, SoundSource.PLAYERS, 0.9F, 0.8F);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.WITHER_DEATH, SoundSource.PLAYERS, 0.6F, 1.4F);
 
@@ -1045,13 +1098,11 @@ public final class ScarletGear {
       level.addFreshEntity(servant);
       SERVANTS.put(servant.getUUID(), new Servant(owner.getUUID()));
 
-      for (int ring = 0; ring < 2; ring++) {
-         double r = 0.9 + ring * 1.1;
-         for (int i = 0; i < 14; i++) {
-            double a = i / 14.0 * Math.PI * 2.0;
-            level.sendParticles(ParticleTypes.CRIMSON_SPORE, x + Math.cos(a) * r, y + 0.4, z + Math.sin(a) * r, 1, 0.0, 0.2, 0.0, 0.02);
-         }
-      }
+      // It climbs out of a pool of the victim's blood.
+      Vec3 pool = new Vec3(x, y + 0.05, z);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.CRIMSON_SPORE, pool, Vec3.ZERO, 2.0, 30.0, SCARLET);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.CRIMSON_SPORE, pool, Vec3.ZERO, 3.0, 0.0, SCARLET);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIMSON_SPORE, pool, Vec3.ZERO, 1.1, 0.0, GLINT);
       bar(owner, "§4The blood answers §8| §fa Blood Revenant of §f" + name + "§a fights for you for a minute");
       return servant;
    }
@@ -1098,6 +1149,14 @@ public final class ScarletGear {
          if (to.scale(1.0 / dist).dot(look) < 0.65) {
             continue;
          }
+         // Something you can see. Without this the Prism and the Spears locked onto a mob on the
+         // other side of a wall, and a ritual could be started through solid stone.
+         net.minecraft.world.phys.HitResult wall = player.level().clip(new net.minecraft.world.level.ClipContext(
+            eye, centre, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, player
+         ));
+         if (wall.getType() != net.minecraft.world.phys.HitResult.Type.MISS) {
+            continue;
+         }
          if (dist < bestDist) {
             bestDist = dist;
             best = (LivingEntity) e;
@@ -1117,8 +1176,8 @@ public final class ScarletGear {
    }
 
    private static void blood(ServerLevel level, double x, double y, double z, int count) {
-      level.sendParticles(ParticleTypes.CRIMSON_SPORE, x, y, z, count, 0.9, 0.9, 0.9, 0.1);
-      level.sendParticles(new DustParticleOptions(-65536, 1.3F), x, y, z, count / 2, 0.8, 0.8, 0.8, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIMSON_SPORE, x, y, z, count, 0.9, 0.9, 0.9, 0.1);
+      com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-65536, 1.3F), x, y, z, count / 2, 0.8, 0.8, 0.8, 0.05);
    }
 
    /** Called on shutdown so no servant outlives the world it was summoned in. */
@@ -1137,6 +1196,16 @@ public final class ScarletGear {
       SPELL.clear();
       RITUALS.clear();
       SAFE_DEATH.clear();
+      for (UUID id : new ArrayList<>(BATS.keySet())) {
+         // Discarded with the servants: a persistent bat left behind is a "Steve's bat" that
+         // outlives its spell, its owner and the server it was cast on.
+         Safe.run("scarlet bat cleanup", () -> {
+            Entity raw = findEntity(server, id);
+            if (raw != null) {
+               raw.discard();
+            }
+         });
+      }
       BATS.clear();
    }
 }
