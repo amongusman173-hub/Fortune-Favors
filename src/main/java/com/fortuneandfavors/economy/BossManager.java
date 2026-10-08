@@ -2716,18 +2716,38 @@ public final class BossManager {
             WardenTempBlock tb = it.next();
             if (now >= tb.until) {
                it.remove();
-
-               try {
-                  BlockState cur = tb.level.getBlockState(tb.pos);
-                  if (cur.is(Blocks.SCULK) || cur.is(Blocks.SCULK_VEIN) || cur.is(Blocks.SCULK_CATALYST)) {
-                     tb.level.setBlock(tb.pos, tb.original, 3);
-                     tb.level
-                        .sendParticles(ParticleTypes.SCULK_CHARGE_POP, tb.pos.getX() + 0.5, tb.pos.getY() + 0.5, tb.pos.getZ() + 0.5, 2, 0.2, 0.2, 0.2, 0.02);
-                  }
-               } catch (Exception var6) {
-               }
+               restoreWardenTempBlock(tb, true);
             }
          }
+      }
+   }
+
+   /**
+    * Puts every block the Elder Warden's sculk covered back the way it was, now.
+    *
+    * <p>The list is held in memory only, so anything still on it when the server stops would
+    * otherwise outlive the fight for good: the restore is a timer, and a timer that never fires
+    * after a restart is the "his sculk never goes away" report. Called on server stop, before
+    * the world is saved.
+    */
+   public static void restoreAllWardenTempSculk() {
+      for (WardenTempBlock tb : new ArrayList<>(wardenTempSculk)) {
+         restoreWardenTempBlock(tb, false);
+      }
+      wardenTempSculk.clear();
+   }
+
+   private static void restoreWardenTempBlock(WardenTempBlock tb, boolean effects) {
+      try {
+         BlockState cur = tb.level.getBlockState(tb.pos);
+         if (cur.is(Blocks.SCULK) || cur.is(Blocks.SCULK_VEIN) || cur.is(Blocks.SCULK_CATALYST)) {
+            tb.level.setBlock(tb.pos, tb.original, 3);
+            if (effects) {
+               tb.level
+                  .sendParticles(ParticleTypes.SCULK_CHARGE_POP, tb.pos.getX() + 0.5, tb.pos.getY() + 0.5, tb.pos.getZ() + 0.5, 2, 0.2, 0.2, 0.2, 0.02);
+            }
+         }
+      } catch (Exception ignored) {
       }
    }
 
@@ -5156,6 +5176,8 @@ public final class BossManager {
             }
          });
       }
+      // After the teardown, so nothing above can lay fresh sculk that this would miss.
+      com.fortuneandfavors.util.Safe.run("elder warden sculk restore", BossManager::restoreAllWardenTempSculk);
    }
 
    /**
