@@ -2520,39 +2520,22 @@ public final class BossManager {
          p.addEffect(new MobEffectInstance(MobEffects.DARKNESS, 240, 0, false, true));
       }
 
-      for (int ring = 0; ring < 9; ring++) {
-         for (int i = 0; i < 26; i++) {
-            double a = i / 26.0 * Math.PI * 2.0;
-            double r = 1.2 + ring * 2.2;
-            double y = cy + 0.4 + ring * 0.25;
-            com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-13726853, 1.8F), cx + Math.cos(a) * r, y, cz + Math.sin(a) * r, 1, 0.03, 0.35, 0.03, 0.0);
-            if (ring % 2 == 0) {
-               com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-5185306, 1.4F), cx + Math.cos(a) * r * 0.6, y + 0.3, cz + Math.sin(a) * r * 0.6, 1, 0.02, 0.25, 0.02, 0.0
-               );
-            }
-         }
-      }
-
-      for (int y = 0; y < 12; y++) {
-         double py = cy + 0.2 + y * 0.6;
-         double spread = 0.7 + y * 0.25;
-         com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SCULK.defaultBlockState()), cx, py, cz, 3, spread * 0.4, 0.25, spread * 0.4, 0.0
-         );
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, cx, py, cz, 6, spread, 0.4, spread, 0.03);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, cx, py, cz, 2, spread * 0.5, 0.3, spread * 0.5, 0.01);
-      }
-
+      // The calling. A wave of sculk rolls out to the edge of the infection (the same fourteen
+      // blocks spreadTempSculk covers), a ring of runes opens over the pit, and for the length of
+      // the rise his heartbeat is the loudest thing in the arena while the souls around him are
+      // drawn down into the ground and a helix climbs out of it with him. These are timed effects
+      // drawn by the client; the old calling was some six hundred particle calls in a single tick.
+      Vec3 pit = new Vec3(cx, cy, cz);
+      Fx.shockwave(level, ParticleTypes.SCULK_SOUL, pit, 14.0, SCULK_TEAL);
+      Fx.runeCircle(level, ParticleTypes.SCULK_SOUL, pit.add(0.0, 0.1, 0.0), 6.0, 90, SCULK_TEAL);
+      Fx.heartbeat(level, ParticleTypes.SCULK_SOUL, pit, 7.0, 90, 0x3FE0FF);
+      Fx.vortex(level, ParticleTypes.SCULK_SOUL, pit, 5.0, 70, SCULK_TEAL);
+      Fx.spiral(level, ParticleTypes.SCULK_SOUL, pit, 7.0, 70, 0x3FE0FF);
       for (int boom = 0; boom < 3; boom++) {
-         double by = cy + 1.2 + boom * 0.5;
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, cx, by, cz, 1, 0.0, 0.0, 0.0, 0.0);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, cx, by, cz, 6, 1.5 + boom, 0.2, 1.5 + boom, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, cx, cy + 1.2 + boom * 0.5, cz, 1, 0.0, 0.0, 0.0, 0.0);
       }
-
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, cx, cy + 1.0, cz, 140, 3.0, 2.0, 3.0, 0.12);
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, cx, cy + 0.8, cz, 60, 2.5, 1.2, 2.5, 0.08);
-      com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-12525360, 2.2F), cx, cy + 0.5, cz, 40, 2.0, 1.0, 2.0, 0.06);
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, cx, cy + 1.5, cz, 20, 1.5, 1.0, 1.5, 0.04);
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, cx, cy + 2.0, cz, 60, 4.0, 2.0, 4.0, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, cx, cy + 1.0, cz, 60, 3.0, 2.0, 3.0, 0.12);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, cx, cy + 0.8, cz, 30, 2.5, 1.2, 2.5, 0.08);
       level.playSound(null, cx, cy, cz, SoundEvents.SCULK_SHRIEKER_SHRIEK, SoundSource.HOSTILE, 1.8F, 0.5F);
       level.playSound(null, cx, cy, cz, SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.5F, 0.4F);
       level.playSound(null, cx, cy, cz, SoundEvents.SCULK_CATALYST_BLOOM, SoundSource.HOSTILE, 1.2F, 0.6F);
@@ -2561,7 +2544,12 @@ public final class BossManager {
       for (Entity en : level.getEntities(
          (Entity)null,
          new AABB(cx - 22.0, cy - 12.0, cz - 22.0, cx + 22.0, cy + 12.0, cz + 22.0),
+         // Monsters only. The call used to take every mob in reach - villagers, iron golems, a
+         // player's tamed wolves and cats, their horse - with a nine-thousand-point sonic boom.
+         // A named or tamed animal is somebody's, and a villager is the village's.
          e2 -> e2 instanceof Mob mob && mob.isAlive() && !mob.isInvulnerable() && !isBoss(mob) && !isFriendlySkeleton(mob)
+            && mob instanceof net.minecraft.world.entity.monster.Enemy && !mob.hasCustomName()
+            && !(mob instanceof net.minecraft.world.entity.TamableAnimal tame && tame.isTame())
       )) {
          if (en instanceof Mob mob) {
             mob.setNoAi(true);
@@ -2776,7 +2764,7 @@ public final class BossManager {
                b.riseTicks--;
                wardenMob.setPos(wardenMob.getX(), wardenMob.getY() + 0.05142857142857143, wardenMob.getZ());
                wardenMob.setYRot(wardenMob.getYRot() + 6.0F);
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, wardenMob.getX(), wardenMob.getY() + 0.5, wardenMob.getZ(), 14, 1.5, 0.7, 1.5, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, wardenMob.getX(), wardenMob.getY() + 0.5, wardenMob.getZ(), 8, 1.5, 0.7, 1.5, 0.05);
                com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SCULK.defaultBlockState()),
                   wardenMob.getX(),
                   wardenMob.getY() + 0.3,
@@ -2788,23 +2776,10 @@ public final class BossManager {
                   0.0
                );
                com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, wardenMob.getX(), wardenMob.getY() + 0.8, wardenMob.getZ(), 4, 1.2, 0.5, 1.2, 0.01);
-               if (b.riseTicks % 4 == 0) {
+               if (b.riseTicks % 8 == 0) {
+                  // A widening ring every few beats, the ground cracking open further as he climbs.
                   double ring = (70 - b.riseTicks) * 0.22 + 1.0;
-
-                  for (int i = 0; i < 20; i++) {
-                     double a = i / 20.0 * Math.PI * 2.0;
-                     com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-13726853, 1.6F),
-                        wardenMob.getX() + Math.cos(a) * ring,
-                        wardenMob.getY() + 0.6,
-                        wardenMob.getZ() + Math.sin(a) * ring,
-                        1,
-                        0.04,
-                        0.25,
-                        0.04,
-                        0.01
-                     );
-                  }
-
+                  Fx.ring(level, new DustParticleOptions(-13726853, 1.6F), wardenMob.position().add(0.0, 0.6, 0.0), ring, SCULK_TEAL);
                   level.playSound(null, wardenMob.getX(), wardenMob.getY(), wardenMob.getZ(), SoundEvents.SCULK_BLOCK_SPREAD, SoundSource.HOSTILE, 0.5F, 0.9F);
                }
 
@@ -2815,31 +2790,16 @@ public final class BossManager {
                   level.playSound(null, wardenMob.getX(), wardenMob.getY(), wardenMob.getZ(), SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.3F, 0.8F);
                   level.playSound(null, wardenMob.getX(), wardenMob.getY(), wardenMob.getZ(), SoundEvents.WARDEN_AGITATED, SoundSource.HOSTILE, 1.0F, 0.5F);
 
+                  // He is out. One roar, and the arena is thrown back by it: a flare at the chest, a
+                  // starburst of soul-light, a shockwave across the floor, and three sonic rings.
+                  Vec3 chest = wardenMob.position().add(0.0, 1.8, 0.0);
+                  Fx.flare(level, ParticleTypes.SCULK_SOUL, chest, 2.4, 0x3FE0FF);
+                  Fx.starburst(level, ParticleTypes.SCULK_SOUL, chest, 6.0, SCULK_TEAL);
+                  Fx.shockwave(level, ParticleTypes.SCULK_SOUL, wardenMob.position(), 12.0, SCULK_TEAL);
                   for (int boom = 0; boom < 3; boom++) {
-                     double by = wardenMob.getY() + 1.2 + boom * 0.4;
-                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, wardenMob.getX(), by, wardenMob.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
-                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, wardenMob.getX(), by, wardenMob.getZ(), 5, 1.8 + boom, 0.2, 1.8 + boom, 0.0);
+                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, wardenMob.getX(), wardenMob.getY() + 1.2 + boom * 0.4, wardenMob.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
                   }
-
-                  for (int ring = 0; ring < 5; ring++) {
-                     double r = 1.4 + ring * 1.8;
-
-                     for (int i = 0; i < 24; i++) {
-                        double a = i / 24.0 * Math.PI * 2.0;
-                        com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-13726853, 2.0F),
-                           wardenMob.getX() + Math.cos(a) * r,
-                           wardenMob.getY() + 0.5 + ring * 0.2,
-                           wardenMob.getZ() + Math.sin(a) * r,
-                           1,
-                           0.03,
-                           0.3,
-                           0.03,
-                           0.01
-                        );
-                     }
-                  }
-
-                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, wardenMob.getX(), wardenMob.getY() + 1.0, wardenMob.getZ(), 50, 2.5, 1.5, 2.5, 0.08);
+                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, wardenMob.getX(), wardenMob.getY() + 1.0, wardenMob.getZ(), 30, 2.5, 1.5, 2.5, 0.08);
 
                   for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && pl.distanceToSqr(wardenMob) < 256.0)) {
                      double dx = p.getX() - wardenMob.getX();
@@ -4083,10 +4043,13 @@ public final class BossManager {
       warden.hurtMarked = true;
       ServerLevel level = (ServerLevel)warden.level();
       level.playSound(null, warden.getX(), warden.getY(), warden.getZ(), SoundEvents.WARDEN_AGITATED, SoundSource.HOSTILE, 1.5F, 0.4F);
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, warden.getX(), warden.getY() + 1.6, warden.getZ(), 6, 1.0, 0.6, 1.0, 0.0);
-      for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && pl.distanceToSqr(warden) < 1600.0)) {
-         // Telegraph dialogue removed
-      }
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, warden.getX(), warden.getY() + 1.6, warden.getZ(), 3, 1.0, 0.6, 1.0, 0.0);
+      // The blow lands and he locks: a flare where it struck, his heartbeat slowing for the whole
+      // of the hold, and the souls he swallowed leaking out of him in a column.
+      Vec3 chest = warden.position().add(0.0, 1.8, 0.0);
+      Fx.flare(level, ParticleTypes.SCULK_SOUL, chest, 2.0, 0xFFFFFF);
+      Fx.heartbeat(level, ParticleTypes.SCULK_SOUL, warden.position(), 5.0, WARDEN_DEATH_TICKS, 0x3FE0FF);
+      Fx.aura(level, ParticleTypes.SCULK_SOUL, warden.position(), 3.4, WARDEN_DEATH_TICKS, SCULK_TEAL);
       return Boolean.FALSE;
    }
 
@@ -4113,7 +4076,13 @@ public final class BossManager {
          0.0
       );
       if (w.deathTicks % 10 == 0) {
-         level.playSound(null, warden.getX(), warden.getY(), warden.getZ(), SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 1.2F, 1.0F);
+         // The beat slows as he goes, and the pitch drops with it.
+         float pitch = 0.6F + 0.4F * w.deathTicks / (float)WARDEN_DEATH_TICKS;
+         level.playSound(null, warden.getX(), warden.getY(), warden.getZ(), SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 1.2F, pitch);
+      }
+      if (w.deathTicks == 20) {
+         // Cracks of light split him open just before the end.
+         Fx.starburst(level, ParticleTypes.SCULK_SOUL, warden.position().add(0.0, 1.6, 0.0), 3.5, 0xFFFFFF);
       }
       if (w.deathTicks > 0) {
          return;
@@ -4185,8 +4154,16 @@ public final class BossManager {
          }
       }
 
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, x, y, z, 140, 2.5, 2.5, 2.5, 0.1);
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, x, y, z, 8, 1.5, 1.0, 1.5, 0.05);
+      // Every soul he swallowed goes up at once: a flare, the body breaking apart into sculk, a
+      // last shockwave through the floor, and a helix of souls climbing out of where he stood.
+      Vec3 heart = new Vec3(x, y, z);
+      Fx.flare(level, ParticleTypes.SCULK_SOUL, heart.add(0.0, 0.8, 0.0), 3.0, 0x3FE0FF);
+      Fx.shatter(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SCULK.defaultBlockState()), heart, 2.2, SCULK_TEAL);
+      Fx.shockwave(level, ParticleTypes.SCULK_SOUL, warden.position(), 12.0, SCULK_TEAL);
+      Fx.spiral(level, ParticleTypes.SCULK_SOUL, warden.position(), 10.0, 50, 0x3FE0FF);
+      Fx.starburst(level, ParticleTypes.SCULK_SOUL, heart.add(0.0, 0.8, 0.0), 7.0, SCULK_TEAL);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, x, y, z, 60, 2.5, 2.5, 2.5, 0.1);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, x, y, z, 3, 1.5, 1.0, 1.5, 0.05);
 
       for (int i = 0; i < 30; i++) {
          double a = RANDOM.nextDouble() * Math.PI * 2.0;
