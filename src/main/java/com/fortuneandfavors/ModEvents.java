@@ -165,6 +165,9 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 public final class ModEvents {
+   /** Players whose on-hit weapon proc is resolving right now; see the damage hook. */
+   private static final java.util.Set<java.util.UUID> PROC_IN_FLIGHT = new java.util.HashSet<>();
+
    private static final Map<UUID, Long> crownRegenCooldown = new HashMap<>();
    private static final Map<UUID, Long> warlordRageCooldown = new HashMap<>();
    private static final Map<UUID, Long> evokerVitalityCooldown = new HashMap<>();
@@ -818,40 +821,51 @@ public final class ModEvents {
 
          if (source.getEntity() instanceof ServerPlayer hitter) {
             BossManager.recallFriendlies(hitter);
-            // The Clockwork Gauntlet winds its Overdrive on landed hits only, so
-            // the charge is driven from here rather than from a swing event: a
-            // swing that misses or is blocked must not build it.
-            if (attackerHeldGauntlet(hitter) && entity instanceof net.minecraft.world.entity.LivingEntity gauntletVictim) {
-               Safe.run("clockwork gauntlet hit", () -> com.fortuneandfavors.economy.ClockworkGear.onGauntletHit(hitter, gauntletVictim));
-            }
-            if (entity instanceof net.minecraft.world.entity.LivingEntity bladeVictim) {
-               if (ModItems.isStarpiercer(hitter.getMainHandItem())) {
-                  Safe.run("starpiercer hit", () -> com.fortuneandfavors.economy.MagisterGear.onStarpiercerHit(hitter, bladeVictim));
-               }
-               if (ModItems.isVoidReaver(hitter.getMainHandItem())) {
-                  Safe.run("void reaver hit", () -> com.fortuneandfavors.economy.VoidShaperGear.onReaverHit(hitter, bladeVictim));
-               }
-               // The End's set: every Voidfang blow leaves a mark that detonates on the
-               // third, and an Enderheart blow landed out of a fall leaves an End
-               // shockwave behind it. Both are read off the weapon in the hand, which
-               // is the only thing the two have in common with every other hit here.
-               if (ModItems.isAnyVoidfang(hitter.getMainHandItem())) {
-                  Safe.run("voidfang hit", () -> com.fortuneandfavors.economy.EnderGear.onVoidfangHit(hitter, bladeVictim));
-               }
-               if (ModItems.isAnyEnderheart(hitter.getMainHandItem())) {
-                  Safe.run("enderheart hit", () -> com.fortuneandfavors.economy.EnderGear.onEnderheartHit(hitter, bladeVictim));
-               }
-               // The sea set's three on-hit halves: the Grasp's knockback passive and its
-               // dive, the Chain's mark and Deep Strike, the Skybreaker's Momentum, Updraft
-               // and Downforce. Read off the hand that landed the blow, like every other one.
-               if (ModItems.isLeviathansGrasp(hitter.getMainHandItem())) {
-                  Safe.run("leviathan's grasp hit", () -> com.fortuneandfavors.economy.SeaAndSkyGear.onGraspHit(hitter, bladeVictim));
-               }
-               if (ModItems.isAbyssalChain(hitter.getMainHandItem())) {
-                  Safe.run("abyssal chain hit", () -> com.fortuneandfavors.economy.SeaAndSkyGear.onChainHit(hitter, bladeVictim));
-               }
-               if (ModItems.isSkybreaker(hitter.getMainHandItem())) {
-                  Safe.run("skybreaker hit", () -> com.fortuneandfavors.economy.SeaAndSkyGear.onSkybreakerHit(hitter, bladeVictim));
+            // One proc at a time per player. The damage a proc deals is credited to the same player,
+            // so it came straight back through this hook as a fresh "landed hit": a Gauntlet ram
+            // through four mobs refilled its own charge and fired a second ram from inside the first,
+            // and every weapon below could do the same with its own effects. While a proc is resolving,
+            // the hits it causes do not count as blows.
+            if (PROC_IN_FLIGHT.add(hitter.getUUID())) {
+               try {
+                  // The Clockwork Gauntlet winds its Overdrive on landed hits only, so
+                  // the charge is driven from here rather than from a swing event: a
+                  // swing that misses or is blocked must not build it.
+                  if (attackerHeldGauntlet(hitter) && entity instanceof net.minecraft.world.entity.LivingEntity gauntletVictim) {
+                     Safe.run("clockwork gauntlet hit", () -> com.fortuneandfavors.economy.ClockworkGear.onGauntletHit(hitter, gauntletVictim));
+                  }
+                  if (entity instanceof net.minecraft.world.entity.LivingEntity bladeVictim) {
+                     if (ModItems.isStarpiercer(hitter.getMainHandItem())) {
+                        Safe.run("starpiercer hit", () -> com.fortuneandfavors.economy.MagisterGear.onStarpiercerHit(hitter, bladeVictim));
+                     }
+                     if (ModItems.isVoidReaver(hitter.getMainHandItem())) {
+                        Safe.run("void reaver hit", () -> com.fortuneandfavors.economy.VoidShaperGear.onReaverHit(hitter, bladeVictim));
+                     }
+                     // The End's set: every Voidfang blow leaves a mark that detonates on the
+                     // third, and an Enderheart blow landed out of a fall leaves an End
+                     // shockwave behind it. Both are read off the weapon in the hand, which
+                     // is the only thing the two have in common with every other hit here.
+                     if (ModItems.isAnyVoidfang(hitter.getMainHandItem())) {
+                        Safe.run("voidfang hit", () -> com.fortuneandfavors.economy.EnderGear.onVoidfangHit(hitter, bladeVictim));
+                     }
+                     if (ModItems.isAnyEnderheart(hitter.getMainHandItem())) {
+                        Safe.run("enderheart hit", () -> com.fortuneandfavors.economy.EnderGear.onEnderheartHit(hitter, bladeVictim));
+                     }
+                     // The sea set's three on-hit halves: the Grasp's knockback passive and its
+                     // dive, the Chain's mark and Deep Strike, the Skybreaker's Momentum, Updraft
+                     // and Downforce. Read off the hand that landed the blow, like every other one.
+                     if (ModItems.isLeviathansGrasp(hitter.getMainHandItem())) {
+                        Safe.run("leviathan's grasp hit", () -> com.fortuneandfavors.economy.SeaAndSkyGear.onGraspHit(hitter, bladeVictim));
+                     }
+                     if (ModItems.isAbyssalChain(hitter.getMainHandItem())) {
+                        Safe.run("abyssal chain hit", () -> com.fortuneandfavors.economy.SeaAndSkyGear.onChainHit(hitter, bladeVictim));
+                     }
+                     if (ModItems.isSkybreaker(hitter.getMainHandItem())) {
+                        Safe.run("skybreaker hit", () -> com.fortuneandfavors.economy.SeaAndSkyGear.onSkybreakerHit(hitter, bladeVictim));
+                     }
+                  }
+               } finally {
+                  PROC_IN_FLIGHT.remove(hitter.getUUID());
                }
             }
             // A Starfall arrow landing: the arrow carries the weapon that fired it for

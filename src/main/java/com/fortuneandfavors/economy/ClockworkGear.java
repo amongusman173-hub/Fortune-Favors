@@ -59,6 +59,11 @@ public final class ClockworkGear {
    private static final int HEART_CALM_TICKS = 80;
    private static final float HEART_REPAIR = 3.0F;
 
+   /** Brass, the colour every Clockwork effect is drawn in. */
+   private static final int BRASS = 0xE2B042;
+   /** The blue of the King's soul-fire, for the spark at the heart of the ram. */
+   private static final int SOULFIRE = 0x3FD8FF;
+
    private static final Map<UUID, Integer> OVERDRIVE = new HashMap<>();
    private static final Map<UUID, Long> LAST_HURT = new HashMap<>();
    private static final Map<UUID, Long> LAST_REPAIR = new HashMap<>();
@@ -98,14 +103,14 @@ public final class ClockworkGear {
       // Trace the ram as a line, not a sphere: it should feel like a piston
       // punching forward rather than a fireball going off at your feet.
       Vec3 end = eye.add(flat.scale(RAM_RANGE));
-      int steps = (int) (RAM_RANGE * 4);
-      for (int i = 0; i <= steps; i++) {
-         double t = i / (double) steps;
-         Vec3 point = eye.add(flat.scale(t * RAM_RANGE));
-         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, point.x, point.y - 0.3, point.z, 2, 0.18, 0.18, 0.18, 0.0);
-         level.sendParticles(ParticleTypes.CRIT, point.x, point.y - 0.3, point.z, 1, 0.1, 0.1, 0.1, 0.02);
-      }
-      level.sendParticles(ParticleTypes.GUST, end.x, end.y - 0.3, end.z, 18, RAM_WIDTH, 0.4, RAM_WIDTH, 0.12);
+      // A piston of brass and soul-fire punched straight out along the line, a shockwave where it
+      // stops. Five shape cues; the old ram sent fifty particle packets to draw the same line.
+      Vec3 low = eye.add(0.0, -0.3, 0.0);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.ELECTRIC_SPARK, low.add(flat.scale(0.8)), flat, 0.0, 0.0, SOULFIRE);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.ELECTRIC_SPARK, low, end.add(0.0, -0.3, 0.0), 0.0, 0.0, BRASS);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SLASH, ParticleTypes.CRIT, attacker.position(), flat, RAM_RANGE, 0.0, BRASS);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, end.add(0.0, -0.3, 0.0), Vec3.ZERO, RAM_WIDTH + 0.6, 0.0, 0xD8C8A8);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.ELECTRIC_SPARK, end.add(0.0, -0.3, 0.0), Vec3.ZERO, RAM_WIDTH + 0.4, 0.0, BRASS);
       level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), ModSounds.BOSS_SLAM, SoundSource.PLAYERS, 1.1F, 1.5F);
       level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), SoundEvents.ANVIL_LAND, SoundSource.PLAYERS, 0.8F, 1.2F);
 
@@ -137,6 +142,16 @@ public final class ClockworkGear {
             continue;
          }
          if (living instanceof ServerPlayer other && isAlly(attacker, other)) {
+            continue;
+         }
+         // Never the owner's own summons, and never through a wall: the ram used to strike whatever
+         // was in the line, including mobs on the far side of solid stone.
+         if (BossManager.isFriendlySkeleton(living)) {
+            continue;
+         }
+         Vec3 centre = living.position().add(0.0, living.getBbHeight() * 0.5, 0.0);
+         if (level.clip(new net.minecraft.world.level.ClipContext(from, centre, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+               net.minecraft.world.level.ClipContext.Fluid.NONE, attacker)).getType() != net.minecraft.world.phys.HitResult.Type.MISS) {
             continue;
          }
          Vec3 to = living.position().subtract(from);
@@ -182,8 +197,9 @@ public final class ClockworkGear {
 
       // ---- Automaton Armor: plating and fireproofing while worn.
       if (ModItems.isAutomatonArmor(player.getItemBySlot(EquipmentSlot.CHEST))) {
-         player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 60, 0, false, false, true));
-         player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 60, 0, false, false, true));
+         // Topped up, not re-sent every tick.
+         topUp(player, MobEffects.RESISTANCE);
+         topUp(player, MobEffects.FIRE_RESISTANCE);
       }
 
       // ---- Mechanical Heart: repair, but only out of combat.
@@ -200,9 +216,18 @@ public final class ClockworkGear {
          LAST_REPAIR.put(player.getUUID(), now);
          player.heal(HEART_REPAIR);
          if (player.level() instanceof ServerLevel level) {
-            level.sendParticles(ParticleTypes.HEART, player.getX(), player.getY() + 1.4, player.getZ(), 3, 0.3, 0.2, 0.3, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HEART, player.getX(), player.getY() + 1.4, player.getZ(), 3, 0.3, 0.2, 0.3, 0.0);
+            // A gear turns once over the heart with every repair.
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.ELECTRIC_SPARK, player.position().add(0.0, 1.2, 0.0), Vec3.ZERO, 0.9, 0.0, BRASS);
             level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 0.5F, 1.6F);
          }
+      }
+   }
+
+   private static void topUp(ServerPlayer player, net.minecraft.core.Holder<net.minecraft.world.effect.MobEffect> effect) {
+      MobEffectInstance current = player.getEffect(effect);
+      if (current == null || current.getDuration() < 20) {
+         player.addEffect(new MobEffectInstance(effect, 60, 0, false, false, true));
       }
    }
 
