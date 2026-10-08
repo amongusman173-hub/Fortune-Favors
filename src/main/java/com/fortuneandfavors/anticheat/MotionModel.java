@@ -245,6 +245,51 @@ public final class MotionModel {
    }
 
    /**
+    * The same question, for a body whose jump is not the stock one and whose last tick may already
+    * have been carrying it upward.
+    *
+    * <p>Two honest things rise past a plain jump's impulse, and the four-argument form flagged both.
+    * Jump Boost raises the impulse itself - by a tenth of a block per level, which is what the
+    * Frog kit's Jump III and the slime boots hand out - so the second and third ticks of a boosted
+    * jump are still above 0.45 while airborne. And a slime block or a bed throws a falling body back
+    * up with most of the speed it landed with, so a bounce off a long fall rises a block a tick for
+    * several ticks with no jump anywhere in it. Neither is an impulse the body was given mid-air:
+    * both are momentum it already had, decaying under gravity exactly as vanilla says it should.
+    *
+    * <p>So the ceiling is the larger of the (boosted) jump and the ballistic continuation of the
+    * previous tick's rise. A body coasting upward on momentum passes; a body that holds or gains
+    * altitude speed - which is what every fly and high-jump module does - does not, because
+    * gravity takes {@link #GRAVITY} a tick off any honest rise and the module has to put it back.
+    */
+   public static boolean impossibleRise(
+      double dy,
+      boolean grounded,
+      boolean jumped,
+      boolean scripted,
+      double ticksPerSample,
+      double extraImpulse,
+      double previousRise
+   ) {
+      if (scripted || grounded || jumped) {
+         return false;
+      }
+      double scale = Math.max(1.0, Math.min(MovementPhysics.MAX_TICK_SCALE, ticksPerSample));
+      double jumpCeiling = (JUMP_IMPULSE + Math.max(0.0, extraImpulse) + RISE_MARGIN) * scale;
+      double coastCeiling = previousRise > 0.0
+         ? ((previousRise - GRAVITY) * VERTICAL_DRAG + RISE_MARGIN) * scale
+         : 0.0;
+      return dy > Math.max(jumpCeiling, coastCeiling);
+   }
+
+   /**
+    * What a Jump Boost of this amplifier adds to a jump's impulse: a tenth of a block per level,
+    * which is vanilla's own number. {@code -1} means no effect at all.
+    */
+   public static double jumpBoostImpulse(int amplifier) {
+      return amplifier < 0 ? 0.0 : 0.1 * (amplifier + 1);
+   }
+
+   /**
     * How many ticks of descent the body should have accumulated by now, given the
     * flight it has had. Used as the expectation the observed altitude is compared
     * against, so the check is about the <i>shape</i> of the fall and not about any

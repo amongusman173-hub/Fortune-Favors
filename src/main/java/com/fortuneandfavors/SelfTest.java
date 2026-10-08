@@ -11587,6 +11587,15 @@ public final class SelfTest {
                && com.fortuneandfavors.anticheat.MotionModel.impossibleRise(0.50, false, false, false),
             "the motion model did not separate a normal airborne step from an impossible rise"
          );
+         // Jump IV's fourth airborne tick (0.54) and a slime bounce coasting down from 0.85 are
+         // momentum the body already had; a fly module holding 0.6 a tick is not.
+         double jumpFour = com.fortuneandfavors.anticheat.MotionModel.jumpBoostImpulse(3);
+         require(
+            !com.fortuneandfavors.anticheat.MotionModel.impossibleRise(0.54, false, false, false, 1.0, jumpFour, -0.1)
+               && !com.fortuneandfavors.anticheat.MotionModel.impossibleRise(0.75, false, false, false, 1.0, 0.0, 0.85)
+               && com.fortuneandfavors.anticheat.MotionModel.impossibleRise(0.60, false, false, false, 1.0, 0.0, 0.60),
+            "the motion model flagged a boosted jump or a bounce, or let a held rise through"
+         );
          // The no-slow model reads the item's own declared price, so what has to be
          // pinned is the arithmetic and not a table of animation names: an item with no
          // use_effects pays vanilla's default fifth of its speed, and an item that

@@ -640,9 +640,17 @@ public final class AntiCheat {
     * for the machine and one that does not.
     */
    private static final double SWING_MIN_TPS = 19.0;
-   /** Distinct targets hit by swings inside one tick: the 6H signature, and a
-    *  count no mouse produces. */
-   private static final int MULTI_TARGET_BURST = 2;
+   /**
+    * Distinct targets hit by swings inside one tick: the 6H signature, and a count no mouse
+    * produces.
+    *
+    * <p>Three, not two. This finding is a single event with no repeat and no lag guard, so its
+    * number has to be one a hitch cannot make. Two was: a fast clicker in a mob crowd whose
+    * connection stalls for a fifth of a second has four clicks delivered on one tick, and two of
+    * them landing on neighbouring mobs is the crowd, not a fan-out. A burst at two targets still
+    * goes through the ordinary burst rule below, which asks for the pattern to repeat.
+    */
+   private static final int MULTI_TARGET_BURST = 3;
    /** Killaura score at which the swing is refused. Decays every tick. */
    private static final double AURA_LIMIT = 10.0;
    private static final double AURA_DECAY_PER_TICK = 0.02;
@@ -1594,6 +1602,12 @@ public final class AntiCheat {
       // the world holding the body, which is exactly what the airborne counters exist to be
       // told, so it counts as being on foot here. See inWeb.
       boolean webbed = inWeb(player);
+      // ...and a body sliding down the side of a honey block, for the same reason. Vanilla caps the
+      // slide at a crawl, so the fall prediction - which integrates full gravity - watched an honest
+      // player drift blocks "above" the fall it expected inside a second and called it flight. Only a
+      // descending body counts: a slide always goes down, so a module hovering beside honey is still
+      // judged on its own.
+      boolean honeySlide = !scripted && dy < 0.0 && besideHoney(player);
       if (grounded && !scripted) {
          track.setSafe(x, y, z);
       }
@@ -1613,7 +1627,7 @@ public final class AntiCheat {
          && track.airArcFell
          && dy > 0.0
          && aboveSupport(player, y, HOP_LANDING_HEIGHT);
-      boolean onFoot = grounded || touchdown || hopLanding || webbed;
+      boolean onFoot = grounded || touchdown || hopLanding || webbed || honeySlide;
 
       // ------------------------------------------------------------------ flight
       boolean hovering = false;
@@ -1656,7 +1670,8 @@ public final class AntiCheat {
       // the drop started to where the player says it ended - and the cost is read
       // off the landing tick: a fall of this size that leaves no mark at all did
       // not happen, or the client lied about when it stopped.
-      if (scripted) {
+      // A honey slide resets vanilla's own fall distance, so the drop is measured from where it ended.
+      if (scripted || honeySlide) {
          track.fallActive = false;
          track.fallTicks = 0;
          track.fallClaims = 0;
@@ -1760,6 +1775,7 @@ public final class AntiCheat {
       if (scripted) {
          track.gainEvents.clear();
          track.riseTicks = 0;
+         track.riseBefore = dy;
          track.predictionTicks = 0;
          track.predictedDrift = 0.0;
          track.predictionVelocity = 0.0;
@@ -2008,12 +2024,17 @@ public final class AntiCheat {
       double dy,
       double ticksPerSample
    ) {
+      // Read before anything can return, so the next tick always sees this one's rise. See
+      // MotionModel.impossibleRise: a bounce or a boosted jump is momentum the body already had.
+      double previousRise = track.riseBefore;
+      track.riseBefore = dy;
       if (scripted || !active(player, MOTION)) {
          track.riseTicks = 0;
          return;
       }
       boolean jumped = grounded && dy > 0.0;
-      if (!MotionModel.impossibleRise(dy, grounded, jumped, scripted, ticksPerSample)) {
+      double boost = jumpBoostImpulse(player);
+      if (!MotionModel.impossibleRise(dy, grounded, jumped, scripted, ticksPerSample, boost, previousRise)) {
          track.riseTicks = 0;
          return;
       }
@@ -2026,10 +2047,20 @@ public final class AntiCheat {
          player,
          MOTION,
          "rose " + round(dy) + " blocks in one tick while airborne and not jumping - a jump is "
-            + round(MotionModel.JUMP_IMPULSE),
-         Math.min(1.0, (dy - MotionModel.JUMP_IMPULSE) / 0.4)
+            + round(MotionModel.JUMP_IMPULSE + boost),
+         Math.min(1.0, (dy - MotionModel.JUMP_IMPULSE - boost) / 0.4)
       );
       correct(player, track, MOTION);
+   }
+
+   /** What this body's Jump Boost adds to a jump, or nothing. Falls back to the stock jump on error. */
+   private static double jumpBoostImpulse(ServerPlayer player) {
+      try {
+         MobEffectInstance boost = player.getEffect(MobEffects.JUMP_BOOST);
+         return boost == null ? 0.0 : MotionModel.jumpBoostImpulse(boost.getAmplifier());
+      } catch (Throwable t) {
+         return 0.0;
+      }
    }
 
    /**
@@ -2077,7 +2108,7 @@ public final class AntiCheat {
       // sample, so it is never handed the fresh arc - it is judged, and the tick it is judged on
       // is the one the vertical and hover checks already own.
       boolean freshHop = dy > 0.0
-         && dy <= (MotionModel.JUMP_IMPULSE + MotionModel.RISE_MARGIN) * scale;
+         && dy <= (MotionModel.JUMP_IMPULSE + jumpBoostImpulse(player) + MotionModel.RISE_MARGIN) * scale;
       if (track.predictionTicks == 0 || freshHop) {
          // Start from the vertical velocity the server actually observed when the player left
          // the ground. Starting from zero (the old implementation) made every ordinary jump
@@ -3218,6 +3249,11 @@ public final class AntiCheat {
          || player.isSpectator()
          || player.isCreative()
          || player.getAbilities().flying
+         // Damage that cannot land leaves no hurt marker either: Resistance V cancels every point
+         // of a fall, and an invulnerable body (a god-mode ability, a spawn guard) takes none.
+         || player.getAbilities().invulnerable
+         || player.isInvulnerable()
+         || resistanceAmplifier(player) >= 4
          || TimeLordManager.isFallGuarded(player)
          || ModItems.isSlimeBoots(player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET))
          || CustomEnchantments.levelOf(player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST), CustomEnchantments.SAFE_LANDING) > 0) {
@@ -3237,6 +3273,11 @@ public final class AntiCheat {
          }
       }
       return false;
+   }
+
+   private static int resistanceAmplifier(ServerPlayer player) {
+      MobEffectInstance resistance = player.getEffect(MobEffects.RESISTANCE);
+      return resistance == null ? -1 : resistance.getAmplifier();
    }
 
    /** Any collision shape within a block and a half under the player's feet. */
@@ -3498,6 +3539,31 @@ public final class AntiCheat {
       try {
          BlockPos feet = player.blockPosition();
          return level.getBlockState(feet).is(Blocks.COBWEB) || level.getBlockState(feet.above()).is(Blocks.COBWEB);
+      } catch (Throwable t) {
+         return false;
+      }
+   }
+
+   /**
+    * True when a honey block is pressed against the side of this body - the contact vanilla's own
+    * wall slide needs. Probed a tenth of a block outside the hitbox, over the body's full height.
+    * Fails closed (false), so a body the module cannot see the world for keeps being judged.
+    */
+   private static boolean besideHoney(ServerPlayer player) {
+      if (!(player.level() instanceof ServerLevel level)) {
+         return false;
+      }
+      try {
+         net.minecraft.world.phys.AABB box = player.getBoundingBox().inflate(0.1, 0.0, 0.1);
+         for (BlockPos pos : BlockPos.betweenClosed(
+            BlockPos.containing(box.minX, box.minY, box.minZ),
+            BlockPos.containing(box.maxX, box.maxY - 1.0E-4, box.maxZ)
+         )) {
+            if (level.getBlockState(pos).is(Blocks.HONEY_BLOCK)) {
+               return true;
+            }
+         }
+         return false;
       } catch (Throwable t) {
          return false;
       }
@@ -4734,13 +4800,21 @@ public final class AntiCheat {
             Vec3 look = attacker.getLookAngle();
             double dot = Math.max(-1.0, Math.min(1.0, look.dot(toTarget.scale(1.0 / length))));
             double angle = Math.toDegrees(Math.acos(dot));
-            if (angle >= AURA_ANGLE_HARD) {
-               track.auraScore += 2.0;
-            } else if (angle >= AURA_ANGLE) {
-               track.auraScore += 1.0;
-            }
-            if (angle >= AURA_ANGLE) {
-               track.lastAuraAngle = angle;
+            // The angle is to the centre, and the centre is not what a player aims at. On a big body -
+            // a warden, a wither, a boss scaled up - or one close enough to touch, a crosshair on the
+            // edge of the box is tens of degrees off the middle while being exactly on target. A ray
+            // that meets the box was aimed, whatever the centre says, so it scores nothing here. The
+            // raw angle still feeds the aim window below, which is a question about precision.
+            boolean aimedAtBox = angle >= AURA_ANGLE && lookRayMeetsBox(attacker, target, range);
+            if (!aimedAtBox) {
+               if (angle >= AURA_ANGLE_HARD) {
+                  track.auraScore += 2.0;
+               } else if (angle >= AURA_ANGLE) {
+                  track.auraScore += 1.0;
+               }
+               if (angle >= AURA_ANGLE) {
+                  track.lastAuraAngle = angle;
+               }
             }
 
             // The aim window. This is a different question from the aura score:
@@ -7938,6 +8012,8 @@ public final class AntiCheat {
       private boolean hasPreviousStep;
       /** Consecutive rises past the jump impulse. */
       private int riseTicks;
+      /** Last tick's vertical step, so a rise coasting on earlier momentum is not read as a new impulse. */
+      private double riseBefore;
       /** Whether the body was on the ground on the previous tick, which is what makes
        *  the per-tick friction term the right one. */
       private boolean groundedBefore;
