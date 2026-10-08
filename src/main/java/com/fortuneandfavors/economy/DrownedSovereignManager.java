@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -52,15 +53,23 @@ import net.minecraft.world.phys.Vec3;
  *       Leviathan's Wrath, Dead Sea, Final Depth.</li>
  * </ul>
  *
+ * <p>Two more sit outside those tables on their own cooldowns and cut into the rotation when they
+ * are ready: <b>Breaker Ring</b> (every phase; a ring of water rolls out along the floor - jump it)
+ * and <b>The Deep Looks</b> (phase two on; he stares, and anyone he can still see when the stare
+ * lands is hit - break line of sight or get out of the dome). They are kept out of the phase lists
+ * on purpose, because those lists are the codex page and the self-test's pinned design.
+ *
  * <h2>Everything multi-second is one scheduler</h2>
  * Most of that list is "a thing that happens shortly, somewhere", and a fight has to be able to have
  * several of them in the air at once while its own move loop keeps running. Rather than a field per
  * ability, every delayed effect is a {@link Pending}: a kind, a place, a fuse, and - for the ones
  * that linger - a life. The tick loop counts them down and lands them, which is why three Tsunami
- * waves can be travelling while a prison is still counting down on somebody.
+ * waves can be travelling while a prison is still counting down on somebody. The two cooldown moves
+ * are {@link Strike}s instead, because they land on the fight clock rather than a fuse.
  *
- * <p>All particles go through {@link BossVfx}, so a Bedrock client is handed a smaller version of
- * every shape rather than a queue it cannot drain.
+ * <p>Every shape is sent through {@link Fx}, which hands modded clients the real effect and everyone
+ * else a particle version. The per-tick particle upkeep a timed Fx shape already covers is wrapped as
+ * vanilla-only (see {@link #vanillaOnly}), so a modded client is not drawing both.
  */
 public final class DrownedSovereignManager {
 
@@ -77,6 +86,11 @@ public final class DrownedSovereignManager {
    private static final String BOSS_NAME = "\u00a73\u00a7l\uD83C\uDF0A The Drowned Sovereign";
    private static final String SAY = "\u00a73The Sovereign\u00a7r\u00a77 \u203a \u00a7f";
 
+   /** His palette: open water, the foam on it, and the dark underneath both. */
+   private static final int TIDE = 0x2E9BD6;
+   private static final int FOAM = 0xD8F6FF;
+   private static final int ABYSS = 0x0E2A4A;
+
    private static final double MAX_HEALTH = 760.0;
    private static final double SEEK_RANGE = 90.0;
    /** Wider than the widest arena in the mod, and no wider - see {@code ClockworkKingManager}. */
@@ -91,11 +105,17 @@ public final class DrownedSovereignManager {
    private static final int MOVE_GAP_2 = 58;
    private static final int MOVE_GAP_3 = 42;
 
+   /** The arrival: how long he takes to climb out of the floor, and from how deep. */
+   private static final int RISE_TICKS = 60;
+   private static final double RISE_DEPTH = 3.0;
+
    /** The wave: how wide the arc is, how far it reaches, and what it costs to stand in it. */
    private static final double WAVE_HALF_ANGLE = 100.0;
    private static final double WAVE_REACH = 13.0;
    private static final float WAVE_DAMAGE = 9.0F;
    private static final double WAVE_PUSH = 2.15;
+   /** How many ticks before a big wave lands its direction is drawn on the floor. */
+   private static final int WAVE_WARN = 16;
 
    private static final double CHARGE_RADIUS = 4.0;
    private static final float CHARGE_DAMAGE = 15.0F;
@@ -104,8 +124,20 @@ public final class DrownedSovereignManager {
    private static final double TENTACLE_RADIUS = 2.4;
    private static final float TENTACLE_DAMAGE = 11.0F;
 
+   /** Riptide: the lanes are drawn first, then he runs them one after another. */
+   private static final int DASH_TELL = 16;
+   private static final int DASH_STEP = 8;
+   private static final double DASH_HALF_WIDTH = 1.4;
+   private static final float DASH_DAMAGE = 8.0F;
+
    private static final double PRISON_RADIUS = 2.2;
    private static final int PRISON_TICKS = 60;
+   /** How long the prison's circle shows before it closes - the time to step out of it. */
+   private static final int PRISON_FUSE = 18;
+   private static final float PRISON_DAMAGE = 3.0F;
+
+   /** The most called drowned standing at once, however often the call comes round. */
+   private static final int MAX_MINIONS = 8;
 
    private static final double MAELSTROM_RADIUS = 22.0;
    private static final double MAW_RADIUS = 26.0;
@@ -115,6 +147,8 @@ public final class DrownedSovereignManager {
    private static final int BEAM_LIFE = 20;
    private static final double BEAM_REACH = 30.0;
    private static final double BEAM_HALF_WIDTH = 1.6;
+   /** The beam is a ray along the floor, not a wall to the sky: above this, it passes under you. */
+   private static final double BEAM_HEIGHT = 3.0;
    private static final int BEAM_HIT_COOLDOWN = 20;
 
    private static final int BLACK_TIDE_LIFE = 120;
@@ -126,6 +160,8 @@ public final class DrownedSovereignManager {
    private static final int EYE_HIT_COOLDOWN = 30;
 
    private static final int DEAD_SEA_TICKS = 200;
+   /** Dead Sea reaches the arena, not the whole dimension. */
+   private static final double DEAD_SEA_RADIUS = 40.0;
 
    private static final int FINAL_DEPTH_TELL = 40;
    private static final int FINAL_DEPTH_MARKS = 4;
@@ -144,6 +180,20 @@ public final class DrownedSovereignManager {
    /** Three rolls, each one starting a second after the last - a swell, not a single wall. */
    private static final int MEGA_ROLLS = 3;
 
+   /** Breaker Ring: the warning, how far the ring rolls, how fast, and what it costs. */
+   private static final int BREAKER_WARN = 30;
+   private static final double BREAKER_START = 1.5;
+   private static final double BREAKER_REACH = 18.0;
+   private static final double BREAKER_SPEED = 0.8;
+   private static final float BREAKER_DAMAGE = 10.0F;
+   private static final int BREAKER_COOLDOWN = 300;
+
+   /** The Deep Looks: the stare, how far it sees, and what being seen costs. */
+   private static final int GLARE_WARN = 45;
+   private static final double GLARE_REACH = 34.0;
+   private static final float GLARE_DAMAGE = 14.0F;
+   private static final int GLARE_COOLDOWN = 380;
+
    private static final int DEATH_CEREMONY_TICKS = 90;
 
    private static final Random RANDOM = new Random();
@@ -154,6 +204,10 @@ public final class DrownedSovereignManager {
       final Vec3 pos;
       int fuse;
       int life;
+      /** Where a line-shaped effect starts (a beam, a dash), or null for a point. */
+      Vec3 origin;
+      /** Which way a wave rolls, fixed when it is scheduled so its warning tells the truth. */
+      Vec3 dir;
 
       Pending(String kind, Vec3 pos, int fuse, int life) {
          this.kind = kind;
@@ -163,12 +217,37 @@ public final class DrownedSovereignManager {
       }
    }
 
+   /**
+    * A cooldown move that has been warned and not landed yet - a ring about to roll, a stare about
+    * to land. Kept apart from {@link Pending} because these run on the fight clock: the warning
+    * goes out once, as a timed shape, and the strike lands at {@link #landAt} whatever else he is
+    * doing in between.
+    */
+   private static final class Strike {
+      static final int BREAKER = 0;
+      static final int GLARE = 1;
+      final int kind;
+      final Vec3 at;
+      final long landAt;
+      /** Ticks since it landed - how far the ring has rolled. */
+      int age;
+      /** Who the ring has already passed, so one ring is one hit at most. */
+      final Set<UUID> passed = new HashSet<>();
+
+      Strike(int kind, Vec3 at, long landAt) {
+         this.kind = kind;
+         this.at = at;
+         this.landAt = landAt;
+      }
+   }
+
    private static final class Fight {
       final UUID bossId;
       final UUID summoner;
       final ServerBossEvent bar;
       final Set<UUID> participants = new HashSet<>();
       final List<Pending> pending = new ArrayList<>();
+      final List<Strike> strikes = new ArrayList<>();
       /**
        * The bodies Drowned Call brought up, so they can be sent back with him.
        *
@@ -184,9 +263,16 @@ public final class DrownedSovereignManager {
       long now;
       long nextMove;
       long nextTaunt;
+      long nextBreaker;
+      long nextGlare;
       String lastMove = "";
+      /** Ticks left climbing out of the floor; nothing else runs until this is zero. */
+      int riseTicks;
+      double riseFloorY;
       boolean dying;
       int deathTicks;
+      /** Where he stood when the killing blow landed - the body is put back here before it goes. */
+      double deathFloorY;
 
       Fight(UUID bossId, UUID summoner, ServerBossEvent bar) {
          this.bossId = bossId;
@@ -293,14 +379,14 @@ public final class DrownedSovereignManager {
       }
       for (Fight f : FIGHTS.values()) {
          if (summoner.getUUID().equals(f.summoner)) {
-            return "Your tide is already rising - finish this one first!";
+            return "Your tide's already in. Finish it first.";
          }
       }
 
       ServerLevel level = summoner.level();
       Mob boss = (Mob)EntityTypes.DROWNED.create(level, EntitySpawnReason.COMMAND);
       if (boss == null) {
-         return "The deep did not answer - he did not arrive.";
+         return "Nothing answered from below.";
       }
       AttributeInstance maxHp = boss.getAttribute(Attributes.MAX_HEALTH);
       if (maxHp != null) {
@@ -337,9 +423,14 @@ public final class DrownedSovereignManager {
       // The shared marker plus the visible-and-persistent guarantee: see BossManager.markBoss for
       // why a boss has to say so itself.
       BossManager.markBoss(boss);
-      boss.setPos(
-         summoner.getX(), BossGrounding.groundY(level, summoner.getX(), summoner.getZ(), summoner.getY()), summoner.getZ()
-      );
+      // He starts under the floor and climbs out of it (see tickRise). Held still, weightless and
+      // untouchable while he does, so the ground cannot suffocate him and nobody gets a free
+      // first hit on a boss whose fight has not begun.
+      double floorY = BossGrounding.groundY(level, summoner.getX(), summoner.getZ(), summoner.getY());
+      boss.setPos(summoner.getX(), floorY - RISE_DEPTH, summoner.getZ());
+      boss.setNoGravity(true);
+      boss.setNoAi(true);
+      boss.setInvulnerable(true);
       level.addFreshEntity(boss);
 
       ServerBossEvent bar = new ServerBossEvent(
@@ -352,19 +443,32 @@ public final class DrownedSovereignManager {
 
       Fight fight = new Fight(boss.getUUID(), summoner.getUUID(), bar);
       fight.participants.add(summoner.getUUID());
+      fight.riseTicks = RISE_TICKS;
+      fight.riseFloorY = floorY;
       long now = ServerClock.clock(level);
-      fight.nextMove = now + 50L;
+      fight.nextMove = now + RISE_TICKS + 40L;
       fight.nextTaunt = now + 120L;
+      fight.nextBreaker = now + RISE_TICKS + 220L;
+      fight.nextGlare = now + RISE_TICKS;
       FIGHTS.put(boss.getUUID(), fight);
 
       announce(level, "\u00a73\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
       announce(level, "    \u00a73\u00a7l\uD83C\uDF0A THE DROWNED SOVEREIGN \uD83C\uDF0A");
-      announce(level, "    \u00a77The water remembers what he was.");
-      announce(level, "    \u00a78\u201c\u00a7fYou are standing where my kingdom used to be.\u00a78\u201d");
-      announce(level, "    \u00a77\u00a7oEvery move he makes is answered by moving. Keep your feet.");
+      announce(level, "    \u00a77The ground is wet. Then it's water.");
+      announce(level, "    \u00a78\u201c\u00a7fThis was my kingdom.\u00a78\u201d");
+      announce(level, "    \u00a78Everything he does moves you. \u00a77Keep your feet.");
       announce(level, "\u00a73\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
-      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.4F, 0.6F);
-      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 1.2F, 0.7F);
+
+      // The rise is a set piece before it is a boss: a whirlpool opens where he will stand, a
+      // ring of his marks turns under it, and the first spout goes up before anything else does.
+      Vec3 pool = new Vec3(summoner.getX(), floorY, summoner.getZ());
+      Fx.vortex(level, ParticleTypes.BUBBLE, pool.add(0.0, 0.1, 0.0), 6.0, RISE_TICKS, TIDE);
+      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, pool.add(0.0, 0.05, 0.0), 5.0, RISE_TICKS + 10, FOAM);
+      Fx.summonCircle(level, ParticleTypes.SQUID_INK, pool.add(0.0, 0.05, 0.0), 3.0, RISE_TICKS, ABYSS);
+      Fx.geyser(level, ParticleTypes.SPLASH, pool, 6.0, TIDE);
+      level.playSound(null, pool.x, pool.y, pool.z, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.4F, 0.6F);
+      level.playSound(null, pool.x, pool.y, pool.z, SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 1.2F, 0.7F);
+      level.playSound(null, pool.x, pool.y, pool.z, SoundEvents.BUBBLE_COLUMN_UPWARDS_AMBIENT, SoundSource.HOSTILE, 1.6F, 0.6F);
       Advancements.grant(summoner, "summon_drowned_sovereign");
       return null;
    }
@@ -513,14 +617,21 @@ public final class DrownedSovereignManager {
     * body fall over mid-move with a dozen hazards still in the air. Returning {@code FALSE} cancels
     * the damage (Fabric: {@code true} means "allow it"), and the ceremony's own end kills him for
     * real, which is the only route that pays the loot.
+    *
+    * <p>Once the ceremony is running every further blow is cancelled too. It used to fall through to
+    * vanilla, so a second hit during the ceremony killed him on the spot and paid the loot early,
+    * with the ceremony still holding his fight open behind it.
     */
    public static Boolean onLethalDamage(Entity entity, float amount) {
       if (!isDrownedSovereign(entity) || entity.level().isClientSide()) {
          return null;
       }
       Fight fight = FIGHTS.get(entity.getUUID());
-      if (fight == null || fight.dying) {
+      if (fight == null) {
          return null;
+      }
+      if (fight.dying) {
+         return Boolean.FALSE;
       }
       if (!(entity instanceof Mob boss) || boss.getHealth() - amount > 0.0F) {
          return null;
@@ -528,12 +639,27 @@ public final class DrownedSovereignManager {
       ServerLevel level = (ServerLevel)boss.level();
       fight.dying = true;
       fight.deathTicks = DEATH_CEREMONY_TICKS;
+      fight.deathFloorY = boss.getY();
       fight.pending.clear();
+      fight.strikes.clear();
+      // His crew goes under with him now, at the start of the ceremony. The tick that was meant to
+      // do this never ran - the dying branch returns before it - so they used to keep swinging at
+      // players for the whole ceremony.
+      clearMinions(level, fight);
       boss.setHealth(1.0F);
       boss.setNoAi(true);
+      boss.setInvulnerable(true);
+      // Weightless so he can sink through his own floor without the floor pushing back.
+      boss.setNoGravity(true);
+      boss.setDeltaMovement(Vec3.ZERO);
       fight.bar.setProgress(0.0F);
+      // The build-up: the water starts turning around him and does not stop until he is gone.
+      Fx.spiral(level, ParticleTypes.BUBBLE, boss.position(), 10.0, DEATH_CEREMONY_TICKS, TIDE);
+      Fx.vortex(level, ParticleTypes.SQUID_INK, boss.position().add(0.0, 0.1, 0.0), 7.0, DEATH_CEREMONY_TICKS, ABYSS);
+      Fx.aura(level, ParticleTypes.BUBBLE, boss.position(), 5.5, DEATH_CEREMONY_TICKS, FOAM);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.CONDUIT_DEACTIVATE, SoundSource.HOSTILE, 2.0F, 0.6F);
-      announce(level, SAY + "\u00a77\u201c\u00a7f...the tide always comes back.\u00a77\u201d");
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_HURT, SoundSource.HOSTILE, 1.6F, 0.4F);
+      announce(level, SAY + "\u00a77\u201c\u00a7fNo. Not to you.\u00a77\u201d");
       return Boolean.FALSE;
    }
 
@@ -546,14 +672,22 @@ public final class DrownedSovereignManager {
       ServerLevel level = (ServerLevel)boss.level();
       fight.now = now;
 
+      // Only real, playing bodies join: a spectator or a puppet in range is not a participant, and
+      // a participant is who the loot boxes go to.
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-         if (p.level() == level && p.isAlive() && p.distanceToSqr(boss) < SEEK_RANGE * SEEK_RANGE) {
+         if (p.level() == level && p.isAlive() && !p.isSpectator() && !BossManager.isFakePlayer(p)
+            && p.distanceToSqr(boss) < SEEK_RANGE * SEEK_RANGE) {
             fight.participants.add(p.getUUID());
          }
       }
 
       if (fight.dying) {
          tickDeath(server, boss, fight);
+         return;
+      }
+
+      if (fight.riseTicks > 0) {
+         tickRise(level, boss, fight);
          return;
       }
 
@@ -569,13 +703,19 @@ public final class DrownedSovereignManager {
 
       // A presence, so the fight is never silent between moves - and it is water rather than a
       // generic aura, because the whole read of this fight is "the sea is standing here with you".
+      if (now % 40L == 0L) {
+         Fx.aura(level, ParticleTypes.BUBBLE, boss.position(), 5.5, 40, fight.phase >= 3 ? ABYSS : TIDE);
+      }
       if (now % 15L == 0L) {
-         BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 2.4, 2, ParticleTypes.FALLING_WATER);
-         BossVfx.at(level, boss.position(), 0.0, ParticleTypes.BUBBLE, 5, 1.2, 1.4, 1.2, 0.02);
-         BossVfx.at(level, boss.position(), 0.0, ParticleTypes.DRIPPING_WATER, 4, 1.4, 0.6, 1.4, 0.0);
+         vanillaOnly(() -> {
+            BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 2.4, 2, ParticleTypes.FALLING_WATER);
+            BossVfx.at(level, boss.position(), 0.0, ParticleTypes.BUBBLE, 5, 1.2, 1.4, 1.2, 0.02);
+            BossVfx.at(level, boss.position(), 0.0, ParticleTypes.DRIPPING_WATER, 4, 1.4, 0.6, 1.4, 0.0);
+         });
       }
 
       tickPending(level, boss, fight);
+      tickStrikes(level, boss, fight);
       tickMinions(level, fight);
 
       // He wears what he is, and the sea does not burn. A drowned left in daylight catches fire,
@@ -587,15 +727,76 @@ public final class DrownedSovereignManager {
       // every one of his moves is about where the player is standing, and a mob that also throws
       // its own attacks is a mob whose tells cannot be read. Movement is a steady approach to
       // whoever is closest, at a speed the player can back away from, and no jumping at all.
+      // He stands still while he stares: the dome on the floor is his reach, and it has to stay
+      // where it was drawn.
       ServerPlayer chase = nearestPlayer(level, boss, 64.0);
       if (chase != null) {
-         walkToward(boss, chase, 3.0, 0.15);
+         if (isStaring(fight)) {
+            boss.getLookControl().setLookAt(chase, 30.0F, 30.0F);
+            boss.setDeltaMovement(boss.getDeltaMovement().multiply(0.0, 1.0, 0.0));
+         } else {
+            walkToward(boss, chase, 3.0, 0.15);
+         }
       }
 
       if (now >= fight.nextMove) {
          fight.nextMove = now + moveGap(fight.phase);
          chooseMove(level, boss, fight);
       }
+   }
+
+   /**
+    * The arrival. He climbs out of the floor over {@link #RISE_TICKS} inside the whirlpool the
+    * summon opened, with spouts of water going up around the pool as he comes, and lands with a
+    * flash and a shockwave that shoves anyone standing on the spot clear - no damage, just room.
+    * Nothing else in the fight runs until he is up, so the first move is never thrown from inside
+    * the ground.
+    */
+   private static void tickRise(ServerLevel level, Mob boss, Fight fight) {
+      fight.riseTicks--;
+      double y = Math.min(fight.riseFloorY, boss.getY() + RISE_DEPTH / RISE_TICKS);
+      boss.setPos(boss.getX(), y, boss.getZ());
+      boss.setDeltaMovement(Vec3.ZERO);
+      Vec3 pool = new Vec3(boss.getX(), fight.riseFloorY, boss.getZ());
+      vanillaOnly(() -> {
+         BossVfx.at(level, pool.add(0.0, 0.2, 0.0), 0.0, ParticleTypes.BUBBLE, 6, 1.8, 0.3, 1.8, 0.08);
+         BossVfx.at(level, pool.add(0.0, 0.4, 0.0), 0.0, ParticleTypes.SPLASH, 8, 2.0, 0.2, 2.0, 0.2);
+      });
+      if (fight.riseTicks > 0 && fight.riseTicks % 15 == 0) {
+         double a = RANDOM.nextDouble() * Math.PI * 2.0;
+         double r = 3.0 + RANDOM.nextDouble() * 3.0;
+         double sx = pool.x + Math.cos(a) * r;
+         double sz = pool.z + Math.sin(a) * r;
+         Vec3 spout = new Vec3(sx, BossGrounding.groundY(level, sx, sz, pool.y), sz);
+         Fx.geyser(level, ParticleTypes.SPLASH, spout, 5.0 + RANDOM.nextDouble() * 3.0, TIDE);
+         level.playSound(null, sx, spout.y, sz, SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 1.2F, 0.6F);
+      }
+      if (fight.riseTicks % 10 == 0) {
+         level.playSound(null, pool.x, pool.y, pool.z, SoundEvents.BUBBLE_COLUMN_UPWARDS_AMBIENT, SoundSource.HOSTILE, 1.4F, 0.5F);
+      }
+      if (fight.riseTicks > 0) {
+         return;
+      }
+
+      // Up. He gets his weight, his will and his hit points back in the same tick.
+      boss.setPos(boss.getX(), fight.riseFloorY, boss.getZ());
+      boss.setNoGravity(false);
+      boss.setNoAi(false);
+      boss.setInvulnerable(false);
+      Vec3 crown = boss.position().add(0.0, 2.5, 0.0);
+      Fx.flare(level, ParticleTypes.SPLASH, crown, 3.2, FOAM);
+      Fx.starburst(level, ParticleTypes.BUBBLE, crown, 8.0, TIDE);
+      Fx.shockwave(level, ParticleTypes.SPLASH, boss.position(), 14.0, ABYSS);
+      Fx.geyser(level, ParticleTypes.SPLASH, boss.position(), 12.0, FOAM);
+      for (ServerPlayer p : playersNear(level, boss.position(), 6.0)) {
+         Vec3 away = p.position().subtract(boss.position());
+         push(p, new Vec3(away.x, 0.0, away.z), 1.0);
+      }
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 1.8F, 0.5F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 2.0F, 0.5F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.CONDUIT_ACTIVATE, SoundSource.HOSTILE, 1.6F, 0.6F);
+      announce(level, SAY + "\u00a7fUp. \u00a73Kneel.");
+      fight.nextMove = Math.max(fight.nextMove, fight.now + 40L);
    }
 
    /**
@@ -663,13 +864,18 @@ public final class DrownedSovereignManager {
 
    private static void enterPhase(ServerLevel level, Mob boss, Fight fight, int phase) {
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.CONDUIT_ACTIVATE, SoundSource.HOSTILE, 1.8F, phase == 3 ? 0.5F : 0.8F);
-      BossVfx.ring(level, boss.position(), 12.0, 48, ParticleTypes.SPLASH, 0.2);
-      BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 6.0, 3, ParticleTypes.BUBBLE);
+      int color = phase >= 3 ? ABYSS : TIDE;
+      Fx.shockwave(level, ParticleTypes.SPLASH, boss.position(), 14.0, color);
+      Fx.flare(level, ParticleTypes.BUBBLE, boss.position().add(0.0, 2.5, 0.0), 3.0, FOAM);
+      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, boss.position().add(0.0, 0.05, 0.0), 8.0, 40, color);
+      vanillaOnly(() -> BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 6.0, 3, ParticleTypes.BUBBLE));
       if (phase == 2) {
-         announceNear(level, boss, 90.0, SAY + "\u00a7bThe floor of the sea opens.");
+         announceNear(level, boss, 90.0, SAY + "\u00a7fDeeper, then.");
          overlayNear(level, boss, 90.0, "\u00a7b\u00a7lTHE ABYSS OPENS");
       } else if (phase == 3) {
-         announceNear(level, boss, 90.0, SAY + "\u00a73\u00a7l\u201c\u00a7fThen drown with me.\u00a73\u00a7l\u201d");
+         Fx.vortex(level, ParticleTypes.SQUID_INK, boss.position().add(0.0, 0.1, 0.0), 10.0, 40, ABYSS);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.0F, 0.5F);
+         announceNear(level, boss, 90.0, SAY + "\u00a73\u00a7l\u201c\u00a7fDrown with me.\u00a73\u00a7l\u201d");
          overlayNear(level, boss, 90.0, "\u00a73\u00a7lDROWNED GOD");
       }
    }
@@ -683,6 +889,10 @@ public final class DrownedSovereignManager {
    }
 
    private static void chooseMove(ServerLevel level, Mob boss, Fight fight) {
+      // A ready cooldown move takes the slot first, some of the time - see trySpecial.
+      if (trySpecial(level, boss, fight)) {
+         return;
+      }
       List<String> moves = movesForPhase(fight.phase);
       String move = moves.get(RANDOM.nextInt(moves.size()));
       // Never the same move twice in a row: the rotation is the fight's shape, and two Tidal
@@ -719,6 +929,29 @@ public final class DrownedSovereignManager {
       tell(level, boss, move);
    }
 
+   /**
+    * Lets a cooldown move that is ready take this move slot, one time in three.
+    *
+    * <p>The two cooldown moves are not in the phase tables (those are the codex and the self-test's
+    * pinned design), so they cut in here instead: each has its own clock, so neither can come round
+    * twice in a short fight, and the one-in-three roll keeps them from landing on the first slot
+    * after they come off cooldown every single time - the player should not be able to count to
+    * them. A move that finds nobody to aim at gives the slot back to the table.
+    */
+   private static boolean trySpecial(ServerLevel level, Mob boss, Fight fight) {
+      if (fight.phase >= 2 && fight.now >= fight.nextGlare && RANDOM.nextInt(3) == 0 && theDeepLooks(level, boss, fight)) {
+         fight.lastMove = "The Deep Looks";
+         tell(level, boss, fight.lastMove);
+         return true;
+      }
+      if (fight.now >= fight.nextBreaker && RANDOM.nextInt(3) == 0 && breakerRing(level, boss, fight)) {
+         fight.lastMove = "Breaker Ring";
+         tell(level, boss, fight.lastMove);
+         return true;
+      }
+      return false;
+   }
+
    private static void tell(ServerLevel level, Mob boss, String move) {
       level.playSound(null, boss.getX(), boss.getY() + 2.0, boss.getZ(), SoundEvents.ELDER_GUARDIAN_HURT, SoundSource.HOSTILE, 1.4F, 0.6F);
       // Telegraph removed
@@ -731,20 +964,16 @@ public final class DrownedSovereignManager {
       Vec3 look = boss.getLookAngle();
       Vec3 flat = new Vec3(look.x, 0.0, look.z);
       Vec3 unit = flat.lengthSqr() < 1.0E-4 ? new Vec3(1.0, 0.0, 0.0) : flat.normalize();
-      BossVfx.wall(level, boss.position().add(0.0, 1.0, 0.0), unit, 7.0, 3.5, ParticleTypes.SPLASH, 4);
-      BossVfx.wall(level, boss.position().add(0.0, 0.2, 0.0), unit, WAVE_REACH * 0.8, 2.0, ParticleTypes.FALLING_WATER, 3);
-      BossVfx.ring(level, boss.position(), 7.0, 45, ParticleTypes.DOLPHIN, 0.6);
-      BossVfx.ring(level, boss.position(), 4.0, 30, ParticleTypes.ELECTRIC_SPARK, 0.3);
+      Fx.crescent(level, ParticleTypes.SPLASH, boss.position().add(0.0, 1.0, 0.0), unit, WAVE_REACH, TIDE);
+      Fx.shockwave(level, ParticleTypes.SPLASH, boss.position(), 5.0, FOAM);
+      vanillaOnly(() -> {
+         BossVfx.wall(level, boss.position().add(0.0, 1.0, 0.0), unit, 7.0, 3.5, ParticleTypes.SPLASH, 4);
+         BossVfx.wall(level, boss.position().add(0.0, 0.2, 0.0), unit, WAVE_REACH * 0.8, 2.0, ParticleTypes.FALLING_WATER, 3);
+      });
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 1.6F, 0.7F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.HOSTILE, 0.8F, 1.8F);
       for (ServerPlayer p : playersNear(level, boss.position(), WAVE_REACH)) {
-         Vec3 to = p.position().subtract(boss.position());
-         Vec3 toFlat = new Vec3(to.x, 0.0, to.z);
-         if (toFlat.lengthSqr() < 1.0E-4) {
-            continue;
-         }
-         double angle = Math.toDegrees(Math.acos(Math.max(-1.0, Math.min(1.0, toFlat.normalize().dot(unit)))));
-         if (angle > WAVE_HALF_ANGLE) {
+         if (!inFront(boss.position(), unit, p, WAVE_HALF_ANGLE)) {
             continue;
          }
          p.hurtServer(level, level.damageSources().mobAttack(boss), WAVE_DAMAGE);
@@ -759,7 +988,9 @@ public final class DrownedSovereignManager {
          tidalCrash(level, boss);
          return;
       }
-      fight.pending.add(new Pending("charge", target.position(), CHARGE_TELL, 0));
+      Vec3 mark = floorAt(level, target.position());
+      fight.pending.add(new Pending("charge", mark, CHARGE_TELL, 0));
+      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, mark.add(0.0, 0.05, 0.0), CHARGE_RADIUS, CHARGE_TELL, TIDE);
    }
 
    /** Tentacles out of the ground around whoever is standing where. */
@@ -771,12 +1002,23 @@ public final class DrownedSovereignManager {
          double x = anchor != null ? anchor.getX() : boss.getX() + (RANDOM.nextDouble() - 0.5) * 16.0;
          double z = anchor != null ? anchor.getZ() : boss.getZ() + (RANDOM.nextDouble() - 0.5) * 16.0;
          double y = BossGrounding.groundY(level, x, z, anchor != null ? anchor.getY() : boss.getY());
-         fight.pending.add(new Pending("tentacle", new Vec3(x, y, z), 22 + RANDOM.nextInt(10), 0));
+         int fuse = 22 + RANDOM.nextInt(10);
+         Vec3 at = new Vec3(x, y, z);
+         fight.pending.add(new Pending("tentacle", at, fuse, 0));
+         Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, at.add(0.0, 0.05, 0.0), TENTACLE_RADIUS, fuse, ABYSS);
       }
-      announceNear(level, boss, 60.0, SAY + "\u00a77The ground is moving.");
+      hint(playersNear(level, boss.position(), 60.0), "\u00a78Bubbles underfoot. \u00a77Move.");
    }
 
-   /** Dash between bodies, cutting on arrival and on departure. */
+   /**
+    * Dash between bodies, cutting along each lane.
+    *
+    * <p>It used to be instant: he was simply somewhere else, and whoever stood on the old spot had
+    * already been cut. Now the lanes are drawn on the floor first ({@link #DASH_TELL} ticks), then
+    * he runs them one after another, so the answer is to step off the line before he comes down it.
+    * Each landing is put on the floor behind the player rather than at head height in front of a
+    * look vector that can point at the sky.
+    */
    private static void riptide(ServerLevel level, Mob boss, Fight fight) {
       List<ServerPlayer> near = playersNear(level, boss.position(), 30.0);
       if (near.isEmpty()) {
@@ -787,25 +1029,24 @@ public final class DrownedSovereignManager {
       int steps = Math.min(3, near.size());
       for (int i = 0; i < steps; i++) {
          ServerPlayer to = near.get(RANDOM.nextInt(near.size()));
-         Vec3 landing = to.position().add(to.getLookAngle().scale(-2.0));
-         BossVfx.beam(level, from.add(0.0, 1.0, 0.0), landing.add(0.0, 1.0, 0.0), 0.5, ParticleTypes.DOLPHIN);
-         for (ServerPlayer p : playersNear(level, from, 2.2)) {
-            p.hurtServer(level, level.damageSources().mobAttack(boss), 7.0F);
-         }
-         level.playSound(null, from.x, from.y, from.z, SoundEvents.DOLPHIN_SPLASH, SoundSource.HOSTILE, 1.3F, 1.4F);
+         Vec3 look = to.getLookAngle();
+         Vec3 back = new Vec3(look.x, 0.0, look.z);
+         back = back.lengthSqr() < 1.0E-4 ? Vec3.ZERO : back.normalize().scale(-2.0);
+         Vec3 landing = floorAt(level, to.position().add(back));
+         Pending dash = new Pending("dash", landing, DASH_TELL + i * DASH_STEP, 0);
+         dash.origin = from;
+         fight.pending.add(dash);
+         Fx.beam(level, ParticleTypes.DOLPHIN, from.add(0.0, 0.3, 0.0), landing.add(0.0, 0.3, 0.0), ABYSS);
          from = landing;
       }
-      boss.setPos(from.x, from.y, from.z);
-      boss.setDeltaMovement(Vec3.ZERO);
-      boss.hurtMarked = true;
-      for (ServerPlayer p : playersNear(level, from, 2.4)) {
-         p.hurtServer(level, level.damageSources().mobAttack(boss), 6.0F);
-      }
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.TRIDENT_THROW, SoundSource.HOSTILE, 1.3F, 0.6F);
+      hint(near, "\u00a78Lanes on the floor. \u00a77Step off them.");
    }
 
    /** The whirlpool: it decides where everyone nearby is allowed to be. */
    private static void undertow(ServerLevel level, Mob boss, Fight fight) {
       fight.pending.add(new Pending("undertow", boss.position(), 0, 80));
+      Fx.vortex(level, ParticleTypes.BUBBLE, boss.position().add(0.0, 0.1, 0.0), 9.0, 80, TIDE);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 1.2F, 1.1F);
    }
 
@@ -818,9 +1059,29 @@ public final class DrownedSovereignManager {
     * with {@code setPersistenceRequired} on them they never went anywhere on their own. The call is
     * drowned now, they are not persistent, and every one of them is listed in the fight so the
     * fight can take them back down with it.
+    *
+    * <p>Capped at {@link #MAX_MINIONS} standing at once. The call used to add three to five every
+    * time it came round with no ceiling, so a long fight became a crowd, and the list of bodies to
+    * clear grew without end. Dead ones are dropped from the list here; ones merely out of loaded
+    * range stay on it, so the release can still find them.
     */
    private static void drownedCall(ServerLevel level, Mob boss, Fight fight) {
-      int count = 3 + RANDOM.nextInt(3);
+      fight.minions.removeIf(id -> {
+         Entity e = level.getEntity(id);
+         return e != null && !e.isAlive();
+      });
+      int standing = 0;
+      for (UUID id : fight.minions) {
+         if (level.getEntity(id) != null) {
+            standing++;
+         }
+      }
+      int count = Math.min(3 + RANDOM.nextInt(3), MAX_MINIONS - standing);
+      if (count <= 0) {
+         pressureCrush(level, boss);
+         return;
+      }
+      Fx.summonCircle(level, ParticleTypes.BUBBLE_POP, boss.position().add(0.0, 0.05, 0.0), 4.5, 30, TIDE);
       for (int i = 0; i < count; i++) {
          double a = RANDOM.nextDouble() * Math.PI * 2.0;
          double x = boss.getX() + Math.cos(a) * 3.5;
@@ -833,11 +1094,10 @@ public final class DrownedSovereignManager {
          minion.addTag(MINION_TAG);
          level.addFreshEntity(minion);
          fight.minions.add(minion.getUUID());
+         Fx.gooSplash(level, ParticleTypes.SPLASH, minion.position().add(0.0, 0.3, 0.0), 1.0, ABYSS);
       }
-      BossVfx.ring(level, boss.position(), 4.5, 30, ParticleTypes.BUBBLE_POP, 0.5);
-      BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 4.0, 2, ParticleTypes.FALLING_WATER);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.CONDUIT_ATTACK_TARGET, SoundSource.HOSTILE, 1.4F, 0.8F);
-      announceNear(level, boss, 50.0, SAY + "\u00a77The deep sends its crew.");
+      announceNear(level, boss, 50.0, SAY + "\u00a7fCrew. Up.");
    }
 
    /**
@@ -860,6 +1120,7 @@ public final class DrownedSovereignManager {
       for (UUID id : fight.minions) {
          Entity minion = level.getEntity(id);
          if (minion != null && minion.isAlive()) {
+            Fx.gooSplash(level, ParticleTypes.SPLASH, minion.position().add(0.0, 0.5, 0.0), 0.8, TIDE);
             minion.discard();
          }
       }
@@ -868,34 +1129,55 @@ public final class DrownedSovereignManager {
 
    /** Pressure: heavy limbs, heavy tools. */
    private static void pressureCrush(ServerLevel level, Mob boss) {
-      BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 7.0, 3, ParticleTypes.BUBBLE);
+      Fx.dome(level, ParticleTypes.BUBBLE, boss.position(), 10.0, 30, ABYSS);
+      Fx.shockwave(level, ParticleTypes.BUBBLE, boss.position(), 10.0, TIDE);
       for (ServerPlayer p : playersNear(level, boss.position(), 10.0)) {
          p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 80, 1));
          p.addEffect(new MobEffectInstance(MobEffects.MINING_FATIGUE, 80, 1));
-         p.sendOverlayMessage(Component.literal("\u00a73\u00a7lPRESSURE \u00a77- the water is holding you down"));
+         p.sendOverlayMessage(Component.literal("\u00a73\u00a7lPRESSURE \u00a78Heavy arms."));
       }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 0.9F, 0.6F);
    }
 
-   /** One player, inside a sphere of water that is not a room. */
+   /**
+    * One player, inside a sphere of water that is not a room.
+    *
+    * <p>The prison used to be only a drawing: a sphere of particles at the spot, and nothing done to
+    * the person in it. Now it is a real hold. A circle shows on the floor under them for
+    * {@link #PRISON_FUSE} ticks - step out of it and nothing happens - and when it closes, whoever is
+    * still inside is held in the middle for {@link #PRISON_TICKS} ticks and squeezed once a second.
+    */
    private static void tidalPrison(ServerLevel level, Mob boss, Fight fight, ServerPlayer target) {
       if (target == null) {
          pressureCrush(level, boss);
          return;
       }
-      fight.pending.add(new Pending("prison", target.position(), 0, PRISON_TICKS));
+      Vec3 floor = floorAt(level, target.position());
+      fight.pending.add(new Pending("prison", floor, PRISON_FUSE, PRISON_TICKS));
+      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, floor.add(0.0, 0.05, 0.0), PRISON_RADIUS, PRISON_FUSE, FOAM);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.CONDUIT_ACTIVATE, SoundSource.HOSTILE, 1.4F, 1.6F);
+      hint(List.of(target), "\u00a78Water's closing on you. \u00a77Step out.");
    }
 
    // ---------------------------------------------------------- phase 2: the abyss
 
    private static void maelstrom(ServerLevel level, Mob boss, Fight fight) {
       fight.pending.add(new Pending("maelstrom", boss.position(), 0, 160));
-      announceNear(level, boss, 70.0, SAY + "\u00a7b\u00a7lTHE MAELSTROM");
+      Fx.vortex(level, ParticleTypes.SPLASH, boss.position().add(0.0, 0.1, 0.0), MAELSTROM_RADIUS, 160, TIDE);
+      Fx.spiral(level, ParticleTypes.BUBBLE, boss.position(), 8.0, 160, FOAM);
+      announceNear(level, boss, 70.0, SAY + "\u00a7fRound and round.");
+      hint(playersNear(level, boss.position(), 70.0), "\u00a78The current pulls. \u00a77Walk against it.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 1.8F, 0.5F);
    }
 
-   /** A ray across the water, drawn on the ground before it fires. */
+   /**
+    * A ray across the water, drawn on the ground before it fires.
+    *
+    * <p>The ray is fixed where it was aimed. It used to be drawn from wherever he was standing each
+    * tick, so as he walked the "line on the floor" swung round the arena and the warning stopped
+    * matching the hit; and its hit test was flat, so a player twenty blocks up a pillar over the
+    * line was cut anyway. Now it starts where he stood and only reaches {@link #BEAM_HEIGHT} up.
+    */
    private static void abyssalBeam(ServerLevel level, Mob boss, Fight fight) {
       ServerPlayer target = nearestPlayer(level, boss, 40.0);
       Vec3 dir = target == null ? boss.getLookAngle() : target.position().subtract(boss.position());
@@ -903,28 +1185,40 @@ public final class DrownedSovereignManager {
       if (flat.lengthSqr() < 1.0E-4) {
          flat = new Vec3(1.0, 0.0, 0.0);
       }
-      fight.pending.add(new Pending("beam", boss.position().add(flat.normalize().scale(BEAM_REACH)), 0, BEAM_TELL + BEAM_LIFE));
+      Vec3 origin = boss.position();
+      Pending beam = new Pending("beam", origin.add(flat.normalize().scale(BEAM_REACH)), 0, BEAM_TELL + BEAM_LIFE);
+      beam.origin = origin;
+      fight.pending.add(beam);
+      Fx.runeCircle(level, ParticleTypes.GLOW_SQUID_INK, origin.add(0.0, 0.05, 0.0), 2.5, BEAM_TELL, ABYSS);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.1F, 0.7F);
+      hint(playersNear(level, origin, BEAM_REACH + 4.0), "\u00a78A line on the water. \u00a77Get off it.");
    }
 
-   /** Under the floor, then up - once in phase two, three times as Leviathan's Wrath. */
+   /**
+    * Under the floor, then up - once in phase two, three times as Leviathan's Wrath.
+    *
+    * <p>He used to be teleported straight onto a player's feet the moment the move started, which
+    * was a body landing inside you with no warning before the eruption that was meant to be the
+    * hit. Now he goes under where he stands, each eruption is marked on the floor for its whole
+    * fuse, and he comes up <em>with</em> the eruption.
+    */
    private static void dive(ServerLevel level, Mob boss, Fight fight, int times) {
       List<ServerPlayer> near = playersNear(level, boss.position(), 30.0);
       if (near.isEmpty()) {
          tidalCrash(level, boss);
          return;
       }
-      Vec3 under = near.get(RANDOM.nextInt(near.size())).position();
-      boss.setPos(under.x, under.y, under.z);
-      boss.setDeltaMovement(Vec3.ZERO);
-      boss.hurtMarked = true;
+      Fx.gooSplash(level, ParticleTypes.SQUID_INK, boss.position().add(0.0, 0.3, 0.0), 2.4, ABYSS);
+      Fx.vortex(level, ParticleTypes.SQUID_INK, boss.position().add(0.0, 0.1, 0.0), 3.0, 20, ABYSS);
       for (int i = 0; i < Math.max(1, times); i++) {
          ServerPlayer anchor = near.get(RANDOM.nextInt(near.size()));
-         fight.pending.add(new Pending("erupt", anchor.position(), 16 + i * 14, 0));
+         Vec3 mark = floorAt(level, anchor.position());
+         int fuse = 24 + i * 16;
+         fight.pending.add(new Pending("erupt", mark, fuse, 0));
+         Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, mark.add(0.0, 0.05, 0.0), 5.0, fuse, TIDE);
       }
-      BossVfx.disc(level, under, 4.0, ParticleTypes.SQUID_INK, 0.2);
-      level.playSound(null, under.x, under.y, under.z, SoundEvents.ELDER_GUARDIAN_HURT, SoundSource.HOSTILE, 1.6F, 0.5F);
-      announceNear(level, boss, 60.0, SAY + "\u00a77He is underneath you.");
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_HURT, SoundSource.HOSTILE, 1.6F, 0.5F);
+      hint(playersNear(level, boss.position(), 60.0), "\u00a78He's under the floor. \u00a77Watch the circles.");
    }
 
    /** Water that is not water any more: standing in it is the cost. */
@@ -934,9 +1228,13 @@ public final class DrownedSovereignManager {
          double x = boss.getX() + Math.cos(a) * 11.0;
          double z = boss.getZ() + Math.sin(a) * 11.0;
          double y = BossGrounding.groundY(level, x, z, boss.getY());
-         fight.pending.add(new Pending("black", new Vec3(x, y, z), 0, BLACK_TIDE_LIFE));
+         Vec3 at = new Vec3(x, y, z);
+         fight.pending.add(new Pending("black", at, 0, BLACK_TIDE_LIFE));
+         Fx.runeCircle(level, ParticleTypes.SQUID_INK, at.add(0.0, 0.05, 0.0), BLACK_TIDE_RADIUS, BLACK_TIDE_LIFE, ABYSS);
+         Fx.gooSplash(level, ParticleTypes.SQUID_INK, at.add(0.0, 0.3, 0.0), 1.6, ABYSS);
       }
-      announceNear(level, boss, 70.0, SAY + "\u00a73\u00a7lBLACK TIDE \u00a77- \u00a7fget out of the dark water");
+      announceNear(level, boss, 70.0, SAY + "\u00a7fThe water's gone bad.");
+      hint(playersNear(level, boss.position(), 70.0), "\u00a78Dark pools. \u00a77Stay out of them.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 0.8F, 0.5F);
    }
 
@@ -948,9 +1246,11 @@ public final class DrownedSovereignManager {
          double x = boss.getX() + Math.cos(a) * r;
          double z = boss.getZ() + Math.sin(a) * r;
          double y = BossGrounding.groundY(level, x, z, boss.getY());
-         fight.pending.add(new Pending("eye", new Vec3(x, y + 0.4, z), 30 + RANDOM.nextInt(20), EYE_LIFE));
+         int fuse = 30 + RANDOM.nextInt(20);
+         fight.pending.add(new Pending("eye", new Vec3(x, y + 0.4, z), fuse, EYE_LIFE));
+         Fx.runeCircle(level, ParticleTypes.GLOW_SQUID_INK, new Vec3(x, y + 0.05, z), EYE_RADIUS, fuse, ABYSS);
       }
-      announceNear(level, boss, 70.0, SAY + "\u00a7bThe deep opens its eyes.");
+      announceNear(level, boss, 70.0, SAY + "\u00a7fLook down.");
    }
 
    /** Gravity, briefly, in his favour. */
@@ -962,72 +1262,97 @@ public final class DrownedSovereignManager {
          p.hurtMarked = true;
          p.sendOverlayMessage(Component.literal("\u00a73\u00a7lCRUSHING DEPTHS"));
       }
-      BossVfx.disc(level, boss.position(), 20.0, ParticleTypes.SQUID_INK, 0.1);
+      Fx.dome(level, ParticleTypes.SQUID_INK, boss.position(), 20.0, 20, ABYSS);
+      Fx.shockwave(level, ParticleTypes.SPLASH, boss.position(), 20.0, TIDE);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.2F, 0.4F);
    }
 
-   /** Three waves, in sequence, across the whole arena, with the water rolling ahead of each. */
+   /**
+    * Three waves, in sequence, each in its own direction, with that direction drawn on the floor
+    * before it rolls.
+    *
+    * <p>It used to hit everyone within eighteen blocks whatever way the wave went - the direction
+    * was rolled at the moment of impact and only decided which way you were thrown. Now each wave's
+    * direction is fixed when it is scheduled, shown {@link #WAVE_WARN} ticks out, and only the arc
+    * in front of it is hit: get behind him.
+    */
    private static void tsunami(ServerLevel level, Mob boss, Fight fight) {
       for (int i = 0; i < 3; i++) {
-         fight.pending.add(new Pending("tsunami", boss.position(), 14 + i * 26, 0));
+         Pending wave = new Pending("tsunami", boss.position(), 20 + i * 26, 0);
+         wave.dir = randomFlat();
+         fight.pending.add(wave);
       }
-      BossVfx.ring(level, boss.position(), 16.0, 56, ParticleTypes.FALLING_WATER, 0.3);
-      BossVfx.disc(level, boss.position(), 18.0, ParticleTypes.BUBBLE, 0.2);
-      announceNear(level, boss, 80.0, SAY + "\u00a73\u00a7lTSUNAMI \u00a77- three of them");
+      Fx.ring(level, ParticleTypes.FALLING_WATER, boss.position().add(0.0, 0.1, 0.0), 16.0, TIDE);
+      announceNear(level, boss, 80.0, SAY + "\u00a7fThree.");
+      hint(playersNear(level, boss.position(), 80.0), "\u00a78Three waves. \u00a77Get behind him.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 1.9F, 0.4F);
    }
 
    // ----------------------------------------------------- phase 3: the drowned god
 
+   /**
+    * One enormous wave. The class doc promised "one wall you can be behind", but it hit everyone in
+    * thirty blocks; the wall now has a front, drawn on the floor for its whole fuse.
+    */
    private static void worldbreakerTide(ServerLevel level, Mob boss, Fight fight) {
-      fight.pending.add(new Pending("worldbreaker", boss.position(), 30, 0));
-      BossVfx.ring(level, boss.position(), 22.0, 64, ParticleTypes.FALLING_WATER, 0.2);
-      BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 8.0, 3, ParticleTypes.BUBBLE);
-      announceNear(level, boss, 100.0, SAY + "\u00a73\u00a7lWORLDBREAKER TIDE \u00a77- run, or be moved");
+      Pending wave = new Pending("worldbreaker", boss.position(), 30, 0);
+      wave.dir = randomFlat();
+      fight.pending.add(wave);
+      warnWave(level, boss.position(), wave.dir, 26.0);
+      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, boss.position().add(0.0, 0.05, 0.0), 6.0, 30, ABYSS);
+      announceNear(level, boss, 100.0, SAY + "\u00a7fBreak.");
+      hint(playersNear(level, boss.position(), 100.0), "\u00a78One wall. \u00a77Get behind him.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 2.0F, 0.4F);
    }
 
    /** The centre of the arena, pulling. */
    private static void abyssalMaw(ServerLevel level, Mob boss, Fight fight) {
       fight.pending.add(new Pending("maw", boss.position(), 0, 140));
-      announceNear(level, boss, 90.0, SAY + "\u00a73\u00a7lTHE ABYSSAL MAW");
+      Fx.vortex(level, ParticleTypes.SQUID_INK, boss.position().add(0.0, 0.1, 0.0), MAW_RADIUS, 140, ABYSS);
+      Fx.wormhole(level, ParticleTypes.SQUID_INK, boss.position().add(0.0, 2.0, 0.0), false, ABYSS);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.0F, 0.4F);
+      announceNear(level, boss, 90.0, SAY + "\u00a7fCome here.");
+      hint(playersNear(level, boss.position(), 90.0), "\u00a78It pulls. \u00a77Walk against it.");
    }
 
    /**
     * The finale: the whole arena, taken by the sea in three rolls.
     *
-    * <p>The last phase's other moves each have an out - Worldbreaker Tide is one wall you can be
-    * behind, Abyssal Maw is a pull you can walk against, Final Depth marks only a few bodies at a
-    * time. This one has no out by design: it is the fight's closing statement, and the answer to it
-    * is the same as the answer to the whole rest of the fight, which is that you keep your footing
-    * and you accept being moved. Each roll is a full-width wall of water that also drinks the
-    * ground it passes over, so the arena is standing in the tide between rolls as well as during
-    * them.
+    * <p>Each roll is a wall of water the width of the arena with a front, and the front is drawn on
+    * the floor before it lands. The direction used to be rolled at the moment of impact, which
+    * made the closing statement a coin flip; now the answer is the same as the answer to the whole
+    * rest of the fight - read the water, get behind him, and accept being moved when you cannot.
     */
    private static void finalTsunami(ServerLevel level, Mob boss, Fight fight) {
       for (int i = 0; i < MEGA_ROLLS; i++) {
-         fight.pending.add(new Pending("megawave", boss.position(), 26 + i * 24, 0));
+         Pending roll = new Pending("megawave", boss.position(), 26 + i * 24, 0);
+         roll.dir = randomFlat();
+         fight.pending.add(roll);
       }
-      BossVfx.ring(level, boss.position(), MEGA_RADIUS * 0.7, 80, ParticleTypes.FALLING_WATER, 0.25);
-      BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 9.0, 4, ParticleTypes.BUBBLE);
-      BossVfx.column(level, boss.position(), 10.0, ParticleTypes.FALLING_WATER, 4);
+      Fx.ring(level, ParticleTypes.FALLING_WATER, boss.position().add(0.0, 0.1, 0.0), MEGA_RADIUS * 0.7, TIDE);
+      Fx.geyser(level, ParticleTypes.SPLASH, boss.position(), 10.0, FOAM);
+      Fx.vortex(level, ParticleTypes.BUBBLE, boss.position().add(0.0, 0.1, 0.0), 9.0, 26 + MEGA_ROLLS * 24, ABYSS);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 2.2F, 0.4F);
-      announceNear(level, boss, 110.0, SAY + "\u00a73\u00a7lFINAL TSUNAMI \u00a77- \u00a7fthe whole sea, three times");
+      announceNear(level, boss, 110.0, SAY + "\u00a7fAll of it.");
+      hint(playersNear(level, boss.position(), 110.0), "\u00a78Three walls. \u00a77Get behind him each time.");
       overlayNear(level, boss, 110.0, "\u00a73\u00a7lTHE LAST TIDE");
    }
 
-   /** Regeneration goes away, and the sea keeps hurting. */
+   /**
+    * Regeneration goes away, and the sea keeps hurting.
+    *
+    * <p>Bounded by {@link #DEAD_SEA_RADIUS} now: it used to reach every player in the dimension, so
+    * somebody mining at the other end of the world was poisoned by a fight they could not see.
+    */
    private static void deadSea(ServerLevel level, Mob boss) {
-      for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (p.level() != level || !p.isAlive() || p.isCreative() || p.isSpectator()) {
-            continue;
-         }
+      for (ServerPlayer p : playersNear(level, boss.position(), DEAD_SEA_RADIUS)) {
          p.removeEffect(MobEffects.REGENERATION);
          p.addEffect(new MobEffectInstance(MobEffects.HUNGER, DEAD_SEA_TICKS, 2));
          p.addEffect(new MobEffectInstance(MobEffects.POISON, DEAD_SEA_TICKS, 0));
-         p.sendOverlayMessage(Component.literal("\u00a73\u00a7lDEAD SEA \u00a77- nothing heals here"));
+         p.sendOverlayMessage(Component.literal("\u00a73\u00a7lDEAD SEA \u00a78No healing."));
       }
-      BossVfx.disc(level, boss.position(), 30.0, ParticleTypes.SQUID_INK, 0.1);
+      Fx.heartbeat(level, ParticleTypes.SQUID_INK, boss.position().add(0.0, 0.1, 0.0), 8.0, 60, ABYSS);
+      Fx.shockwave(level, ParticleTypes.SQUID_INK, boss.position(), DEAD_SEA_RADIUS * 0.75, ABYSS);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WITHER_SPAWN, SoundSource.HOSTILE, 0.6F, 0.5F);
    }
 
@@ -1040,14 +1365,190 @@ public final class DrownedSovereignManager {
       }
       int i = 0;
       for (ServerPlayer p : near) {
-         fight.pending.add(new Pending("final", p.position(), FINAL_DEPTH_TELL + i * 8, 0));
+         Vec3 mark = floorAt(level, p.position());
+         int fuse = FINAL_DEPTH_TELL + i * 8;
+         fight.pending.add(new Pending("final", mark, fuse, 0));
          // The mark on the floor is the whole tell - see the class doc on why he says nothing.
+         Fx.runeCircle(level, ParticleTypes.GLOW_SQUID_INK, mark.add(0.0, 0.05, 0.0), 3.4, fuse, ABYSS);
          i++;
          if (i >= FINAL_DEPTH_MARKS) {
             break;
          }
       }
-      announceNear(level, boss, 90.0, SAY + "\u00a73\u00a7lFINAL DEPTH");
+      announceNear(level, boss, 90.0, SAY + "\u00a7fDown you go.");
+   }
+
+   // ------------------------------------------------------- cooldown moves (strikes)
+
+   /**
+    * <b>Breaker Ring</b> - a ring of water that rolls out along the floor from his feet.
+    *
+    * <p>The answer is a jump. The ring is low and only takes the legs out from under a player who
+    * is standing on the ground as it passes, so a hop as it reaches you clears it cleanly (so does
+    * standing a block or two up). The warning is a turning circle at his feet, the ring's full
+    * reach drawn on the floor and a hint on the action bar, {@link #BREAKER_WARN} ticks out. In the
+    * last phase a second ring follows the first, so the jump has a rhythm rather than one beat.
+    *
+    * @return false if nobody was near enough to be worth it, so the slot goes back to the table
+    */
+   private static boolean breakerRing(ServerLevel level, Mob boss, Fight fight) {
+      List<ServerPlayer> near = playersNear(level, boss.position(), BREAKER_REACH + 4.0);
+      if (near.isEmpty()) {
+         return false;
+      }
+      Vec3 at = floorAt(level, boss.position());
+      long land = fight.now + BREAKER_WARN;
+      fight.strikes.add(new Strike(Strike.BREAKER, at, land));
+      long last = land;
+      if (fight.phase >= 3) {
+         last = land + 16L;
+         fight.strikes.add(new Strike(Strike.BREAKER, at, last));
+      }
+      fight.nextBreaker = fight.now + BREAKER_COOLDOWN - (fight.phase - 1) * 40L;
+      // The ring is the move: nothing else is thrown while it is rolling.
+      fight.nextMove = Math.max(fight.nextMove, last + 24L);
+      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, at.add(0.0, 0.05, 0.0), 3.0, BREAKER_WARN, FOAM);
+      Fx.ring(level, ParticleTypes.BUBBLE_POP, at.add(0.0, 0.1, 0.0), BREAKER_REACH, ABYSS);
+      Fx.aura(level, ParticleTypes.BUBBLE, boss.position(), 5.5, BREAKER_WARN, TIDE);
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.CONDUIT_ACTIVATE, SoundSource.HOSTILE, 1.6F, 0.6F);
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.BUBBLE_COLUMN_UPWARDS_AMBIENT, SoundSource.HOSTILE, 1.4F, 0.5F);
+      announceNear(level, boss, 60.0, SAY + "\u00a7fDown.");
+      hint(near, fight.phase >= 3 ? "\u00a78Two rings. \u00a77Jump. Then jump." : "\u00a78A ring's coming. \u00a77Jump it.");
+      return true;
+   }
+
+   /**
+    * <b>The Deep Looks</b> - he stops, stares, and whatever he can still see when the stare lands
+    * is hit.
+    *
+    * <p>Two answers, and the warning shows both. A dome of dark water the size of his sight
+    * ({@link #GLARE_REACH}) goes up around him for {@link #GLARE_WARN} ticks while light gathers
+    * over his head: put a solid block between you and him - a pillar, a wall, a hill - or get out
+    * of the dome. He holds still for the whole stare so the dome stays honest. Anyone in the open
+    * and inside it is hit, slowed and shoved away from him.
+    *
+    * @return false if nobody is in sight range, so the slot goes back to the table
+    */
+   private static boolean theDeepLooks(ServerLevel level, Mob boss, Fight fight) {
+      List<ServerPlayer> near = playersNear(level, boss.position(), GLARE_REACH);
+      if (near.isEmpty()) {
+         return false;
+      }
+      long land = fight.now + GLARE_WARN;
+      fight.strikes.add(new Strike(Strike.GLARE, boss.position(), land));
+      fight.nextGlare = fight.now + GLARE_COOLDOWN;
+      fight.nextMove = Math.max(fight.nextMove, land + 16L);
+      Vec3 eye = eyeOf(boss);
+      Fx.dome(level, ParticleTypes.SQUID_INK, boss.position(), GLARE_REACH, GLARE_WARN, ABYSS);
+      Fx.resonance(level, ParticleTypes.GLOW_SQUID_INK, eye, GLARE_WARN, FOAM);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.6F, 0.5F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 1.4F, 0.9F);
+      announceNear(level, boss, GLARE_REACH + 20.0, SAY + "\u00a7fI see you.");
+      hint(playersNear(level, boss.position(), GLARE_REACH + 8.0), "\u00a78He's looking. \u00a77Hide behind something, or get out.");
+      return true;
+   }
+
+   /** Whether a stare is warming up - he holds still for it. */
+   private static boolean isStaring(Fight fight) {
+      for (Strike s : fight.strikes) {
+         if (s.kind == Strike.GLARE) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   private static void tickStrikes(ServerLevel level, Mob boss, Fight fight) {
+      if (fight.strikes.isEmpty()) {
+         return;
+      }
+      for (Iterator<Strike> it = fight.strikes.iterator(); it.hasNext();) {
+         Strike s = it.next();
+         long left = s.landAt - fight.now;
+         if (left > 0L) {
+            // The timed shapes were sent once at the warning; this is the particle version of the
+            // same thing for clients without the mod, which only ever saw its first frame.
+            if (s.kind == Strike.BREAKER && left % 6L == 0L) {
+               vanillaOnly(() -> BossVfx.ring(level, s.at.add(0.0, 0.1, 0.0), BREAKER_REACH, 48, ParticleTypes.BUBBLE_POP, 0.1));
+            } else if (s.kind == Strike.GLARE && left % 3L == 0L) {
+               Vec3 eye = eyeOf(boss);
+               vanillaOnly(() -> BossVfx.at(level, eye, 0.0, ParticleTypes.GLOW_SQUID_INK, 4, 0.4, 0.4, 0.4, 0.02));
+            }
+            continue;
+         }
+         boolean done = s.kind == Strike.BREAKER ? rollBreaker(level, boss, s) : landGlare(level, boss, s);
+         if (done) {
+            it.remove();
+         }
+      }
+   }
+
+   /**
+    * One tick of a rolling Breaker Ring. The ring's edge moves {@link #BREAKER_SPEED} a tick; anyone
+    * the edge crosses this tick is checked once, and is only hit if they are on the ground and
+    * roughly level with the floor it rolls along.
+    *
+    * @return true once the ring has rolled its full reach
+    */
+   private static boolean rollBreaker(ServerLevel level, Mob boss, Strike s) {
+      if (s.age == 0) {
+         Fx.nova(level, ParticleTypes.SPLASH, s.at.add(0.0, 0.3, 0.0), 2.5, FOAM);
+         level.playSound(null, s.at.x, s.at.y, s.at.z, SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 1.8F, 0.5F);
+         level.playSound(null, s.at.x, s.at.y, s.at.z, SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.HOSTILE, 1.2F, 0.7F);
+      }
+      double inner = BREAKER_START + s.age * BREAKER_SPEED;
+      s.age++;
+      double outer = BREAKER_START + s.age * BREAKER_SPEED;
+      if (s.age % 3 == 1) {
+         Fx.ring(level, ParticleTypes.SPLASH, s.at.add(0.0, 0.15, 0.0), outer, TIDE);
+      }
+      for (ServerPlayer q : playersNear(level, s.at, outer + 2.0)) {
+         if (s.passed.contains(q.getUUID())) {
+            continue;
+         }
+         double dx = q.getX() - s.at.x;
+         double dz = q.getZ() - s.at.z;
+         double d = Math.sqrt(dx * dx + dz * dz);
+         if (d <= inner || d > outer) {
+            continue;
+         }
+         s.passed.add(q.getUUID());
+         double dy = q.getY() - s.at.y;
+         if (!q.onGround() || dy > 1.2 || dy < -2.5) {
+            // Jumped it, or standing above it: the ring goes under.
+            continue;
+         }
+         q.hurtServer(level, level.damageSources().mobAttack(boss), BREAKER_DAMAGE);
+         push(q, new Vec3(dx, 0.0, dz), 1.0);
+         q.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 1));
+         Fx.gooSplash(level, ParticleTypes.SPLASH, q.position().add(0.0, 0.3, 0.0), 1.0, FOAM);
+      }
+      return outer >= BREAKER_REACH;
+   }
+
+   /** The stare lands on everyone inside its reach that he still has a line to. */
+   private static boolean landGlare(ServerLevel level, Mob boss, Strike s) {
+      Vec3 eye = eyeOf(boss);
+      Fx.flare(level, ParticleTypes.GLOW_SQUID_INK, eye, 3.0, FOAM);
+      Fx.starburst(level, ParticleTypes.GLOW_SQUID_INK, eye, 9.0, TIDE);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 1.6F, 0.6F);
+      int seen = 0;
+      for (ServerPlayer q : playersNear(level, boss.position(), GLARE_REACH)) {
+         if (!boss.hasLineOfSight(q)) {
+            continue;
+         }
+         seen++;
+         Fx.beam(level, ParticleTypes.GLOW_SQUID_INK, eye, q.position().add(0.0, 1.0, 0.0), FOAM);
+         Fx.gooSplash(level, ParticleTypes.SPLASH, q.position().add(0.0, 1.0, 0.0), 1.2, TIDE);
+         q.hurtServer(level, level.damageSources().mobAttack(boss), GLARE_DAMAGE);
+         Vec3 away = q.position().subtract(boss.position());
+         push(q, new Vec3(away.x, 0.0, away.z), 1.2);
+         q.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 60, 1));
+      }
+      if (seen == 0) {
+         announceNear(level, boss, GLARE_REACH + 20.0, SAY + "\u00a7fHiding. Fine.");
+      }
+      return true;
    }
 
    // ------------------------------------------------------------------ pending
@@ -1080,31 +1581,65 @@ public final class DrownedSovereignManager {
    private static void drawPending(ServerLevel level, Mob boss, Fight fight, Pending pending, boolean tell) {
       Vec3 p = pending.pos;
       switch (pending.kind) {
-         case "charge" -> BossVfx.ring(level, p, CHARGE_RADIUS, 32, tell ? ParticleTypes.BUBBLE_POP : ParticleTypes.SPLASH, 0.3);
-         case "tentacle" -> {
-            BossVfx.ring(level, p, TENTACLE_RADIUS, 18, ParticleTypes.BUBBLE_POP, 0.15);
-            if (!tell) {
-               BossVfx.column(level, p, 4.0, ParticleTypes.FALLING_WATER, 3);
+         case "charge" -> vanillaOnly(() -> BossVfx.ring(level, p, CHARGE_RADIUS, 32, ParticleTypes.BUBBLE_POP, 0.3));
+         case "tentacle" -> vanillaOnly(() -> BossVfx.ring(level, p, TENTACLE_RADIUS, 18, ParticleTypes.BUBBLE_POP, 0.15));
+         case "erupt" -> vanillaOnly(() -> BossVfx.ring(level, p, 5.0, 24, ParticleTypes.BUBBLE_POP, 0.15));
+         case "final" -> vanillaOnly(() -> BossVfx.ring(level, p, 3.4, 24, ParticleTypes.BUBBLE_POP, 0.15));
+         case "dash" -> {
+            // The lane is redrawn while it is waiting, so it is on the floor the whole time.
+            if (pending.fuse % 6 == 0 && pending.origin != null) {
+               Fx.beam(level, ParticleTypes.DOLPHIN, pending.origin.add(0.0, 0.3, 0.0), p.add(0.0, 0.3, 0.0), ABYSS);
+            }
+         }
+         case "tsunami", "worldbreaker", "megawave" -> {
+            if (pending.dir != null && (pending.fuse == WAVE_WARN || pending.fuse == WAVE_WARN / 2)) {
+               double reach = pending.kind.equals("tsunami") ? 18.0 : pending.kind.equals("worldbreaker") ? 26.0 : MEGA_REACH;
+               warnWave(level, boss.position(), pending.dir, reach);
             }
          }
          case "prison" -> {
-            BossVfx.sphere(level, p.add(0.0, 1.0, 0.0), PRISON_RADIUS, 4, ParticleTypes.SPLASH);
-            BossVfx.sphere(level, p.add(0.0, 1.0, 0.0), PRISON_RADIUS * 0.8, 3, ParticleTypes.BUBBLE);
-            BossVfx.ring(level, p.add(0.0, 1.0, 0.0), PRISON_RADIUS, 24, ParticleTypes.DOLPHIN, 0.4);
+            if (tell) {
+               vanillaOnly(() -> BossVfx.ring(level, p, PRISON_RADIUS, 20, ParticleTypes.BUBBLE_POP, 0.1));
+               break;
+            }
+            if (pending.life % 3 == 0) {
+               vanillaOnly(() -> {
+                  BossVfx.sphere(level, p.add(0.0, 1.0, 0.0), PRISON_RADIUS, 3, ParticleTypes.SPLASH);
+                  BossVfx.ring(level, p.add(0.0, 1.0, 0.0), PRISON_RADIUS, 24, ParticleTypes.DOLPHIN, 0.4);
+               });
+            }
+            // The hold: anyone still in it is kept in the middle and squeezed once a second.
+            for (ServerPlayer q : playersNear(level, p, PRISON_RADIUS + 1.5)) {
+               double dx = q.getX() - p.x;
+               double dz = q.getZ() - p.z;
+               double flat = Math.sqrt(dx * dx + dz * dz);
+               if (flat > PRISON_RADIUS + 0.6 || Math.abs(q.getY() - p.y) > 3.0) {
+                  continue;
+               }
+               if (flat > PRISON_RADIUS * 0.4) {
+                  pull(q, p, 0.25);
+               }
+               if (pending.life % 20 == 0) {
+                  q.hurtServer(level, level.damageSources().mobAttack(boss), PRISON_DAMAGE);
+                  q.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 25, 2));
+               }
+            }
          }
          case "undertow" -> {
-            BossVfx.ring(level, p, 9.0 - (pending.life % 20) * 0.2, 36, ParticleTypes.SPLASH, 0.3);
-            BossVfx.ring(level, p, 5.0, 24, ParticleTypes.DOLPHIN, 0.5);
-            BossVfx.at(level, p, 0.0, ParticleTypes.DRIPPING_WATER, 3, 2.4, 0.6, 2.4, 0.0);
-            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, p.x, p.y + 0.8, p.z, 2, 0.6, 0.2, 0.6, 0.02);
+            vanillaOnly(() -> {
+               BossVfx.ring(level, p, 9.0 - (pending.life % 20) * 0.2, 36, ParticleTypes.SPLASH, 0.3);
+               BossVfx.ring(level, p, 5.0, 24, ParticleTypes.DOLPHIN, 0.5);
+               BossVfx.at(level, p, 0.0, ParticleTypes.DRIPPING_WATER, 3, 2.4, 0.6, 2.4, 0.0);
+            });
             for (ServerPlayer q : playersNear(level, p, 9.0)) {
                pull(q, p, 0.16);
             }
          }
          case "maelstrom" -> {
-            BossVfx.ring(level, p, MAELSTROM_RADIUS - (pending.life % 40) * 0.3, 64, ParticleTypes.SPLASH, 0.5);
-            BossVfx.ring(level, p, 6.0, 30, ParticleTypes.DOLPHIN, 0.6);
-            level.sendParticles(net.minecraft.core.particles.ColorParticleOption.create(ParticleTypes.FLASH, 0x66DDFF), p.x, p.y + 1.0, p.z, 1, 0.0, 0.0, 0.0, 0.0);
+            vanillaOnly(() -> {
+               BossVfx.ring(level, p, MAELSTROM_RADIUS - (pending.life % 40) * 0.3, 64, ParticleTypes.SPLASH, 0.5);
+               BossVfx.ring(level, p, 6.0, 30, ParticleTypes.DOLPHIN, 0.6);
+            });
             for (ServerPlayer q : playersNear(level, p, MAELSTROM_RADIUS)) {
                pull(q, p, 0.22);
                if (pending.life % 20 == 0) {
@@ -1113,8 +1648,13 @@ public final class DrownedSovereignManager {
             }
          }
          case "maw" -> {
-            BossVfx.sphere(level, p.add(0.0, 2.0, 0.0), MAW_RADIUS * 0.5, 4, ParticleTypes.SQUID_INK);
-            BossVfx.ring(level, p, MAW_RADIUS, 32, ParticleTypes.SOUL_FIRE_FLAME, 0.4);
+            vanillaOnly(() -> {
+               BossVfx.sphere(level, p.add(0.0, 2.0, 0.0), MAW_RADIUS * 0.5, 4, ParticleTypes.SQUID_INK);
+               BossVfx.ring(level, p, MAW_RADIUS, 32, ParticleTypes.SOUL_FIRE_FLAME, 0.4);
+            });
+            if (pending.life == 1) {
+               Fx.wormhole(level, ParticleTypes.SQUID_INK, p.add(0.0, 2.0, 0.0), true, ABYSS);
+            }
             for (ServerPlayer q : playersNear(level, p, MAW_RADIUS)) {
                pull(q, p, 0.30);
                if (pending.life % 15 == 0) {
@@ -1123,8 +1663,10 @@ public final class DrownedSovereignManager {
             }
          }
          case "black" -> {
-            BossVfx.disc(level, p, BLACK_TIDE_RADIUS, ParticleTypes.SQUID_INK, 0.15);
-            BossVfx.ring(level, p, BLACK_TIDE_RADIUS, 28, ParticleTypes.FALLING_WATER, 0.3);
+            vanillaOnly(() -> {
+               BossVfx.disc(level, p, BLACK_TIDE_RADIUS, ParticleTypes.SQUID_INK, 0.15);
+               BossVfx.ring(level, p, BLACK_TIDE_RADIUS, 28, ParticleTypes.FALLING_WATER, 0.3);
+            });
             if (pending.life % 10 == 0) {
                for (ServerPlayer q : playersNear(level, p, BLACK_TIDE_RADIUS)) {
                   q.hurtServer(level, level.damageSources().mobAttack(boss), BLACK_TIDE_DAMAGE);
@@ -1132,22 +1674,39 @@ public final class DrownedSovereignManager {
             }
          }
          case "beam" -> {
-            Vec3 from = boss.position().add(0.0, 1.5, 0.0);
+            Vec3 origin = pending.origin == null ? boss.position() : pending.origin;
+            Vec3 from = origin.add(0.0, 1.5, 0.0);
             Vec3 to = p.add(0.0, 1.5, 0.0);
             boolean firing = pending.life <= BEAM_LIFE;
-            BossVfx.beam(level, from, to, 0.3, ParticleTypes.BUBBLE);
-            BossVfx.beam(level, from, to, 0.4, firing ? ParticleTypes.SQUID_INK : ParticleTypes.DOLPHIN);
-            if (firing) {
-               level.sendParticles(ParticleTypes.ELECTRIC_SPARK, to.x, to.y, to.z, 3, 0.2, 0.2, 0.2, 0.05);
-               for (ServerPlayer q : playersNear(level, boss.position(), 40.0)) {
-                  if (distanceToLine(q.position(), from, to) < BEAM_HALF_WIDTH && mayTouch(fight, q.getUUID(), BEAM_HIT_COOLDOWN)) {
-                     q.hurtServer(level, level.damageSources().mobAttack(boss), BEAM_DAMAGE);
-                  }
+            if (!firing) {
+               if (pending.life % 4 == 0) {
+                  Fx.beam(level, ParticleTypes.DOLPHIN, origin.add(0.0, 0.2, 0.0), p.add(0.0, 0.2, 0.0), ABYSS);
+               }
+               break;
+            }
+            if (pending.life == BEAM_LIFE) {
+               Vec3 dir = to.subtract(from);
+               Fx.muzzle(level, ParticleTypes.SPLASH, from, dir, TIDE);
+               level.playSound(null, from.x, from.y, from.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 1.4F, 0.7F);
+            }
+            if (pending.life % 4 == 0) {
+               Fx.beam(level, ParticleTypes.GLOW_SQUID_INK, from, to, FOAM);
+            }
+            for (ServerPlayer q : playersNear(level, origin, BEAM_REACH + 4.0)) {
+               if (Math.abs(q.getY() - origin.y) > BEAM_HEIGHT) {
+                  continue;
+               }
+               if (distanceToLine(q.position(), from, to) < BEAM_HALF_WIDTH && mayTouch(fight, q.getUUID(), BEAM_HIT_COOLDOWN)) {
+                  q.hurtServer(level, level.damageSources().mobAttack(boss), BEAM_DAMAGE);
                }
             }
          }
          case "eye" -> {
-            BossVfx.column(level, p, 2.0, ParticleTypes.END_ROD, 2);
+            if (tell) {
+               vanillaOnly(() -> BossVfx.ring(level, p, EYE_RADIUS, 14, ParticleTypes.BUBBLE_POP, 0.1));
+               break;
+            }
+            vanillaOnly(() -> BossVfx.column(level, p, 2.0, ParticleTypes.END_ROD, 2));
             if (pending.life < EYE_LIFE - 10) {
                for (ServerPlayer q : playersNear(level, p, EYE_RADIUS)) {
                   if (mayTouch(fight, q.getUUID(), EYE_HIT_COOLDOWN)) {
@@ -1165,8 +1724,9 @@ public final class DrownedSovereignManager {
       Vec3 p = pending.pos;
       switch (pending.kind) {
          case "charge" -> {
-            BossVfx.disc(level, p, CHARGE_RADIUS, ParticleTypes.SPLASH, 0.2);
-            BossVfx.sphere(level, p.add(0.0, 1.0, 0.0), CHARGE_RADIUS, 2, ParticleTypes.BUBBLE);
+            Fx.nova(level, ParticleTypes.BUBBLE, p.add(0.0, 1.0, 0.0), CHARGE_RADIUS, FOAM);
+            Fx.geyser(level, ParticleTypes.SPLASH, p, 6.0, TIDE);
+            vanillaOnly(() -> BossVfx.disc(level, p, CHARGE_RADIUS, ParticleTypes.SPLASH, 0.2));
             level.playSound(null, p.x, p.y, p.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.4F, 0.6F);
             for (ServerPlayer q : playersNear(level, p, CHARGE_RADIUS)) {
                q.hurtServer(level, level.damageSources().mobAttack(boss), CHARGE_DAMAGE);
@@ -1174,15 +1734,50 @@ public final class DrownedSovereignManager {
             }
          }
          case "tentacle" -> {
+            Fx.pillar(level, ParticleTypes.SQUID_INK, p, 5.0, ABYSS);
+            Fx.gooSplash(level, ParticleTypes.SPLASH, p.add(0.0, 0.5, 0.0), 1.2, TIDE);
             level.playSound(null, p.x, p.y, p.z, SoundEvents.ELDER_GUARDIAN_HURT, SoundSource.HOSTILE, 1.2F, 0.6F);
             for (ServerPlayer q : playersNear(level, p, TENTACLE_RADIUS)) {
                q.hurtServer(level, level.damageSources().mobAttack(boss), TENTACLE_DAMAGE);
                push(q, new Vec3(0.0, 1.0, 0.0), 1.5);
             }
          }
+         case "dash" -> {
+            Vec3 from = pending.origin == null ? boss.position() : pending.origin;
+            Fx.comet(level, ParticleTypes.SPLASH, from.add(0.0, 1.0, 0.0), p.add(0.0, 1.0, 0.0), 4, TIDE);
+            Fx.gooSplash(level, ParticleTypes.SPLASH, p.add(0.0, 0.3, 0.0), 1.6, FOAM);
+            level.playSound(null, p.x, p.y, p.z, SoundEvents.DOLPHIN_SPLASH, SoundSource.HOSTILE, 1.3F, 1.4F);
+            Vec3 lane = p.subtract(from);
+            Vec3 side = new Vec3(-lane.z, 0.0, lane.x);
+            for (ServerPlayer q : playersNear(level, from, from.distanceTo(p) + 2.0)) {
+               if (Math.abs(q.getY() - p.y) > 3.0 || distanceToLine(q.position(), from, p) >= DASH_HALF_WIDTH) {
+                  continue;
+               }
+               q.hurtServer(level, level.damageSources().mobAttack(boss), DASH_DAMAGE);
+               Vec3 off = q.position().subtract(from);
+               push(q, side.dot(off) >= 0.0 ? side : side.scale(-1.0), 0.9);
+            }
+            boss.setPos(p.x, p.y, p.z);
+            boss.setDeltaMovement(Vec3.ZERO);
+            boss.hurtMarked = true;
+         }
+         case "prison" -> {
+            Fx.dome(level, ParticleTypes.BUBBLE, p, PRISON_RADIUS, PRISON_TICKS, TIDE);
+            Fx.gooSplash(level, ParticleTypes.SPLASH, p.add(0.0, 1.0, 0.0), 1.4, FOAM);
+            level.playSound(null, p.x, p.y, p.z, SoundEvents.CONDUIT_ATTACK_TARGET, SoundSource.HOSTILE, 1.4F, 0.8F);
+         }
+         case "eye" -> {
+            Fx.pillar(level, ParticleTypes.END_ROD, p, 3.0, FOAM);
+            Fx.flare(level, ParticleTypes.GLOW_SQUID_INK, p.add(0.0, 1.0, 0.0), 1.0, TIDE);
+            level.playSound(null, p.x, p.y, p.z, SoundEvents.CONDUIT_ATTACK_TARGET, SoundSource.HOSTILE, 0.9F, 1.4F);
+         }
          case "erupt" -> {
-            BossVfx.column(level, p, 6.0, ParticleTypes.FALLING_WATER, 4);
-            BossVfx.ring(level, p, 5.0, 32, ParticleTypes.SPLASH, 0.2);
+            // He comes up with the water.
+            boss.setPos(p.x, p.y, p.z);
+            boss.setDeltaMovement(Vec3.ZERO);
+            boss.hurtMarked = true;
+            Fx.geyser(level, ParticleTypes.SPLASH, p, 9.0, FOAM);
+            Fx.shockwave(level, ParticleTypes.SPLASH, p, 5.0, TIDE);
             level.playSound(null, p.x, p.y, p.z, SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 1.6F, 0.5F);
             for (ServerPlayer q : playersNear(level, p, 5.0)) {
                q.hurtServer(level, level.damageSources().mobAttack(boss), 12.0F);
@@ -1190,55 +1785,66 @@ public final class DrownedSovereignManager {
             }
          }
          case "tsunami" -> {
-            Vec3 dir = randomFlat();
-            BossVfx.wall(level, boss.position().add(0.0, 1.0, 0.0), dir, 14.0, 4.0, ParticleTypes.SPLASH, 4);
-            BossVfx.wall(level, boss.position().add(0.0, 0.3, 0.0), dir, 18.0, 2.0, ParticleTypes.FALLING_WATER, 3);
-            BossVfx.disc(level, boss.position(), 12.0, ParticleTypes.BUBBLE, 0.2);
-            level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 1.8F, 0.5F);
-            for (ServerPlayer q : playersNear(level, boss.position(), 18.0)) {
+            Vec3 dir = pending.dir == null ? randomFlat() : pending.dir;
+            Vec3 from = boss.position();
+            Fx.crescent(level, ParticleTypes.SPLASH, from.add(0.0, 1.0, 0.0), dir, 18.0, TIDE);
+            Fx.shockwave(level, ParticleTypes.SPLASH, from, 8.0, FOAM);
+            vanillaOnly(() -> {
+               BossVfx.wall(level, from.add(0.0, 1.0, 0.0), dir, 14.0, 4.0, ParticleTypes.SPLASH, 4);
+               BossVfx.wall(level, from.add(0.0, 0.3, 0.0), dir, 18.0, 2.0, ParticleTypes.FALLING_WATER, 3);
+            });
+            level.playSound(null, from.x, from.y, from.z, SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 1.8F, 0.5F);
+            for (ServerPlayer q : playersNear(level, from, 18.0)) {
+               if (!inFront(from, dir, q, WAVE_HALF_ANGLE)) {
+                  continue;
+               }
                q.hurtServer(level, level.damageSources().mobAttack(boss), 10.0F);
                push(q, dir, 2.4);
                q.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 60, 0));
             }
          }
          case "megawave" -> {
-            Vec3 dir = randomFlat();
-            // One roll of the finale: a wall across the width of the arena, and the ground it
-            // passes over left standing in water.
-            BossVfx.wall(level, boss.position().add(0.0, 1.0, 0.0), dir, MEGA_REACH, 9.0, ParticleTypes.SPLASH, 6);
-            BossVfx.wall(level, boss.position().add(0.0, 0.3, 0.0), dir, MEGA_REACH, 3.0, ParticleTypes.FALLING_WATER, 4);
-            BossVfx.disc(level, boss.position(), MEGA_RADIUS, ParticleTypes.FALLING_WATER, 0.22);
-            BossVfx.sphere(level, boss.position().add(0.0, 3.0, 0.0), 12.0, 3, ParticleTypes.BUBBLE);
-            level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 2.1F, 0.4F);
-            for (ServerPlayer q : playersNear(level, boss.position(), MEGA_RADIUS)) {
-               Vec3 to = q.position().subtract(boss.position());
-               Vec3 toFlat = new Vec3(to.x, 0.0, to.z);
-               if (toFlat.lengthSqr() < 1.0E-4) {
-                  toFlat = dir;
-               }
-               double angle = Math.toDegrees(Math.acos(Math.max(-1.0, Math.min(1.0, toFlat.normalize().dot(dir)))));
-               if (angle > WAVE_HALF_ANGLE) {
+            Vec3 dir = pending.dir == null ? randomFlat() : pending.dir;
+            Vec3 from = boss.position();
+            // One roll of the finale: a wall across the width of the arena.
+            Fx.crescent(level, ParticleTypes.SPLASH, from.add(0.0, 1.0, 0.0), dir, MEGA_REACH, TIDE);
+            Fx.shockwave(level, ParticleTypes.SPLASH, from, MEGA_RADIUS, FOAM);
+            Fx.geyser(level, ParticleTypes.SPLASH, from, 8.0, ABYSS);
+            vanillaOnly(() -> {
+               BossVfx.wall(level, from.add(0.0, 1.0, 0.0), dir, MEGA_REACH, 9.0, ParticleTypes.SPLASH, 6);
+               BossVfx.wall(level, from.add(0.0, 0.3, 0.0), dir, MEGA_REACH, 3.0, ParticleTypes.FALLING_WATER, 4);
+               BossVfx.disc(level, from, MEGA_RADIUS, ParticleTypes.FALLING_WATER, 0.22);
+            });
+            level.playSound(null, from.x, from.y, from.z, SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 2.1F, 0.4F);
+            for (ServerPlayer q : playersNear(level, from, MEGA_RADIUS)) {
+               if (!inFront(from, dir, q, WAVE_HALF_ANGLE)) {
                   continue;
                }
                q.hurtServer(level, level.damageSources().mobAttack(boss), MEGA_DAMAGE);
                push(q, dir, MEGA_PUSH);
                q.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 80, 1));
-               q.sendOverlayMessage(Component.literal("\u00a73\u00a7lTHE TIDE TAKES THE GROUND"));
+               q.sendOverlayMessage(Component.literal("\u00a73\u00a7lSWEPT"));
             }
          }
          case "worldbreaker" -> {
-            Vec3 dir = randomFlat();
-            BossVfx.wall(level, boss.position().add(0.0, 1.0, 0.0), dir, 26.0, 6.0, ParticleTypes.SPLASH, 5);
-            BossVfx.disc(level, boss.position(), 26.0, ParticleTypes.FALLING_WATER, 0.2);
-            level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 2.0F, 0.4F);
-            for (ServerPlayer q : playersNear(level, boss.position(), 30.0)) {
+            Vec3 dir = pending.dir == null ? randomFlat() : pending.dir;
+            Vec3 from = boss.position();
+            Fx.crescent(level, ParticleTypes.SPLASH, from.add(0.0, 1.0, 0.0), dir, 26.0, TIDE);
+            Fx.shockwave(level, ParticleTypes.SPLASH, from, 26.0, ABYSS);
+            Fx.geyser(level, ParticleTypes.SPLASH, from, 10.0, FOAM);
+            vanillaOnly(() -> BossVfx.wall(level, from.add(0.0, 1.0, 0.0), dir, 26.0, 6.0, ParticleTypes.SPLASH, 5));
+            level.playSound(null, from.x, from.y, from.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 2.0F, 0.4F);
+            for (ServerPlayer q : playersNear(level, from, 30.0)) {
+               if (!inFront(from, dir, q, WAVE_HALF_ANGLE)) {
+                  continue;
+               }
                q.hurtServer(level, level.damageSources().mobAttack(boss), 19.0F);
                push(q, dir, 2.9);
             }
          }
          case "final" -> {
-            BossVfx.column(level, p, 5.0, ParticleTypes.SPLASH, 4);
-            BossVfx.sphere(level, p.add(0.0, 1.0, 0.0), 3.4, 2, ParticleTypes.BUBBLE);
+            Fx.geyser(level, ParticleTypes.SPLASH, p, 8.0, FOAM);
+            Fx.nova(level, ParticleTypes.BUBBLE, p.add(0.0, 1.0, 0.0), 3.4, TIDE);
             level.playSound(null, p.x, p.y, p.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.5F, 0.7F);
             for (ServerPlayer q : playersNear(level, p, 3.4)) {
                q.hurtServer(level, level.damageSources().mobAttack(boss), 17.0F);
@@ -1266,21 +1872,65 @@ public final class DrownedSovereignManager {
 
    // --------------------------------------------------------------------- loot
 
+   /**
+    * The death ceremony. He sinks back into the floor he came out of while the water turns around
+    * him; spouts go up closer and higher every few beats, his heart is heard under the floor near
+    * the end, and the last tick is one burst - a flash, a starburst, a geyser the height of a
+    * house and a shockwave across the arena - before the body goes.
+    */
    private static void tickDeath(MinecraftServer server, Mob boss, Fight fight) {
       ServerLevel level = (ServerLevel)boss.level();
       fight.deathTicks--;
-      // The sea reclaiming him: he sinks into the floor rather than falling over on top of it.
-      BossVfx.disc(level, boss.position(), 5.0, ParticleTypes.FALLING_WATER, 0.1);
-      BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 4.0, 2, ParticleTypes.BUBBLE);
-      if (now(level) % 6L == 0L) {
+      int left = fight.deathTicks;
+      double progress = 1.0 - Math.max(0, left) / (double)DEATH_CEREMONY_TICKS;
+      boss.setDeltaMovement(Vec3.ZERO);
+      if (left > 20) {
+         boss.setPos(boss.getX(), boss.getY() - 0.03, boss.getZ());
+      }
+      vanillaOnly(() -> {
+         BossVfx.disc(level, boss.position(), 5.0, ParticleTypes.FALLING_WATER, 0.1);
+         BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 4.0, 2, ParticleTypes.BUBBLE);
+      });
+      if (left % 6 == 0) {
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BUBBLE_COLUMN_UPWARDS_AMBIENT, SoundSource.HOSTILE, 1.4F, 0.5F);
       }
-      if (fight.deathTicks > 0) {
+      if (left > 0 && left % 15 == 0) {
+         double a = RANDOM.nextDouble() * Math.PI * 2.0;
+         double r = 7.0 - progress * 4.0;
+         double sx = boss.getX() + Math.cos(a) * r;
+         double sz = boss.getZ() + Math.sin(a) * r;
+         Vec3 spout = new Vec3(sx, BossGrounding.groundY(level, sx, sz, fight.deathFloorY), sz);
+         Fx.geyser(level, ParticleTypes.SPLASH, spout, 5.0 + progress * 6.0, TIDE);
+         Fx.ring(level, ParticleTypes.BUBBLE_POP, new Vec3(boss.getX(), fight.deathFloorY + 0.1, boss.getZ()), 3.0 + progress * 6.0, FOAM);
+         level.playSound(null, sx, spout.y, sz, SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 1.3F, 0.6F + (float)progress * 0.4F);
+      }
+      if (left == 60) {
+         announce(level, SAY + "\u00a77\u201c\u00a7fThe tide...\u00a77\u201d");
+      }
+      if (left == 30) {
+         announce(level, SAY + "\u00a77\u201c\u00a7f...comes back.\u00a77\u201d");
+         Fx.heartbeat(level, ParticleTypes.SQUID_INK, new Vec3(boss.getX(), fight.deathFloorY + 0.1, boss.getZ()), 6.0, 30, ABYSS);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 2.0F, 0.6F);
+      }
+      if (left > 0) {
          return;
       }
-      BossVfx.sphere(level, boss.position().add(0.0, 1.0, 0.0), 10.0, 3, ParticleTypes.SPLASH);
+
+      // The burst. He is put back on the floor first, so the body and the loot land on the
+      // surface rather than inside the ground he sank into.
+      boss.setPos(boss.getX(), fight.deathFloorY, boss.getZ());
+      Vec3 heart = boss.position().add(0.0, 2.0, 0.0);
+      Fx.flare(level, ParticleTypes.SPLASH, heart, 4.0, FOAM);
+      Fx.starburst(level, ParticleTypes.BUBBLE, heart, 10.0, TIDE);
+      Fx.nova(level, ParticleTypes.BUBBLE, heart, 8.0, FOAM);
+      Fx.shockwave(level, ParticleTypes.SPLASH, boss.position(), 18.0, ABYSS);
+      Fx.geyser(level, ParticleTypes.SPLASH, boss.position(), 16.0, FOAM);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 2.0F, 0.7F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 1.8F, 0.4F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 2.2F, 0.4F);
       boss.setNoAi(false);
+      boss.setNoGravity(false);
+      boss.setInvulnerable(false);
       onBossDeath(level, boss);
       if (boss.isAlive()) {
          boss.hurtServer(level, level.damageSources().generic(), boss.getMaxHealth() * 4.0F + 100.0F);
@@ -1316,7 +1966,7 @@ public final class DrownedSovereignManager {
       }
       announce(level, "\u00a73\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
       announce(level, "    \u00a73\u00a7l\uD83C\uDF0A THE SOVEREIGN SINKS \uD83C\uDF0A");
-      announce(level, "    \u00a77The water goes quiet. It will not stay that way.");
+      announce(level, "    \u00a77The water goes flat. \u00a78For now.");
       announce(level, "\u00a73\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
    }
 
@@ -1329,6 +1979,10 @@ public final class DrownedSovereignManager {
    // ------------------------------------------------------------------ teardown
 
    private static void release(MinecraftServer server, Fight fight) {
+      // Nothing scheduled outlives the fight: a wave or a ring still in the list would otherwise be
+      // held by a fight object nobody ticks any more.
+      fight.pending.clear();
+      fight.strikes.clear();
       fight.bar.setVisible(false);
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
          fight.bar.removePlayer(p);
@@ -1364,7 +2018,7 @@ public final class DrownedSovereignManager {
       List<ServerPlayer> out = new ArrayList<>();
       double r2 = radius * radius;
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level) {
+         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level || BossManager.isFakePlayer(p)) {
             continue;
          }
          if (p.distanceToSqr(pos.x, pos.y, pos.z) <= r2) {
@@ -1378,7 +2032,7 @@ public final class DrownedSovereignManager {
       ServerPlayer best = null;
       double bestDist = radius * radius;
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level) {
+         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level || BossManager.isFakePlayer(p)) {
             continue;
          }
          double d = p.distanceToSqr(boss);
@@ -1419,6 +2073,60 @@ public final class DrownedSovereignManager {
       Vec3 unit = seg.scale(1.0 / len);
       double along = Math.max(0.0, Math.min(len, flatPoint.subtract(flatFrom).dot(unit)));
       return flatPoint.distanceTo(flatFrom.add(unit.scale(along)));
+   }
+
+   /** The floor under a point, so a mark is drawn where the player is standing and not mid-jump. */
+   private static Vec3 floorAt(ServerLevel level, Vec3 at) {
+      return new Vec3(at.x, BossGrounding.groundY(level, at.x, at.z, at.y), at.z);
+   }
+
+   /** Roughly where his eyes are, at his scale - where the stare comes from. */
+   private static Vec3 eyeOf(Mob boss) {
+      return boss.position().add(0.0, boss.getBbHeight() * 0.9, 0.0);
+   }
+
+   /** Whether {@code q} is inside the arc a wave rolling along {@code dir} from {@code origin} covers. */
+   private static boolean inFront(Vec3 origin, Vec3 dir, ServerPlayer q, double halfAngle) {
+      Vec3 to = q.position().subtract(origin);
+      Vec3 flat = new Vec3(to.x, 0.0, to.z);
+      if (flat.lengthSqr() < 1.0E-4) {
+         return true;
+      }
+      double angle = Math.toDegrees(Math.acos(Math.max(-1.0, Math.min(1.0, flat.normalize().dot(dir.normalize())))));
+      return angle <= halfAngle;
+   }
+
+   /** A big wave's warning: its front drawn in dark water, and a line down the middle of it. */
+   private static void warnWave(ServerLevel level, Vec3 origin, Vec3 dir, double reach) {
+      Vec3 base = origin.add(0.0, 0.2, 0.0);
+      Fx.crescent(level, ParticleTypes.BUBBLE_POP, base, dir, reach, ABYSS);
+      Fx.beam(level, ParticleTypes.BUBBLE_POP, base, base.add(dir.normalize().scale(reach)), ABYSS);
+      level.playSound(null, origin.x, origin.y, origin.z, SoundEvents.WATER_AMBIENT, SoundSource.HOSTILE, 1.6F, 0.6F);
+   }
+
+   /**
+    * A one-line mechanic hint on the action bar of the players it is about - the grey narrator
+    * voice, not the boss's. Sent straight to them like the other action-bar lines in this file,
+    * since the {@link #overlayNear} funnel is closed.
+    */
+   private static void hint(List<ServerPlayer> players, String text) {
+      Component line = Component.literal(text);
+      for (ServerPlayer p : players) {
+         p.sendOverlayMessage(line);
+      }
+   }
+
+   /**
+    * Draws particle upkeep for vanilla clients only. Used where a timed {@link Fx} shape was already
+    * sent for the same thing, so a modded client is not drawing the shape and the particles both.
+    */
+   private static void vanillaOnly(Runnable draw) {
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         draw.run();
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
    }
 
    private static long now(ServerLevel level) {
