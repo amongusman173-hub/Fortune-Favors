@@ -121,85 +121,136 @@ def wooden_marionette():
     save(img, "wooden_marionette")
 
 
+# The four loot-pool pieces are placed pixel by pixel through tools/pixelkit.py and get its
+# selective outline; the marionette above is his summon, not loot, and keeps its older art.
+import sys as _sys  # noqa: E402
+_sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from pixelkit import Canvas, ramp, rgba  # noqa: E402
+
+P_DEEP, P_SHADE, P_BASE, P_LIGHT = ramp("#e9e2d4")
+V_DEEP, V_SHADE, V_BASE, V_LIGHT = ramp("#8d5cf0")
+R_DEEP, R_SHADE, R_BASE, R_LIGHT = ramp("#c3283f")
+G_DEEP, G_SHADE, G_BASE, G_LIGHT = ramp("#e2b24a")
+W_DEEP, W_SHADE, W_BASE, W_LIGHT = ramp("#9a6a3c")
+HOLE = rgba("#120e16")
+GLOWV = rgba("#e6d6ff")
+THREAD = rgba("#f3efe4")
+
+MASK_PALETTE = {
+    "U": P_LIGHT, "P": P_BASE, "S": P_SHADE, "D": P_DEEP,
+    "k": HOLE, "v": V_SHADE, "V": V_LIGHT, "g": GLOWV,
+    "R": R_BASE, "r": R_DEEP, "L": R_LIGHT, "G": G_BASE, "Y": G_LIGHT,
+}
+
+
+def _save_canvas(c, name):
+    save(c.image(), name)
+
+
 def puppeteers_mask():
-    """Porcelain over wood, with the smile painted on. The only part that is carved."""
-    img, d = canvas()
-    d.ellipse([2, 1, 13, 14], fill=PORCELAIN, outline=BLACK)
-    # The painted eyes, and the shade the porcelain takes under its own brow.
-    d.ellipse([4, 5, 6, 8], fill=BLACK)
-    d.ellipse([9, 5, 11, 8], fill=BLACK)
-    d.line([4, 3, 11, 3], fill=PORCELAIN_SHADE)
-    # The smile: carved rather than painted, so it is cut in, not drawn on.
-    d.line([5, 10, 10, 10], fill=PAINT)
-    d.point([4, 9], fill=PAINT_DARK)
-    d.point([11, 9], fill=PAINT_DARK)
-    d.line([5, 11, 10, 11], fill=PAINT_DARK)
-    d.line([3, 12, 3, 13], fill=PORCELAIN_DEEP)
-    d.line([12, 12, 12, 13], fill=PORCELAIN_DEEP)
-    save(img, "puppeteers_mask")
+    """His face: porcelain, harlequin paint round the eyes, a stitched grin, one tear."""
+    c = Canvas()
+    c.grid([
+        "................",
+        ".....UUUUUP.....",
+        "...UUPPPPPPPS...",
+        "..UPPPPPPPPPPS..",
+        "..UPvVPPPPVvPS..",
+        ".UPvkkVPPVkkvPS.",
+        ".UPvkkvPPvkkvPS.",
+        ".UPPvvPPPPvvPPS.",
+        ".UPPPkPPPPPPPPS.",
+        ".UPPPkPPPPPPPSS.",
+        "..PLPPPPPPPPLSS.",
+        "..PSRRrRRrRRSD..",
+        "...SSRRRRRRSD...",
+        "....SSSSSSDD....",
+        "......DDDD......",
+        "................",
+    ], MASK_PALETTE)
+    c.outline()
+    _save_canvas(c, "puppeteers_mask")
 
 
 def empty_mask():
-    """No face at all - the same porcelain, with nothing behind the eye holes.
-
-    The slits glow because the mask is worn rather than held: something is looking
-    out of it, and it is not a face.
-    """
-    img, d = canvas()
-    d.ellipse([2, 1, 13, 14], fill=PORCELAIN_SHADE, outline=BLACK)
-    d.ellipse([3, 2, 12, 12], fill=PORCELAIN)
-    # Empty eye holes with a violet light behind them.
-    d.line([4, 6, 7, 6], fill=BLACK)
-    d.line([8, 6, 11, 6], fill=BLACK)
-    d.line([4, 7, 7, 7], fill=VIOLET_DARK)
-    d.line([8, 7, 11, 7], fill=VIOLET_DARK)
-    d.point([5, 6], fill=VIOLET)
-    d.point([10, 6], fill=VIOLET)
-    # No mouth. The absence is the design.
-    d.line([5, 11, 10, 11], fill=PORCELAIN_DEEP)
-    d.line([6, 12, 9, 12], fill=PORCELAIN_DEEP)
-    d.point([3, 4], fill=PORCELAIN_DEEP)
-    d.point([12, 10], fill=PORCELAIN_DEEP)
-    save(img, "empty_mask")
+    """The same porcelain with nothing behind it: cracked, mouthless, lit from inside."""
+    c = Canvas()
+    c.grid([
+        "................",
+        ".....UUUUUP.....",
+        "...UUPPPPPPPS...",
+        "..UPPPPPPPDPPS..",
+        "..UPPPPPPDPPPS..",
+        ".UPkkkPPPDkkkPS.",
+        ".UPkgkPPDPkgkPS.",
+        ".UPPkPPPDPPkPPS.",
+        ".UPPPPPDPPPPPPS.",
+        ".UPPPPPPPPPPPPS.",
+        "..PPPPPPPPPPPSS.",
+        "..PSPPPPPPPPSD..",
+        "...SSPPPPPPSD...",
+        "....SSSSSSDD....",
+        "......DDDD......",
+        "................",
+    ], MASK_PALETTE)
+    c.outline(skip=[GLOWV])
+    _save_canvas(c, "empty_mask")
 
 
 def marionette_strings():
-    """A control bar with a bundle of strings wound onto it.
-
-    Read at a glance as "a thing you hold that has strings coming off it", because
-    the item's two verbs - tie one to somebody, then pull - both start here.
-    """
-    img, d = canvas()
-    # The cross-bar, the way a marionette is actually held.
-    d.rectangle([2, 2, 13, 3], fill=WOOD_LIGHT, outline=WOOD_DARK)
-    d.point([2, 2], fill=WOOD_DARK)
-    d.point([13, 3], fill=WOOD_DARK)
-    d.line([7, 2, 7, 8], fill=WOOD_DARK)
-    # Four strings leaving the bar and gathering into a bundle.
-    for i, x in enumerate((4, 6, 9, 11)):
-        d.line([x, 4, 8 + (i - 1), 9], fill=STRING if i % 2 == 0 else STRING_DIM)
-    # The bundle itself: it never stops moving, so it is drawn mid-turn.
-    d.ellipse([5, 9, 11, 14], fill=STRING_DIM, outline=BLACK)
-    d.ellipse([6, 10, 10, 13], fill=STRING)
-    d.line([6, 11, 10, 11], fill=STRING_DIM)
-    d.line([6, 12, 10, 12], fill=STRING_DIM)
-    d.point([8, 11], fill=VIOLET)
-    save(img, "marionette_strings")
+    """The control bar, the way a marionette is held, with its strings and their knots."""
+    c = Canvas()
+    c.grid([
+        "................",
+        ".......VW.......",
+        "..VVVVVVWWWWWw..",
+        "..WWWWWWWWWWww..",
+        "..t.t..Ww.t..t..",
+        "..t.t..Ww.t..t..",
+        "..t..t.Ww.t.t...",
+        "..t..t..w.t.t...",
+        "..t..t...t..t...",
+        "...t..t..t.t....",
+        "...t..t..t.t....",
+        "...o..t..t.o....",
+        "......t..t......",
+        "......o..o......",
+        "................",
+        "................",
+    ], {"V": W_LIGHT, "W": W_BASE, "w": W_SHADE, "t": THREAD, "o": V_LIGHT})
+    # gold caps on the bar's ends
+    for x, y, col in ((2, 2, G_LIGHT), (2, 3, G_BASE), (13, 2, G_BASE), (13, 3, G_SHADE)):
+        c.set(x, y, col)
+    c.outline(skip=[THREAD, V_LIGHT])
+    _save_canvas(c, "marionette_strings")
 
 
 def puppeteer_loot_box():
-    """His box: violet lacquer with a porcelain mask for a latch."""
-    img, d = canvas()
-    chest(d, VIOLET_DARK, VIOLET, PORCELAIN_SHADE, PORCELAIN, BLACK)
-    # The latch is the mask, small enough to read at icon size.
-    d.ellipse([6, 7, 9, 10], fill=PORCELAIN, outline=BLACK)
-    d.point([7, 8], fill=BLACK)
-    d.point([8, 8], fill=BLACK)
-    d.line([7, 9, 8, 9], fill=PAINT)
-    # A thread tied round the whole box, because nothing of his is loose.
-    d.line([1, 12, 14, 12], fill=STRING_DIM)
-    d.point([2, 3], fill=VIOLET_LIGHT)
-    save(img, "puppeteer_loot_box")
+    """His box: violet lacquer, a stage curtain drawn back on either side, the mask for a latch."""
+    c = Canvas()
+    c.grid([
+        "................",
+        "................",
+        "..VVVVVVVVVVVV..",
+        "..VPPPPPPPPPPp..",
+        "..VPPPPPPPPPPp..",
+        "..VpppppppppPp..",
+        "..YGGGGYYGGGGg..",
+        "..LRrUUUUUUrRR..",
+        "..RRrUkUUkUrRr..",
+        "..RRrUUmmUUrRr..",
+        "..RrPPUUUUPPrr..",
+        "..RrPPPPPPPPrr..",
+        "..rPPPPPPPPPPr..",
+        "..VPPPPPPPPPPp..",
+        "..dddddddddddd..",
+        "................",
+    ], {"V": V_LIGHT, "P": V_BASE, "p": V_SHADE, "d": V_DEEP,
+        "G": G_BASE, "g": G_SHADE, "Y": G_LIGHT,
+        "R": R_BASE, "r": R_SHADE, "L": R_LIGHT,
+        "U": P_LIGHT, "k": HOLE, "m": R_BASE})
+    c.outline()
+    _save_canvas(c, "puppeteer_loot_box")
 
 
 if __name__ == "__main__":

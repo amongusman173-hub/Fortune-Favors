@@ -343,13 +343,10 @@ def clockwork_gauntlet():
 
 
 if __name__ == "__main__":
-    evoker_cloak()
-    illusioner_cloak()
-    evoker_spellbook()
-    illusioner_spellbook()
+    # The evoker and illusioner robes and spellbooks are drawn by tools/make_raid_textures.py and
+    # the Mystery Keys by tools/make_mystery_keys.py; the functions above are kept for reference
+    # but no longer run, so a rerun of this script cannot overwrite the newer art.
     excalibur()
     mystery_box()
-    for tier_name, body, dark, light in KEY_TIERS:
-        mystery_key(tier_name, body, dark, light)
     clockwork_trophy()
     clockwork_gauntlet()
