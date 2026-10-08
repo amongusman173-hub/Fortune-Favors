@@ -30,6 +30,35 @@ package com.fortuneandfavors.util;
  *   <li>{@link #AURA} - a flickering column of flame and wisps; a = height, b = ticks.</li>
  *   <li>{@link #FLARE} - a blinding bloom with a ring; a = size.</li>
  * </ul>
+ *
+ * <p>The themed set (116-127), drawn with the themed sprites rather than the ice ones:
+ * <ul>
+ *   <li>{@link #SCULK_BLOOM} - sculk veins creeping out over the ground from the position, spores
+ *       swelling and popping along them; a = radius, b = ticks.</li>
+ *   <li>{@link #SOUL_STREAM} - soul wisps flowing from the position to the second vector (a point)
+ *       on a weaving path; a = how far the stream sways (blocks), b = ticks.</li>
+ *   <li>{@link #TIDE_WAVE} - a rolling wall of water travelling from the position along the second
+ *       vector (a direction), throwing droplets and leaving foam; a = reach, b = ticks.</li>
+ *   <li>{@link #GUST} - a swirl of wind: feathers and streaks corkscrewing along the second vector
+ *       (a direction); a = reach. Lives 16 ticks.</li>
+ *   <li>{@link #GEAR_SPIN} - three interlocking cogs turning; they stand upright facing the second
+ *       vector (a direction), or lie flat on the ground when it is zero; a = size, b = ticks.</li>
+ *   <li>{@link #STARFALL} - twinkling stars raining over a circle, flashing where they land;
+ *       a = radius, b = ticks.</li>
+ *   <li>{@link #GEM_SHARDS} - faceted gems bursting out of a flash, glinting as they tumble;
+ *       a = size. Lives 20 ticks.</li>
+ *   <li>{@link #BLOOD_SPLASH} - droplets arcing out (biased along the second vector, a direction,
+ *       when it is not zero), then dripping; a = size. Lives 22 ticks.</li>
+ *   <li>{@link #THREADS} - puppet strings dropping from above onto the position and hanging taut,
+ *       swaying, before they snap; a = how high above the strings start, b = ticks.</li>
+ *   <li>{@link #VOID_COLLAPSE} - dark motes imploding into the position, then a ring thrown out;
+ *       a = radius, b = ticks of implosion (the ring follows).</li>
+ *   <li>{@link #RIFT_PORTAL} - an upright portal rift that tears open over 10 ticks, holds for b
+ *       ticks and seals over 10; it stands at the position (its foot) facing the second vector (a
+ *       direction - whatever steps out comes that way); a = height.</li>
+ *   <li>{@link #SONIC_RING} - sculk shockwave crescents racing from the position along the second
+ *       vector (a direction); a = reach, b = ticks.</li>
+ * </ul>
  */
 public final class FxKinds {
    public static final int SPIRAL = 100;
@@ -48,6 +77,19 @@ public final class FxKinds {
    public static final int COMET = 113;
    public static final int AURA = 114;
    public static final int FLARE = 115;
+   public static final int SCULK_BLOOM = 116;
+   public static final int SOUL_STREAM = 117;
+   public static final int TIDE_WAVE = 118;
+   public static final int GUST = 119;
+   public static final int GEAR_SPIN = 120;
+   public static final int STARFALL = 121;
+   public static final int GEM_SHARDS = 122;
+   public static final int BLOOD_SPLASH = 123;
+   public static final int THREADS = 124;
+   public static final int VOID_COLLAPSE = 125;
+   public static final int RIFT_PORTAL = 126;
+   /** The last id that fits in a signed byte: the template set is full at 127. */
+   public static final int SONIC_RING = 127;
 
    private FxKinds() {
    }

@@ -15,7 +15,11 @@ import net.minecraft.resources.Identifier;
  */
 final class FfParticle extends SingleQuadParticle {
    enum Tex {
-      GLOW, SPARK, MOTE, RING, SHARD, RUNE, SMOKE, BLOB, ROCK, EMBER, CRYSTAL, STREAK, BUBBLE, ARC, FLARE, WISP, CRACK, FLAKE, ICICLE, FLAME, HEXRUNE, BOLT;
+      GLOW, SPARK, MOTE, RING, SHARD, RUNE, SMOKE, BLOB, ROCK, EMBER, CRYSTAL, STREAK, BUBBLE, ARC, FLARE, WISP, CRACK, FLAKE, ICICLE, FLAME, HEXRUNE, BOLT,
+      // Themed sprites (tools/make_vfx_particles.py): sculk and souls had been borrowing the ice
+      // set, water and wind the frost set. SCULK_SPORE and VOID_MOTE are dark at the heart, so
+      // they read as hollow or deep whatever the tint.
+      SCULK_TENDRIL, SCULK_SPORE, SOUL_WISP, PETAL, FEATHER, DROPLET, COG, STAR, GEM, THREAD, VOID_MOTE, RUNE2, SHOCK;
 
       final Identifier id = Identifier.fromNamespaceAndPath("fortuneandfavors", name().toLowerCase(java.util.Locale.ROOT));
    }

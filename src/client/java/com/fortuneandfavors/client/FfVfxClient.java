@@ -69,9 +69,16 @@ public final class FfVfxClient {
          dispatcher.register(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("ffvfx").executes(c -> {
             selfTest();
             c.getSource().sendFeedback(net.minecraft.network.chat.Component.literal(
-               "\u00a7dF&F VFX test played. \u00a77If you see nothing, send logs/latest.log (look for 'fortuneandfavors-vfx')."));
+               "\u00a7dF&F VFX test played. \u00a77If you see nothing, send logs/latest.log (look for 'fortuneandfavors-vfx'). "
+                  + "\u00a77/ffvfx themed plays the themed set."));
             return 1;
-         }))
+         }).then(net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("themed").executes(c -> {
+            selfTestThemed();
+            c.getSource().sendFeedback(net.minecraft.network.chat.Component.literal(
+               "\u00a7dF&F themed VFX played: \u00a77three rows of four, nearest first - sculk bloom, soul stream, tide wave, gust / "
+                  + "gear spin, starfall, gem shards, blood splash / threads, void collapse, rift portal, sonic ring."));
+            return 1;
+         })))
       );
    }
 
@@ -100,6 +107,49 @@ public final class FfVfxClient {
          new Cue(FxKinds.SHOCKWAVE, p, (float)(at.x + look.x * 10 + side.x * 5), (float)at.y, (float)(at.z + look.z * 10 + side.z * 5), 0, 0, 0, 4.0F, 0, 0, 0xE2B042),
          new Cue(FxKinds.VORTEX, ParticleTypes.REVERSE_PORTAL, (float)(at.x + look.x * 10 - side.x * 5), (float)at.y, (float)(at.z + look.z * 10 - side.z * 5), 0, 0, 0, 2.5F, 60, 0, 0x8C5CFF)
       ));
+   }
+
+   /**
+    * /ffvfx themed: the twelve themed templates (FxKinds 116-127) laid out in three rows of four
+    * in front of you, left to right in kind order, each in the colour it was made for.
+    */
+   private static void selfTestThemed() {
+      Minecraft mc = Minecraft.getInstance();
+      if (mc.player == null) {
+         return;
+      }
+      Vec3 look = mc.player.getLookAngle();
+      Vec3 f = new Vec3(look.x, 0.0, look.z);
+      f = f.lengthSqr() < 1.0E-4 ? new Vec3(0.0, 0.0, 1.0) : f.normalize();
+      Vec3 side = new Vec3(-f.z, 0.0, f.x);
+      Vec3 feet = mc.player.position();
+      int[] kinds = {
+         FxKinds.SCULK_BLOOM, FxKinds.SOUL_STREAM, FxKinds.TIDE_WAVE, FxKinds.GUST,
+         FxKinds.GEAR_SPIN, FxKinds.STARFALL, FxKinds.GEM_SHARDS, FxKinds.BLOOD_SPLASH,
+         FxKinds.THREADS, FxKinds.VOID_COLLAPSE, FxKinds.RIFT_PORTAL, FxKinds.SONIC_RING
+      };
+      List<Cue> cues = new ArrayList<>();
+      for (int i = 0; i < kinds.length; i++) {
+         Vec3 at = feet.add(f.scale(7.0 + 8.0 * (i / 4))).add(side.scale(-10.5 + 7.0 * (i % 4)));
+         float x = (float)at.x, y = (float)at.y, z = (float)at.z;
+         float fx = (float)f.x, fz = (float)f.z;
+         cues.add(switch (kinds[i]) {
+            case FxKinds.SCULK_BLOOM -> new Cue(kinds[i], ParticleTypes.SCULK_SOUL, x, y, z, 0, 0, 0, 3.0F, 80, 0, 0x2FD8D0);
+            case FxKinds.SOUL_STREAM -> new Cue(kinds[i], ParticleTypes.SOUL, x - (float)side.x * 2.5F, y + 0.5F, z - (float)side.z * 2.5F,
+               x + (float)side.x * 2.5F, y + 2.5F, z + (float)side.z * 2.5F, 0.8F, 80, 0, 0x3FE0FF);
+            case FxKinds.TIDE_WAVE -> new Cue(kinds[i], ParticleTypes.SPLASH, x - fx * 2.0F, y, z - fz * 2.0F, fx, 0, fz, 6.0F, 30, 0, 0x3F8CFF);
+            case FxKinds.GUST -> new Cue(kinds[i], ParticleTypes.GUST, x - fx * 2.0F, y + 1.0F, z - fz * 2.0F, fx, 0.15F, fz, 5.0F, 0, 0, 0xE8F4FF);
+            case FxKinds.GEAR_SPIN -> new Cue(kinds[i], ParticleTypes.CRIT, x, y + 1.6F, z, -fx, 0, -fz, 1.2F, 80, 0, 0xE2B042);
+            case FxKinds.STARFALL -> new Cue(kinds[i], ParticleTypes.END_ROD, x, y, z, 0, 0, 0, 3.0F, 80, 0, 0xFFE6A0);
+            case FxKinds.GEM_SHARDS -> new Cue(kinds[i], ParticleTypes.HAPPY_VILLAGER, x, y + 1.2F, z, 0, 0, 0, 1.5F, 0, 0, 0x3FE07A);
+            case FxKinds.BLOOD_SPLASH -> new Cue(kinds[i], ParticleTypes.DAMAGE_INDICATOR, x, y + 1.2F, z, side.x > 0 ? 1 : -1, 0.2F, 0, 1.2F, 0, 0, 0xA0101E);
+            case FxKinds.THREADS -> new Cue(kinds[i], ParticleTypes.END_ROD, x, y, z, 0, 0, 0, 5.0F, 80, 0, 0xE8D8FF);
+            case FxKinds.VOID_COLLAPSE -> new Cue(kinds[i], ParticleTypes.REVERSE_PORTAL, x, y + 1.5F, z, 0, 0, 0, 3.0F, 40, 0, 0x8C5CFF);
+            case FxKinds.RIFT_PORTAL -> new Cue(kinds[i], ParticleTypes.REVERSE_PORTAL, x, y, z, -fx, 0, -fz, 3.2F, 60, 0, 0x9B4DFF);
+            default -> new Cue(kinds[i], ParticleTypes.SONIC_BOOM, x - fx * 3.0F, y + 1.2F, z - fz * 3.0F, fx, 0, fz, 9.0F, 30, 0, 0x2FD8D0);
+         });
+      }
+      accept(cues);
    }
 
    private static void tick(Minecraft mc) {
@@ -177,7 +227,7 @@ public final class FfVfxClient {
                case FfVfx.SNOW_SPAWN, FfVfx.SNOW_DEATH -> start(level, c, Math.max(4, Math.min(200, (int)c.a())), true);
                case FfVfx.FROST_SPRAY -> frostSpray(level, c);
                case FfVfx.ICE_TRAIL -> start(level, c, Math.max(2, Math.min(80, (int)c.b())), false);
-               case FfVfx.ICE_BURST -> iceShatter(level, c.x(), c.y(), c.z(), Math.max(0.3, c.a()), c.color());
+               case FfVfx.ICE_BURST -> iceShatter(level, c.x(), c.y(), c.z(), Math.max(0.3, c.a()), c.color(), c.particle());
                case FfVfx.SONIC -> sonicLance(level, c);
                case FfVfx.RESONANCE -> start(level, c, Math.max(10, Math.min(200, (int)c.a())), true);
                case FfVfx.ROD_ORBIT, FfVfx.MIND_AURA, FfVfx.SNOW_AURA, FfVfx.SCULK_AURA -> {
@@ -198,6 +248,15 @@ public final class FfVfxClient {
                case FxKinds.CHAINS -> chains(level, c);
                case FxKinds.SHATTER -> shatter(level, c);
                case FxKinds.FLARE -> flare(level, c);
+               // The themed set (116-127).
+               case FxKinds.SCULK_BLOOM, FxKinds.SOUL_STREAM, FxKinds.GEAR_SPIN, FxKinds.STARFALL, FxKinds.THREADS ->
+                  start(level, c, Math.max(6, Math.min(400, (int)c.b())), true);
+               case FxKinds.TIDE_WAVE, FxKinds.SONIC_RING -> start(level, c, Math.max(8, Math.min(80, (int)c.b())), true);
+               case FxKinds.GUST -> start(level, c, 16, true);
+               case FxKinds.GEM_SHARDS -> start(level, c, 20, true);
+               case FxKinds.BLOOD_SPLASH -> start(level, c, 22, false);
+               case FxKinds.VOID_COLLAPSE -> start(level, c, Math.max(6, Math.min(200, (int)c.b())) + VOID_RING_TICKS, true);
+               case FxKinds.RIFT_PORTAL -> start(level, c, RIFT_OPEN_TICKS + Math.max(0, Math.min(400, (int)c.b())) + RIFT_OPEN_TICKS, true);
                default -> {
                }
             }
@@ -261,6 +320,18 @@ public final class FfVfxClient {
          case FxKinds.COMET -> comet(level, l);
          case FxKinds.SHOCKWAVE -> shockwave(level, l);
          case FxKinds.CRESCENT -> crescent(level, l);
+         case FxKinds.SCULK_BLOOM -> sculkBloom(level, l);
+         case FxKinds.SOUL_STREAM -> soulStream(level, l);
+         case FxKinds.TIDE_WAVE -> tideWave(level, l);
+         case FxKinds.GUST -> gust(level, l);
+         case FxKinds.GEAR_SPIN -> gearSpin(level, l);
+         case FxKinds.STARFALL -> starfall(level, l);
+         case FxKinds.GEM_SHARDS -> gemShards(level, l);
+         case FxKinds.BLOOD_SPLASH -> bloodSplash(level, l);
+         case FxKinds.THREADS -> threads(level, l);
+         case FxKinds.VOID_COLLAPSE -> voidCollapse(level, l);
+         case FxKinds.RIFT_PORTAL -> riftPortal(level, l);
+         case FxKinds.SONIC_RING -> sonicRing(level, l);
          default -> {
          }
       }
@@ -284,9 +355,20 @@ public final class FfVfxClient {
          : type == ParticleTypes.END_ROD || type == ParticleTypes.FIREWORK ? Tex.SPARK
          : type == ParticleTypes.ENCHANT ? Tex.HEXRUNE
          : type == ParticleTypes.SNOWFLAKE ? Tex.FLAKE
-         : type == ParticleTypes.FLAME || type == ParticleTypes.SOUL_FIRE_FLAME || type == ParticleTypes.SOUL || type == ParticleTypes.SCULK_SOUL ? Tex.FLAME
+         // Sculk and souls get their own sprites - they used to borrow the flame (and, through the
+         // frost templates, the snowflake and icicle).
+         : type == ParticleTypes.SCULK_SOUL || type == ParticleTypes.SOUL ? Tex.SOUL_WISP
+         : type == ParticleTypes.SCULK_CHARGE_POP ? Tex.SCULK_SPORE
+         : type == ParticleTypes.SONIC_BOOM ? Tex.SHOCK
+         : type == ParticleTypes.FLAME || type == ParticleTypes.SOUL_FIRE_FLAME ? Tex.FLAME
          : type == ParticleTypes.PORTAL || type == ParticleTypes.REVERSE_PORTAL ? Tex.MOTE
-         : type == ParticleTypes.CLOUD || type == ParticleTypes.GUST || type == ParticleTypes.WHITE_ASH ? Tex.SMOKE
+         : water(type) ? Tex.DROPLET
+         : type == ParticleTypes.BUBBLE || type == ParticleTypes.BUBBLE_POP ? Tex.BUBBLE
+         : type == ParticleTypes.GUST || type == ParticleTypes.SMALL_GUST ? Tex.FEATHER
+         : type == ParticleTypes.CHERRY_LEAVES ? Tex.PETAL
+         : type == ParticleTypes.TOTEM_OF_UNDYING || type == ParticleTypes.HAPPY_VILLAGER ? Tex.STAR
+         : type == ParticleTypes.DAMAGE_INDICATOR ? Tex.DROPLET
+         : type == ParticleTypes.CLOUD || type == ParticleTypes.WHITE_ASH || type == ParticleTypes.SQUID_INK || type == ParticleTypes.GLOW_SQUID_INK ? Tex.SMOKE
          : Tex.GLOW;
       double want = c.count() * RAW_DENSITY;
       int n = (int)want + (r.nextDouble() < want - (int)want ? 1 : 0);
@@ -297,7 +379,7 @@ public final class FfVfxClient {
             r.nextGaussian() * s, r.nextGaussian() * s + (gel ? 0.12 : 0.0), r.nextGaussian() * s,
             boom ? 2.5F : tex == Tex.SMOKE ? 0.5F : gel ? 0.2F + r.nextFloat() * 0.12F : 0.22F, boom ? 8 : 16 + r.nextInt(12),
             boom ? 2.0F : 0.6F, 0.05F, 0.9F);
-         if ((gel || tex == Tex.ROCK) && made != null) {
+         if ((gel || tex == Tex.ROCK || tex == Tex.DROPLET) && made != null) {
             made.fall(tex == Tex.ROCK ? 1.0F : 0.7F);
          }
       }
@@ -1199,7 +1281,7 @@ public final class FfVfxClient {
          double a = r.nextDouble() * Math.PI * 2.0;
          double from = radius * 1.6;
          double ox = Math.cos(a) * from, oz = Math.sin(a) * from;
-         p(level, Tex.MOTE, rgb, c.x() + ox, c.y() + 0.4 + r.nextDouble() * 1.5, c.z() + oz,
+         p(level, soulish(c.particle()) ? Tex.SOUL_WISP : Tex.MOTE, rgb, c.x() + ox, c.y() + 0.4 + r.nextDouble() * 1.5, c.z() + oz,
             (-ox - oz * 0.6) / 14.0, 0.02, (-oz + ox * 0.6) / 14.0, 0.22F, 14, 0.3F, 0.1F, 1.0F);
       }
       if (big && t > 0.7) {
@@ -1266,18 +1348,29 @@ public final class FfVfxClient {
    }
 
    private static void iceShatter(ClientLevel level, double x, double y, double z, double size, int ICE) {
+      iceShatter(level, x, y, z, size, ICE, null);
+   }
+
+   /**
+    * The same burst in the theme of the cue's particle: the Warden sends ICE_BURST with sculk
+    * souls, raids with flame and totem light - and those used to throw snowflakes. {@code o} null
+    * means ice.
+    */
+   private static void iceShatter(ClientLevel level, double x, double y, double z, double size, int ICE, ParticleOptions o) {
       RandomSource r = level.getRandom();
+      Tex flake = flakeOf(o);
+      Tex crystal = crystalOf(o);
       flash(level, x, y, z, ICE, (float)(2.5 * size));
       p(level, Tex.RING, ICE, x, y, z, 0.0, 0.0, 0.0, 0.5F, 10, (float)(8.0 * size), 0.0F, 1.0F);
       for (int i = 0; i < (int)(10 * size); i++) {
-         FfParticle s = p(level, i % 2 == 0 ? Tex.SHARD : Tex.CRYSTAL, i % 3 == 0 ? WHITE : ICE, x, y, z,
+         FfParticle s = p(level, i % 2 == 0 ? Tex.SHARD : crystal, i % 3 == 0 ? WHITE : ICE, x, y, z,
             r.nextGaussian() * 0.25 * size, 0.2 + r.nextDouble() * 0.25, r.nextGaussian() * 0.25 * size, 0.22F, 24, 0.7F, (r.nextFloat() - 0.5F) * 0.6F, 0.96F);
          if (s != null) {
             s.fall(0.04F);
          }
       }
       for (int i = 0; i < (int)(8 * size); i++) {
-         p(level, Tex.FLAKE, WHITE, x, y, z, r.nextGaussian() * 0.2 * size, r.nextGaussian() * 0.15, r.nextGaussian() * 0.2 * size, 0.25F, 26, 0.5F, 0.15F, 0.9F);
+         p(level, flake, flake == Tex.FLAKE ? WHITE : ICE, x, y, z, r.nextGaussian() * 0.2 * size, r.nextGaussian() * 0.15, r.nextGaussian() * 0.2 * size, 0.25F, 26, 0.5F, 0.15F, 0.9F);
       }
    }
 
@@ -1291,12 +1384,18 @@ public final class FfVfxClient {
          flash(level, c.x(), c.y() + 1.0, c.z(), ICE, 8.0F);
          p(level, Tex.FLARE, WHITE, c.x(), c.y() + 1.0, c.z(), 0.0, 0.0, 0.0, 3.0F, 10, 1.4F, 0.05F, 1.0F);
       }
-      int n = 20 + (int)(c.a() * 2.0);
+      // Ice throws crystals up in the wake; sculk lays veins flat along the ground with spores
+      // between them, so a Warden "infection" reads as sculk spreading, not frost.
+      boolean sculk = sculky(c.particle());
+      Tex crystal = crystalOf(c.particle());
+      Tex flake = flakeOf(c.particle());
+      int n = Math.min(60, 20 + (int)(c.a() * 2.0));
       for (int i = 0; i < n; i++) {
          double a = Math.PI * 2.0 * i / n + l.age * 0.05;
          double x = c.x() + Math.cos(a) * rad, z = c.z() + Math.sin(a) * rad;
-         p(level, i % 3 == 0 ? Tex.CRYSTAL : Tex.FLAKE, i % 2 == 0 ? WHITE : ICE, x, c.y() + 0.2, z, 0.0, 0.05 + r.nextDouble() * 0.05, 0.0,
-            i % 3 == 0 ? 0.35F : 0.25F, 10, 0.5F, 0.1F, 0.95F);
+         p(level, i % 3 == 0 ? crystal : flake, i % 2 == 0 ? (sculk ? 0x7FFFF0 : WHITE) : ICE, x, c.y() + (sculk ? 0.08 : 0.2), z,
+            0.0, (0.05 + r.nextDouble() * 0.05) * (sculk ? 0.2 : 1.0), 0.0,
+            i % 3 == 0 ? 0.35F : 0.25F, sculk ? 16 : 10, sculk ? 1.2F : 0.5F, 0.1F, 0.95F);
       }
       if ((l.age & 1) == 0) {
          p(level, Tex.SMOKE, ICE, c.x() + r.nextGaussian() * rad * 0.5, c.y() + 0.3, c.z() + r.nextGaussian() * rad * 0.5, 0.0, 0.01, 0.0, 1.2F, 20, 1.6F, 0.05F, 0.95F, 0.3F);
@@ -1308,17 +1407,18 @@ public final class FfVfxClient {
       Cue c = l.cue;
       int ICE = c.color();
       double h = Math.max(1.0, c.a());
+      Tex crystal = crystalOf(c.particle());
       if (l.age == 0) {
          for (int k = 0; k < (int)(h * 2.5); k++) {
             double y = c.y() + k * 0.4;
             float size = (float)(0.7 - 0.5 * k / (h * 2.5));
-            p(level, Tex.CRYSTAL, k % 2 == 0 ? ICE : WHITE, c.x(), y, c.z(), 0.0, 0.0, 0.0, size, 12, 0.9F, 0.0F, 1.0F);
+            p(level, crystal, k % 2 == 0 ? ICE : WHITE, c.x(), y, c.z(), 0.0, 0.0, 0.0, size, 12, 0.9F, crystal == Tex.CRYSTAL ? 0.0F : 0.15F, 1.0F);
          }
          p(level, Tex.RING, ICE, c.x(), c.y() + 0.1, c.z(), 0.0, 0.0, 0.0, 0.4F, 8, 5.0F, 0.0F, 1.0F);
          sparkBurst(level, c.x(), c.y() + 0.4, c.z(), 10, 0.35, ICE);
       }
       if (l.age == 11) {
-         iceShatter(level, c.x(), c.y() + h * 0.5, c.z(), 0.8, ICE);
+         iceShatter(level, c.x(), c.y() + h * 0.5, c.z(), 0.8, ICE, c.particle());
       }
    }
 
@@ -1541,7 +1641,8 @@ public final class FfVfxClient {
       line(level, Tex.GLOW, c.color(), a, b, (int)len, 0.5F, 7, 0.5F);
       for (double d = 1.0; d < len; d += 1.6) {
          Vec3 q = a.add(dir.scale(d));
-         p(level, Tex.RING, d % 3.2 < 1.6 ? c.color() : WHITE, q.x, q.y, q.z, dir.x * 0.05, dir.y * 0.05, dir.z * 0.05, 0.4F, 6 + (int)(d / 4.0), 3.0F, 0.0F, 1.0F, 0.8F);
+         boolean even = d % 3.2 < 1.6;
+         p(level, even ? Tex.RING : Tex.SHOCK, even ? c.color() : WHITE, q.x, q.y, q.z, dir.x * 0.05, dir.y * 0.05, dir.z * 0.05, even ? 0.4F : 0.55F, 6 + (int)(d / 4.0), even ? 3.0F : 2.4F, 0.0F, 1.0F, 0.8F);
       }
       p(level, Tex.FLARE, WHITE, a.x, a.y, a.z, 0.0, 0.0, 0.0, 1.6F, 6, 1.3F, 0.0F, 1.0F);
       flash(level, b.x, b.y, b.z, c.color(), 4.0F);
@@ -1562,7 +1663,7 @@ public final class FfVfxClient {
          if (l.age % 3 == 0) {
             p(level, Tex.RING, c.color(), x, y + 1.6, z, 0.0, 0.0, 0.0, (float)(9.0 - 4.0 * k), 6, 0.05F, 0.0F, 1.0F, 0.7F);
          }
-         vortex(level, Tex.MOTE, c.color(), x, y + 1.6, z, 7.0 - 4.0 * k, 4, 0.22F, 0.5);
+         vortex(level, (l.age & 1) == 0 ? Tex.SOUL_WISP : Tex.SCULK_SPORE, c.color(), x, y + 1.6, z, 7.0 - 4.0 * k, 4, 0.22F, 0.5);
          p(level, Tex.GLOW, c.color(), x, y + 1.7, z, 0.0, 0.0, 0.0, (float)(0.6 + 2.4 * k), 3, 1.0F, 0.0F, 1.0F, 0.7F);
          if (l.age % 2 == 0) {
             p(level, Tex.SMOKE, 0x061418, x + r.nextGaussian() * 6.0, y + 0.3, z + r.nextGaussian() * 6.0, 0.0, 0.01, 0.0, 3.0F, 30, 1.4F, 0.02F, 0.97F, 0.5F);
@@ -1583,11 +1684,15 @@ public final class FfVfxClient {
          }
       }
       if (beat > 24) {
-         p(level, Tex.MOTE, c.color(), x + r.nextGaussian() * 5.0, y + 0.2, z + r.nextGaussian() * 5.0, 0.0, 0.06, 0.0, 0.2F, 30, 0.6F, 0.0F, 1.0F);
+         p(level, Tex.SCULK_SPORE, c.color(), x + r.nextGaussian() * 5.0, y + 0.2, z + r.nextGaussian() * 5.0, 0.0, 0.06, 0.0, 0.2F, 30, 0.6F, 0.0F, 1.0F);
       }
    }
 
-   /** The Elder Warden's presence: a soul heart beating in his chest, tendrils of light off his head, the dark pooling at his feet. */
+   /**
+    * The Elder Warden's presence: a soul heart beating in his chest, souls streaming off his head,
+    * the dark pooling at his feet and sculk veins creeping out from under him, spores swelling on
+    * them. All sculk sprites - it used to borrow the soul flame.
+    */
    private static void sculkAura(ClientLevel level, Live l) {
       Cue c = l.cue;
       net.minecraft.world.entity.Entity body = level.getEntity(c.count());
@@ -1603,8 +1708,18 @@ public final class FfVfxClient {
          p(level, Tex.RING, c.color(), x, y + h * 0.62, z, 0.0, 0.0, 0.0, 0.5F, 8, beat == 0 ? 7.0F : 4.0F, 0.0F, 1.0F, 0.5F);
       }
       if ((l.age & 1) == 0) {
-         p(level, Tex.FLAME, r.nextBoolean() ? c.color() : WHITE, x + r.nextGaussian() * 0.6, y + h * 0.9, z + r.nextGaussian() * 0.6,
-            r.nextGaussian() * 0.02, 0.05, r.nextGaussian() * 0.02, 0.22F, 18, 0.4F, 0.3F, 0.97F, 0.8F);
+         p(level, Tex.SOUL_WISP, r.nextBoolean() ? c.color() : WHITE, x + r.nextGaussian() * 0.6, y + h * 0.9, z + r.nextGaussian() * 0.6,
+            r.nextGaussian() * 0.02, 0.05, r.nextGaussian() * 0.02, 0.26F, 18, 0.4F, 0.08F, 0.97F, 0.8F);
+      }
+      if (l.age % 4 == 0) {
+         // A vein creeping out from under him, lying low and slowly widening.
+         double a = r.nextDouble() * Math.PI * 2.0, d = 0.6 + r.nextDouble() * (two ? 2.6 : 1.8);
+         p(level, Tex.SCULK_TENDRIL, (l.age & 4) == 0 ? c.color() : 0x0E6A70, x + Math.cos(a) * d, y + 0.08, z + Math.sin(a) * d,
+            Math.cos(a) * 0.01, 0.0, Math.sin(a) * 0.01, 0.45F, 34, 1.5F, 0.01F, 1.0F, 0.85F);
+      }
+      if (l.age % 6 == 3) {
+         double a = r.nextDouble() * Math.PI * 2.0, d = 0.8 + r.nextDouble() * 1.8;
+         p(level, Tex.SCULK_SPORE, c.color(), x + Math.cos(a) * d, y + 0.2, z + Math.sin(a) * d, 0.0, 0.025, 0.0, 0.16F, 24, 1.7F, 0.0F, 0.98F, 0.9F);
       }
       if (l.age % 3 == 0) {
          p(level, Tex.SMOKE, 0x041014, x + r.nextGaussian() * 1.2, y + 0.2, z + r.nextGaussian() * 1.2, 0.0, 0.0, 0.0, 2.0F, 30, 1.4F, 0.02F, 1.0F, 0.55F);
@@ -1868,7 +1983,7 @@ public final class FfVfxClient {
          double x = c.x() + Math.cos(a) * rr;
          double z = c.z() + Math.sin(a) * rr;
          double y = c.y() + 0.5 + Math.sin(l.age * 0.15 + i) * 0.5;
-         p(level, Tex.WISP, i == 0 ? WHITE : rgb, x, y, z, -Math.sin(a) * 0.06, 0.01, Math.cos(a) * 0.06, 0.35F, 18, 0.6F, 0.5F, 0.95F);
+         p(level, i == 0 ? Tex.WISP : Tex.PETAL, i == 0 ? WHITE : rgb, x, y, z, -Math.sin(a) * 0.06, 0.01, Math.cos(a) * 0.06, i == 0 ? 0.35F : 0.28F, 18, 0.6F, i == 0 ? 0.5F : 0.2F, 0.95F);
       }
    }
 
@@ -1911,10 +2026,12 @@ public final class FfVfxClient {
       int rgb = colourOf(c);
       double h = Math.max(1.0, c.a());
       RandomSource r = level.getRandom();
+      // Soul and sculk auras burn with soul wisps and shed spores; everything else with flame and wisps.
+      boolean soul = soulish(c.particle());
       for (int i = 0; i < 3; i++) {
          double a = r.nextDouble() * Math.PI * 2.0;
          double rr = 0.5 + r.nextDouble() * 0.3;
-         p(level, i == 0 ? Tex.FLAME : Tex.WISP, rgb, c.x() + Math.cos(a) * rr, c.y() + r.nextDouble() * h * 0.4, c.z() + Math.sin(a) * rr,
+         p(level, soul ? (i == 2 && sculky(c.particle()) ? Tex.SCULK_SPORE : Tex.SOUL_WISP) : i == 0 ? Tex.FLAME : Tex.WISP, rgb, c.x() + Math.cos(a) * rr, c.y() + r.nextDouble() * h * 0.4, c.z() + Math.sin(a) * rr,
             0.0, 0.06 + r.nextDouble() * 0.04, 0.0, 0.4F, 14, 0.5F, 0.2F, 0.95F);
       }
    }
@@ -1926,6 +2043,787 @@ public final class FfVfxClient {
       flash(level, c.x(), c.y(), c.z(), rgb, s * 1.6F);
       p(level, Tex.FLARE, WHITE, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, s, 8, 1.4F, 0.1F, 1.0F);
       p(level, Tex.RING, rgb, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, s * 0.6F, 10, s * 2.4F, 0.0F, 0.8F);
+   }
+
+   // ------------------------------------------------------------------ the themed set (FxKinds 116-127)
+   //
+   // Shared rules: each draws only while the camera is within FAR_BLOCKS of it (the cue keeps
+   // ageing while skipped, so walking up to one shows it mid-animation, never restarted); each
+   // keeps to roughly forty particles a tick at its biggest; each has a white-hot core over a
+   // coloured body and a secondary sparkle so it reads at a glance and still rewards a look.
+
+   /** Ticks a void collapse spends on its ring after the implosion. */
+   private static final int VOID_RING_TICKS = 14;
+   /** Ticks a rift portal spends tearing open, and again sealing. */
+   private static final int RIFT_OPEN_TICKS = 10;
+   /** Beyond this many blocks from the camera the themed templates skip their per-tick drawing. */
+   private static final double FAR_BLOCKS = 96.0;
+
+   private static boolean far(double x, double y, double z) {
+      Minecraft mc = Minecraft.getInstance();
+      if (mc.player == null) {
+         return false;
+      }
+      double dx = mc.player.getX() - x, dy = mc.player.getY() - y, dz = mc.player.getZ() - z;
+      return dx * dx + dy * dy + dz * dz > FAR_BLOCKS * FAR_BLOCKS;
+   }
+
+   /** The second vector as a unit direction; flat straight ahead (+z) when it is zero. */
+   private static Vec3 direction(Cue c, boolean flat) {
+      Vec3 d = new Vec3(c.ax(), flat ? 0.0 : c.ay(), c.az());
+      return d.lengthSqr() < 1.0E-4 ? new Vec3(0.0, 0.0, 1.0) : d.normalize();
+   }
+
+   /** Any unit vector square to {@code d}, preferring the horizontal. */
+   private static Vec3 across(Vec3 d) {
+      Vec3 u = d.cross(Math.abs(d.y) > 0.95 ? new Vec3(1.0, 0.0, 0.0) : new Vec3(0.0, 1.0, 0.0));
+      return u.normalize();
+   }
+
+   private static double easeOut(double t) {
+      double k = Math.max(0.0, Math.min(1.0, t));
+      return 1.0 - (1.0 - k) * (1.0 - k) * (1.0 - k);
+   }
+
+   /** A fixed pseudo-random number in [0, 1) per (cue position, index): shapes that hold still. */
+   private static double fixed(Cue c, int i) {
+      long h = Double.doubleToLongBits(c.x() * 31.0 + c.z() * 17.0 + c.y() * 7.0) ^ (i * 0x9E3779B97F4A7C15L);
+      h ^= h >>> 29;
+      h *= 0xBF58476D1CE4E5B9L;
+      h ^= h >>> 32;
+      return ((h >>> 11) & 0xFFFFF) / (double)0x100000;
+   }
+
+   private static int darker(int rgb, double k) {
+      int r = (int)(((rgb >> 16) & 255) * k), g = (int)(((rgb >> 8) & 255) * k), b = (int)((rgb & 255) * k);
+      return (r << 16) | (g << 8) | b;
+   }
+
+   /**
+    * Sculk bloom: six veins creep out from the heart along fixed wandering paths, forking halfway,
+    * leaving a trail of tendril sprites that stays down for the rest of the bloom. Spores swell
+    * on the veins and pop with a puff of soul light; the heart pulses, and a dark haze sits on
+    * the ground. Creeps over the first 60% of its life, then breathes.
+    */
+   private static void sculkBloom(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      int deep = darker(rgb, 0.45);
+      double radius = Math.max(1.0, c.a());
+      double y = c.y() + 0.07;
+      double reach = radius * easeOut(l.t() / 0.6);
+      int keep = Math.max(6, Math.min(200, l.life - l.age + 8));
+      int veins = 6;
+      for (int k = 0; k < veins; k++) {
+         double base = Math.PI * 2.0 * (k + fixed(c, k) * 0.6) / veins;
+         double w1 = fixed(c, k + 20) * 6.0, w2 = fixed(c, k + 40) * 6.0;
+         for (int fork = 0; fork < ((k & 1) == 1 && reach > radius * 0.45 ? 2 : 1); fork++) {
+            double s = reach * (fork == 0 ? 1.0 : 0.8);
+            double ang = base + 0.45 * Math.sin(s * 0.9 + w1) + 0.2 * Math.sin(s * 2.3 + w2) + (fork == 0 ? 0.0 : 0.35 * (s - radius * 0.36) / radius);
+            double x = c.x() + Math.cos(ang) * s, z = c.z() + Math.sin(ang) * s;
+            if (l.t() < 0.62 && s > 0.2) {
+               // The trail: a tendril left at the tip every other tick, holding for the rest of the bloom.
+               if ((l.age & 1) == 0) {
+                  p(level, Tex.SCULK_TENDRIL, (k + l.age) % 3 == 0 ? rgb : deep, x, y, z, 0.0, 0.0, 0.0, fork == 0 ? 0.5F : 0.38F, keep, 1.15F, 0.0F, 1.0F, 0.95F);
+               }
+               p(level, Tex.GLOW, rgb, x, y + 0.05, z, 0.0, 0.0, 0.0, 0.35F, 3, 0.6F, 0.0F, 1.0F, 0.8F);
+            } else if ((l.age + k) % 5 == 0) {
+               // Afterwards: pulses of light running out along each vein.
+               double run = ((l.age * 0.12 + k * 0.3) % 1.0) * s;
+               double a2 = base + 0.45 * Math.sin(run * 0.9 + w1) + 0.2 * Math.sin(run * 2.3 + w2);
+               p(level, Tex.GLOW, WHITE, c.x() + Math.cos(a2) * run, y + 0.05, c.z() + Math.sin(a2) * run, 0.0, 0.0, 0.0, 0.22F, 4, 0.8F, 0.0F, 1.0F, 0.9F);
+            }
+         }
+      }
+      // Spores: one swelling on a vein every few ticks, one popping.
+      if (l.age % 3 == 0 && reach > 0.5) {
+         double a = r.nextDouble() * Math.PI * 2.0, d = 0.3 + r.nextDouble() * reach;
+         p(level, Tex.SCULK_SPORE, rgb, c.x() + Math.cos(a) * d, y + 0.15, c.z() + Math.sin(a) * d, 0.0, 0.004, 0.0, 0.14F, 16, 2.2F, 0.0F, 1.0F);
+      }
+      if (l.age % 4 == 2 && reach > 0.5) {
+         double a = r.nextDouble() * Math.PI * 2.0, d = 0.3 + r.nextDouble() * reach;
+         double px = c.x() + Math.cos(a) * d, pz = c.z() + Math.sin(a) * d;
+         p(level, Tex.RING, rgb, px, y + 0.25, pz, 0.0, 0.0, 0.0, 0.15F, 6, 4.0F, 0.0F, 1.0F, 0.8F);
+         p(level, Tex.GLOW, WHITE, px, y + 0.25, pz, 0.0, 0.0, 0.0, 0.3F, 4, 1.4F, 0.0F, 1.0F);
+         for (int i = 0; i < 3; i++) {
+            p(level, i == 0 ? Tex.SOUL_WISP : Tex.SPARK, i == 0 ? rgb : WHITE, px, y + 0.3, pz,
+               r.nextGaussian() * 0.03, 0.06 + r.nextDouble() * 0.06, r.nextGaussian() * 0.03, i == 0 ? 0.25F : 0.14F, 16, 0.5F, 0.1F, 0.95F);
+         }
+      }
+      // The heart: a slow double beat.
+      int beat = l.age % 24;
+      if (beat == 0 || beat == 5) {
+         p(level, Tex.GLOW, rgb, c.x(), y + 0.3, c.z(), 0.0, 0.0, 0.0, beat == 0 ? 1.4F : 1.0F, 6, 1.4F, 0.0F, 1.0F, 0.8F);
+         p(level, Tex.SCULK_SPORE, WHITE, c.x(), y + 0.3, c.z(), 0.0, 0.0, 0.0, 0.5F, 6, 1.3F, 0.0F, 1.0F, 0.9F);
+         p(level, Tex.RING, rgb, c.x(), y + 0.1, c.z(), 0.0, 0.0, 0.0, 0.6F, 10, (float)Math.min(30.0, radius * 2.0), 0.0F, 1.0F, 0.5F);
+      }
+      if (l.age % 4 == 0) {
+         p(level, Tex.SMOKE, 0x041014, c.x() + r.nextGaussian() * reach * 0.5, y + 0.15, c.z() + r.nextGaussian() * reach * 0.5,
+            0.0, 0.004, 0.0, 1.6F, 30, 1.5F, 0.02F, 1.0F, 0.45F);
+      }
+   }
+
+   /**
+    * Soul stream: four soul wisps chase each other from A to B on a weaving path (still at both
+    * ends, widest in the middle), each dragging a fading tail of light, with loose motes drifting
+    * off the current. A faint pull glows at the source and a flare at the mouth as each arrives.
+    */
+   private static void soulStream(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z()) && far(c.ax(), c.ay(), c.az())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      Vec3 a = new Vec3(c.x(), c.y(), c.z());
+      Vec3 b = new Vec3(c.ax(), c.ay(), c.az());
+      Vec3 d = b.subtract(a);
+      double len = d.length();
+      if (len < 0.3) {
+         return;
+      }
+      Vec3 dir = d.scale(1.0 / len);
+      Vec3 u = across(dir);
+      Vec3 v = dir.cross(u);
+      double sway = Math.max(0.0, Math.min(4.0, c.a()));
+      double step = Math.max(0.025, Math.min(0.12, 0.6 / len));   // about 0.6 blocks a tick
+      double fade = Math.min(1.0, Math.min(l.age / 6.0, (l.life - l.age) / 8.0));
+      int heads = 4;
+      for (int k = 0; k < heads; k++) {
+         double f = (l.age * step + k / (double)heads) % 1.0;
+         double env = Math.sin(Math.PI * f);
+         double w1 = Math.sin(f * Math.PI * 3.0 + k * 1.7) * sway * env;
+         double w2 = Math.cos(f * Math.PI * 2.0 + k) * sway * 0.5 * env;
+         Vec3 q = a.add(d.scale(f)).add(u.scale(w1)).add(v.scale(w2));
+         p(level, Tex.SOUL_WISP, k == 0 ? WHITE : rgb, q.x, q.y, q.z, dir.x * 0.02, dir.y * 0.02 + 0.01, dir.z * 0.02, 0.4F, 3, 0.9F, 0.05F, 1.0F, (float)fade);
+         p(level, Tex.GLOW, WHITE, q.x, q.y, q.z, 0.0, 0.0, 0.0, 0.18F, 3, 1.0F, 0.0F, 1.0F, (float)fade);
+         p(level, Tex.GLOW, rgb, q.x, q.y, q.z, 0.0, 0.004, 0.0, 0.3F, 10, 0.25F, 0.0F, 1.0F, (float)(0.6 * fade));
+         if (f + step >= 1.0) {
+            p(level, Tex.FLARE, WHITE, b.x, b.y, b.z, 0.0, 0.0, 0.0, 0.7F, 5, 1.3F, 0.05F, 1.0F);
+            p(level, Tex.RING, rgb, b.x, b.y, b.z, 0.0, 0.0, 0.0, 0.3F, 6, 3.0F, 0.0F, 1.0F, 0.7F);
+         }
+      }
+      if ((l.age & 1) == 0) {
+         Vec3 q = a.lerp(b, r.nextDouble()).add(r.nextGaussian() * 0.4, r.nextGaussian() * 0.4, r.nextGaussian() * 0.4);
+         p(level, r.nextInt(3) == 0 ? Tex.SPARK : Tex.MOTE, r.nextBoolean() ? rgb : WHITE, q.x, q.y, q.z,
+            dir.x * 0.04, 0.02, dir.z * 0.04, 0.14F, 18, 0.4F, 0.1F, 0.96F, (float)fade);
+      }
+      if (l.age % 4 == 0) {
+         p(level, Tex.GLOW, rgb, a.x, a.y, a.z, 0.0, 0.0, 0.0, 0.9F, 6, 0.4F, 0.0F, 1.0F, (float)(0.6 * fade));
+      }
+   }
+
+   /**
+    * Tide wave: a wall of water rolls out along the direction, rising to a curling white crest
+    * and easing off as it goes; spray and droplets are thrown ahead off the lip, foam is left
+    * on the ground behind, and at the end it crashes in a ring of spray.
+    */
+   private static void tideWave(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      Vec3 f = direction(c, true);
+      Vec3 side = new Vec3(-f.z, 0.0, f.x);
+      double reach = Math.max(1.5, c.a());
+      double t = (l.age + 1.0) / l.life;
+      double dist = reach * easeOut(t);
+      double halfW = Math.max(1.2, Math.min(4.5, reach * 0.35)) * (0.7 + 0.3 * t);
+      double height = 1.9 * (1.0 - 0.45 * t);
+      Vec3 front = new Vec3(c.x(), c.y(), c.z()).add(f.scale(dist));
+      if (l.age == 0) {
+         p(level, Tex.RING, rgb, c.x(), c.y() + 0.15, c.z(), 0.0, 0.0, 0.0, 0.5F, 10, 6.0F, 0.0F, 1.0F, 0.7F);
+         p(level, Tex.GLOW, WHITE, c.x(), c.y() + 0.5, c.z(), 0.0, 0.0, 0.0, 1.0F, 5, 1.5F, 0.0F, 1.0F);
+      }
+      int cols = clamp((int)(halfW * 2.0 / 0.55), 6, 16);
+      for (int i = 0; i <= cols; i++) {
+         double s = -1.0 + 2.0 * i / cols;
+         double edge = Math.sqrt(Math.max(0.0, 1.0 - s * s * 0.85));   // lower at the flanks
+         Vec3 q = front.add(side.scale(s * halfW));
+         double h = height * edge;
+         p(level, Tex.GLOW, rgb, q.x, q.y + h * 0.45, q.z, f.x * 0.05, 0.0, f.z * 0.05, (float)(0.5 + h * 0.35), 4, 0.8F, 0.0F, 1.0F, 0.55F);
+         // The crest curls forward over the face.
+         Vec3 lip = q.add(f.scale(0.35 * edge));
+         p(level, (i & 1) == 0 ? Tex.BUBBLE : Tex.DROPLET, (i & 1) == 0 ? WHITE : 0xD8F0FF, lip.x, q.y + h, lip.z,
+            f.x * 0.06, -0.01, f.z * 0.06, 0.22F, 4, 0.8F, 0.1F, 1.0F, 0.95F);
+      }
+      // Spray off the lip, falling.
+      for (int i = 0; i < 3; i++) {
+         Vec3 q = front.add(side.scale((r.nextDouble() * 2.0 - 1.0) * halfW));
+         FfParticle drop = p(level, Tex.DROPLET, i == 0 ? WHITE : rgb, q.x, q.y + height, q.z,
+            f.x * (0.12 + r.nextDouble() * 0.1) + r.nextGaussian() * 0.03, 0.12 + r.nextDouble() * 0.1, f.z * (0.12 + r.nextDouble() * 0.1) + r.nextGaussian() * 0.03,
+            0.16F + r.nextFloat() * 0.08F, 18, 0.7F, 0.0F, 0.98F);
+         if (drop != null) {
+            drop.fall(0.9F);
+         }
+      }
+      // Foam left on the ground behind it.
+      if ((l.age & 1) == 0) {
+         Vec3 q = front.subtract(f.scale(0.8)).add(side.scale((r.nextDouble() * 2.0 - 1.0) * halfW));
+         p(level, Tex.SMOKE, 0xE8F6FF, q.x, q.y + 0.12, q.z, 0.0, 0.0, 0.0, 0.9F, 20, 1.6F, 0.02F, 1.0F, 0.35F);
+      }
+      if (l.age == l.life - 1) {
+         flash(level, front.x, front.y + 0.6, front.z, rgb, 2.5F);
+         p(level, Tex.RING, WHITE, front.x, front.y + 0.2, front.z, 0.0, 0.0, 0.0, 0.6F, 10, (float)(halfW * 4.0), 0.0F, 1.0F, 0.8F);
+         for (int i = 0; i < 14; i++) {
+            double a = Math.PI * 2.0 * i / 14;
+            FfParticle drop = p(level, Tex.DROPLET, i % 3 == 0 ? WHITE : rgb, front.x, front.y + 0.6, front.z,
+               Math.cos(a) * 0.18 + f.x * 0.1, 0.3 + r.nextDouble() * 0.2, Math.sin(a) * 0.18 + f.z * 0.1, 0.2F, 22, 0.7F, 0.0F, 0.98F);
+            if (drop != null) {
+               drop.fall(1.0F);
+            }
+         }
+      }
+   }
+
+   /**
+    * Gust: three strands of wind corkscrew out along the direction - one of feathers, two of
+    * speed streaks - on a widening helix, a puff where it starts, pale wind haze behind the
+    * front, and loose feathers left tumbling down in its wake.
+    */
+   private static void gust(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      Vec3 dir = direction(c, false);
+      Vec3 u = across(dir);
+      Vec3 v = dir.cross(u);
+      Vec3 o = new Vec3(c.x(), c.y(), c.z());
+      double reach = Math.max(1.0, c.a());
+      double t = (l.age + 1.0) / l.life;
+      double s = reach * easeOut(t);
+      if (l.age == 0) {
+         p(level, Tex.RING, WHITE, o.x, o.y, o.z, 0.0, 0.0, 0.0, 0.3F, 8, 5.0F, 0.0F, 1.0F, 0.7F);
+         p(level, Tex.SMOKE, 0xF2F6FF, o.x, o.y, o.z, dir.x * 0.1, dir.y * 0.1, dir.z * 0.1, 0.8F, 12, 2.0F, 0.1F, 0.9F, 0.4F);
+      }
+      double radius = 0.3 + 0.7 * (s / reach);
+      for (int k = 0; k < 3; k++) {
+         for (int j = 0; j < 2; j++) {
+            double back = j * 0.45;
+            double ang = (l.age - back * 2.0) * 0.9 + k * Math.PI * 2.0 / 3.0;
+            Vec3 q = o.add(dir.scale(Math.max(0.0, s - back))).add(u.scale(Math.cos(ang) * radius)).add(v.scale(Math.sin(ang) * radius));
+            Vec3 tan = u.scale(-Math.sin(ang)).add(v.scale(Math.cos(ang))).scale(0.08);
+            p(level, k == 0 ? Tex.FEATHER : Tex.STREAK, k == 0 ? rgb : WHITE, q.x, q.y, q.z,
+               dir.x * 0.18 + tan.x, dir.y * 0.18 + tan.y, dir.z * 0.18 + tan.z, k == 0 ? 0.3F : 0.38F, 6, 0.7F, k == 0 ? 0.35F : 0.0F, 0.85F, j == 0 ? 0.95F : 0.55F);
+         }
+      }
+      if ((l.age & 1) == 0) {
+         Vec3 q = o.add(dir.scale(s * 0.7));
+         p(level, Tex.SMOKE, 0xF2F6FF, q.x, q.y, q.z, dir.x * 0.08, dir.y * 0.08, dir.z * 0.08, 0.7F, 10, 1.8F, 0.05F, 0.92F, 0.22F);
+      }
+      if (l.age % 3 == 0) {
+         Vec3 q = o.add(dir.scale(s * r.nextDouble())).add(r.nextGaussian() * 0.5, r.nextGaussian() * 0.3, r.nextGaussian() * 0.5);
+         FfParticle fe = p(level, Tex.FEATHER, r.nextBoolean() ? rgb : WHITE, q.x, q.y, q.z,
+            dir.x * 0.05 + r.nextGaussian() * 0.02, 0.03, dir.z * 0.05 + r.nextGaussian() * 0.02, 0.22F, 30, 1.0F, (r.nextFloat() - 0.5F) * 0.3F, 0.95F);
+         if (fe != null) {
+            fe.fall(0.04F);
+         }
+      }
+   }
+
+   /**
+    * Gear spin: three meshing cogs - a big one and two smaller ones geared to it, each turning at
+    * the right ratio and the right way. Each is a ghostly turning cog sprite under a ring of lit
+    * teeth drawn in the world, with sparks spitting where the teeth meet and a puff of steam
+    * now and then. Spins up at the start and winds down at the end.
+    */
+   private static void gearSpin(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      double size = Math.max(0.5, Math.min(6.0, c.a()));
+      boolean flat = c.ax() * c.ax() + c.az() * c.az() < 1.0E-4;
+      Vec3 e1, e2, centre;
+      if (flat) {
+         e1 = new Vec3(1.0, 0.0, 0.0);
+         e2 = new Vec3(0.0, 0.0, 1.0);
+         centre = new Vec3(c.x(), c.y() + 0.1, c.z());
+      } else {
+         Vec3 f = direction(c, true);
+         e1 = new Vec3(-f.z, 0.0, f.x);
+         e2 = new Vec3(0.0, 1.0, 0.0);
+         centre = new Vec3(c.x(), c.y(), c.z());
+      }
+      double t = l.t();
+      double speed = Math.min(1.0, Math.min(t / 0.15, (1.0 - t) / 0.15));
+      float fade = (float)Math.max(0.15, speed);
+      double[] radius = {size, size * 0.6, size * 0.45};
+      double[] place = {0.0, 0.35, Math.PI + 0.9};
+      double turn = 0.07 * l.age;   // the big cog's angle; the others follow by ratio
+      for (int g = 0; g < 3; g++) {
+         double gr = radius[g];
+         double dist = g == 0 ? 0.0 : (radius[0] + gr) * 0.93;
+         Vec3 hub = centre.add(e1.scale(Math.cos(place[g]) * dist)).add(e2.scale(Math.sin(place[g]) * dist));
+         double ratio = g == 0 ? 1.0 : -radius[0] / gr;
+         double ang = turn * ratio + (g == 0 ? 0.0 : Math.PI / Math.max(6, (int)(gr * 7.0)));
+         if (l.age == 0) {
+            p(level, Tex.COG, rgb, hub.x, hub.y, hub.z, 0.0, 0.0, 0.0, (float)(gr * 1.9), l.life, 1.0F, (float)(0.07 * ratio), 1.0F, 0.45F);
+            p(level, Tex.GLOW, WHITE, hub.x, hub.y, hub.z, 0.0, 0.0, 0.0, (float)(gr * 0.9), 6, 1.4F, 0.0F, 1.0F, 0.8F);
+         }
+         if ((l.age & 1) == 1) {
+            continue;
+         }
+         int teeth = clamp((int)(gr * 7.0), 6, 16);
+         for (int i = 0; i < teeth; i++) {
+            double a = ang + Math.PI * 2.0 * i / teeth;
+            Vec3 tip = hub.add(e1.scale(Math.cos(a) * gr)).add(e2.scale(Math.sin(a) * gr));
+            p(level, Tex.GLOW, i == 0 ? WHITE : rgb, tip.x, tip.y, tip.z, 0.0, 0.0, 0.0, 0.28F, 3, 1.0F, 0.0F, 1.0F, fade);
+            if ((i & 1) == 0) {
+               Vec3 rim = hub.add(e1.scale(Math.cos(a + Math.PI / teeth) * gr * 0.72)).add(e2.scale(Math.sin(a + Math.PI / teeth) * gr * 0.72));
+               p(level, Tex.MOTE, darker(rgb, 0.7), rim.x, rim.y, rim.z, 0.0, 0.0, 0.0, 0.2F, 3, 1.0F, 0.0F, 1.0F, fade * 0.8F);
+            }
+         }
+         p(level, Tex.GLOW, WHITE, hub.x, hub.y, hub.z, 0.0, 0.0, 0.0, 0.3F, 3, 1.0F, 0.0F, 1.0F, fade);
+         if (g > 0 && l.age % 6 == 0 && speed > 0.5) {
+            // Where the teeth meet: a spit of sparks.
+            Vec3 mesh = centre.lerp(hub, radius[0] / (radius[0] + gr));
+            for (int i = 0; i < 3; i++) {
+               FfParticle sp = p(level, Tex.SPARK, i == 0 ? WHITE : 0xFFC060, mesh.x, mesh.y, mesh.z,
+                  r.nextGaussian() * 0.08, 0.06 + r.nextDouble() * 0.06, r.nextGaussian() * 0.08, 0.14F, 12, 0.4F, 0.2F, 0.95F);
+               if (sp != null) {
+                  sp.fall(0.5F);
+               }
+            }
+         }
+      }
+      if (l.age % 14 == 7) {
+         p(level, Tex.SMOKE, 0xC8C4BC, centre.x + r.nextGaussian() * size * 0.4, centre.y + size * 0.3, centre.z + r.nextGaussian() * size * 0.4,
+            0.0, 0.04, 0.0, 0.6F, 20, 2.0F, 0.03F, 0.97F, 0.3F);
+      }
+   }
+
+   /**
+    * Starfall: stars rain over the circle, each a slowly turning four-point twinkle with a soft
+    * glow following it down; points flash on the ground as they land, a few stars hang and wink
+    * in the air, and a faint ring marks the circle.
+    */
+   private static void starfall(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      double radius = Math.max(1.0, Math.min(24.0, c.a()));
+      float fade = (float)Math.min(1.0, (l.life - l.age) / 10.0);
+      int n = clamp((int)(radius * 0.7), 2, 7);
+      for (int i = 0; i < n; i++) {
+         double a = r.nextDouble() * Math.PI * 2.0, d = Math.sqrt(r.nextDouble()) * radius;
+         double x = c.x() + Math.cos(a) * d, z = c.z() + Math.sin(a) * d, y = c.y() + 7.0 + r.nextDouble() * 2.0;
+         double vx = 0.04, vy = -0.38;
+         p(level, Tex.STAR, i % 3 == 0 ? WHITE : rgb, x, y, z, vx, vy, 0.0, 0.32F + r.nextFloat() * 0.15F, 20, 0.7F, 0.12F, 1.0F, fade);
+         p(level, Tex.GLOW, rgb, x - vx * 2.0, y - vy * 2.0, z, vx, vy, 0.0, 0.4F, 18, 0.4F, 0.0F, 1.0F, 0.45F * fade);
+      }
+      if (l.age > 18) {
+         for (int i = 0; i < 2; i++) {
+            double a = r.nextDouble() * Math.PI * 2.0, d = Math.sqrt(r.nextDouble()) * radius;
+            double x = c.x() + Math.cos(a) * d, z = c.z() + Math.sin(a) * d;
+            p(level, Tex.FLARE, WHITE, x, c.y() + 0.15, z, 0.0, 0.0, 0.0, 0.5F, 5, 1.2F, 0.1F, 1.0F, fade);
+            p(level, Tex.RING, rgb, x, c.y() + 0.1, z, 0.0, 0.0, 0.0, 0.15F, 6, 4.0F, 0.0F, 1.0F, 0.7F * fade);
+            p(level, Tex.SPARK, rgb, x, c.y() + 0.2, z, r.nextGaussian() * 0.04, 0.08, r.nextGaussian() * 0.04, 0.14F, 10, 0.4F, 0.2F, 0.9F, fade);
+         }
+      }
+      if (l.age % 3 == 0) {
+         double a = r.nextDouble() * Math.PI * 2.0, d = Math.sqrt(r.nextDouble()) * radius;
+         p(level, Tex.STAR, WHITE, c.x() + Math.cos(a) * d, c.y() + 1.5 + r.nextDouble() * 4.0, c.z() + Math.sin(a) * d,
+            0.0, 0.0, 0.0, 0.22F, 8, 0.3F, 0.3F, 1.0F, fade);
+      }
+      if (l.age % 8 == 0) {
+         int pts = clamp((int)(Math.PI * 2.0 * radius / 1.4), 8, 32);
+         for (int i = 0; i < pts; i++) {
+            double a = l.age * 0.01 + Math.PI * 2.0 * i / pts;
+            p(level, Tex.MOTE, rgb, c.x() + Math.cos(a) * radius, c.y() + 0.1, c.z() + Math.sin(a) * radius, 0.0, 0.0, 0.0, 0.2F, 9, 1.0F, 0.0F, 1.0F, 0.5F * fade);
+         }
+      }
+   }
+
+   /**
+    * Gem shards: a white flash and a halo, then cut gems thrown up and out - tumbling, falling,
+    * each facet catching the light - with sparks among them and twinkles winking where they
+    * are for a second afterwards.
+    */
+   private static void gemShards(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      double size = Math.max(0.4, Math.min(5.0, c.a()));
+      if (l.age == 0) {
+         flash(level, c.x(), c.y(), c.z(), rgb, (float)(1.2 + size));
+         p(level, Tex.FLARE, WHITE, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, (float)(0.8 + size * 0.6), 8, 1.4F, 0.08F, 1.0F);
+         p(level, Tex.RING, rgb, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, 0.4F, 10, (float)(size * 6.0), 0.0F, 1.0F, 0.8F);
+         int n = clamp((int)(size * 10.0), 8, 28);
+         for (int i = 0; i < n; i++) {
+            Vec3 d = new Vec3(r.nextGaussian(), 0.6 + Math.abs(r.nextGaussian()), r.nextGaussian()).normalize().scale(0.12 + r.nextDouble() * 0.16 * size);
+            FfParticle gem = p(level, Tex.GEM, i % 4 == 0 ? WHITE : i % 4 == 1 ? darker(rgb, 0.75) : rgb, c.x(), c.y(), c.z(), d.x, d.y, d.z,
+               0.2F + r.nextFloat() * 0.16F, 26 + r.nextInt(10), 0.9F, (r.nextFloat() - 0.5F) * 0.5F, 0.97F);
+            if (gem != null) {
+               gem.fall(0.7F);
+            }
+         }
+         sparkBurst(level, c.x(), c.y(), c.z(), 12, 0.3, rgb);
+         return;
+      }
+      double spread = Math.min(size * 1.8, 0.25 * l.age);
+      for (int i = 0; i < 2; i++) {
+         p(level, Tex.STAR, WHITE, c.x() + r.nextGaussian() * spread * 0.6, c.y() + 0.5 + r.nextGaussian() * 0.5 - l.age * 0.03, c.z() + r.nextGaussian() * spread * 0.6,
+            0.0, 0.0, 0.0, 0.2F, 4, 0.4F, 0.2F, 1.0F);
+      }
+      if (l.age < 6) {
+         p(level, Tex.GLOW, rgb, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, (float)(1.2 * size * (1.0 - l.age / 6.0)) + 0.1F, 3, 1.0F, 0.0F, 1.0F, 0.5F);
+      }
+   }
+
+   /**
+    * Blood splash: a dark spurt of droplets arcing out (thrown with the blow when the cue has a
+    * direction), a crown of finer drops, a red mist - then drips falling from the wound for a
+    * second after.
+    */
+   private static void bloodSplash(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      int dark = darker(rgb, 0.55);
+      double size = Math.max(0.3, Math.min(4.0, c.a()));
+      boolean aimed = c.ax() * c.ax() + c.ay() * c.ay() + c.az() * c.az() > 1.0E-4;
+      Vec3 aim = aimed ? new Vec3(c.ax(), c.ay(), c.az()).normalize() : Vec3.ZERO;
+      if (l.age == 0) {
+         p(level, Tex.GLOW, rgb, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, (float)(0.6 + size * 0.5), 5, 1.4F, 0.0F, 1.0F, 0.6F);
+         p(level, Tex.GLOW, 0xFFD0D0, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, 0.3F, 3, 1.5F, 0.0F, 1.0F, 0.8F);
+         int n = clamp((int)(size * 12.0), 8, 30);
+         for (int i = 0; i < n; i++) {
+            Vec3 d = new Vec3(r.nextGaussian() * 0.6, 0.5 + r.nextDouble() * 0.6, r.nextGaussian() * 0.6).add(aim.scale(1.2)).normalize()
+               .scale((0.1 + r.nextDouble() * 0.2) * (0.6 + size * 0.4));
+            FfParticle drop = p(level, Tex.DROPLET, i % 3 == 0 ? dark : rgb, c.x(), c.y(), c.z(), d.x, d.y, d.z,
+               0.1F + r.nextFloat() * 0.12F * (float)size, 18 + r.nextInt(10), 0.8F, 0.0F, 0.98F);
+            if (drop != null) {
+               drop.fall(1.0F);
+            }
+         }
+         for (int i = 0; i < 10; i++) {
+            double a = Math.PI * 2.0 * i / 10;
+            FfParticle drop = p(level, Tex.DROPLET, rgb, c.x(), c.y(), c.z(), Math.cos(a) * 0.12 + aim.x * 0.08, 0.18, Math.sin(a) * 0.12 + aim.z * 0.08,
+               0.08F, 14, 0.7F, 0.0F, 0.97F);
+            if (drop != null) {
+               drop.fall(1.0F);
+            }
+         }
+         for (int i = 0; i < 3; i++) {
+            p(level, Tex.SMOKE, dark, c.x() + r.nextGaussian() * 0.2, c.y() + r.nextGaussian() * 0.2, c.z() + r.nextGaussian() * 0.2,
+               aim.x * 0.03, 0.01, aim.z * 0.03, 0.5F, 16, 1.8F, 0.03F, 0.95F, 0.35F);
+         }
+         return;
+      }
+      if (l.age < 16 && (l.age & 1) == 0) {
+         for (int i = 0; i < 2; i++) {
+            FfParticle drip = p(level, Tex.DROPLET, i == 0 ? dark : rgb, c.x() + r.nextGaussian() * 0.2 * size, c.y() - 0.1, c.z() + r.nextGaussian() * 0.2 * size,
+               0.0, 0.0, 0.0, 0.07F + r.nextFloat() * 0.05F, 16, 0.9F, 0.0F, 0.99F);
+            if (drip != null) {
+               drip.fall(0.55F);
+            }
+         }
+      }
+   }
+
+   /**
+    * Threads: five puppet strings drop out of the air onto the target in the first eight ticks,
+    * then hang taut and sway, a bead of light running down each now and then, a sigil turning
+    * where they hang from. In the last five ticks they snap - sparks at the break, the ends
+    * whipping back up.
+    */
+   private static void threads(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      double height = Math.max(1.5, Math.min(16.0, c.a()));
+      int drop = 8;
+      int snapAt = Math.max(drop + 1, l.life - 5);
+      double fall = easeOut((l.age + 1.0) / drop);
+      double snap = l.age >= snapAt ? (l.age - snapAt + 1.0) / (l.life - snapAt) : 0.0;
+      Vec3 target = new Vec3(c.x(), c.y(), c.z());
+      Vec3 sigil = target.add(0.0, height, 0.0);
+      int strings = 5;
+      if (l.age % 4 == 0 && snap == 0.0) {
+         p(level, Tex.RUNE2, rgb, sigil.x, sigil.y + 0.2, sigil.z, 0.0, 0.0, 0.0, 0.9F, 5, 1.0F, 0.05F, 1.0F, 0.85F);
+         p(level, Tex.GLOW, WHITE, sigil.x, sigil.y + 0.2, sigil.z, 0.0, 0.0, 0.0, 0.5F, 5, 1.0F, 0.0F, 1.0F, 0.6F);
+      }
+      for (int k = 0; k < strings; k++) {
+         double ang = Math.PI * 2.0 * k / strings + fixed(c, k) * 0.5;
+         Vec3 top = sigil.add(Math.cos(ang) * 0.9, 0.0, Math.sin(ang) * 0.9);
+         Vec3 end = target.add(Math.cos(ang) * 0.3, 0.6 + (k % 3) * 0.45, Math.sin(ang) * 0.3);   // wrists, shoulders, head
+         Vec3 span = end.subtract(top);
+         double len = span.length();
+         if (len < 0.1) {
+            continue;
+         }
+         Vec3 sway = new Vec3(-span.z, 0.0, span.x).normalize().scale(Math.sin(l.age * 0.15 + k * 1.3) * 0.18);
+         // From the top down to the falling tip; after the snap, only the top part, whipping back.
+         double from = 0.0;
+         double to = snap > 0.0 ? 0.5 * (1.0 - snap) : fall;
+         int pts = clamp((int)(len * to / 0.5), 1, 16);
+         if ((l.age & 1) == 0 || l.age < drop) {
+            for (int i = 0; i <= pts; i++) {
+               double f = from + (to - from) * i / pts;
+               double bow = Math.sin(Math.PI * f);
+               Vec3 q = top.add(span.scale(f)).add(sway.scale(bow));
+               p(level, i % 4 == 2 ? Tex.THREAD : Tex.GLOW, i % 4 == 2 ? rgb : (i & 1) == 0 ? WHITE : rgb, q.x, q.y, q.z, 0.0, 0.0, 0.0,
+                  i % 4 == 2 ? 0.3F : 0.09F, 3, 1.0F, 0.0F, 1.0F, 0.9F);
+            }
+         }
+         if (l.age == drop - 1) {
+            p(level, Tex.FLARE, WHITE, end.x, end.y, end.z, 0.0, 0.0, 0.0, 0.4F, 5, 1.3F, 0.1F, 1.0F);
+         }
+         if (snap == 0.0 && l.age > drop && (l.age + k * 7) % 18 == 0) {
+            Vec3 bead = top.add(span.scale(0.5)).add(sway);
+            p(level, Tex.SPARK, WHITE, top.x, top.y, top.z, span.x / 10.0, span.y / 10.0, span.z / 10.0, 0.2F, 10, 1.0F, 0.2F, 1.0F);
+            p(level, Tex.GLOW, rgb, bead.x, bead.y, bead.z, 0.0, 0.0, 0.0, 0.25F, 4, 1.0F, 0.0F, 1.0F, 0.7F);
+         }
+         if (l.age == snapAt) {
+            Vec3 cut = top.add(span.scale(0.5)).add(sway);
+            for (int i = 0; i < 4; i++) {
+               p(level, Tex.SPARK, i == 0 ? WHITE : rgb, cut.x, cut.y, cut.z, r.nextGaussian() * 0.1, r.nextGaussian() * 0.1, r.nextGaussian() * 0.1, 0.16F, 10, 0.4F, 0.2F, 0.9F);
+            }
+            FfParticle loose = p(level, Tex.THREAD, rgb, cut.x, cut.y - 0.4, cut.z, 0.0, 0.0, 0.0, 0.5F, 14, 0.8F, 0.1F, 1.0F, 0.8F);
+            if (loose != null) {
+               loose.fall(0.3F);
+            }
+         }
+      }
+      if (l.age == snapAt) {
+         flash(level, target.x, target.y + 1.0, target.z, rgb, 1.2F);
+      }
+   }
+
+   /**
+    * Void collapse: dark motes and void rings fall inward from a shrinking shell while the centre
+    * darkens into a black knot with a coloured halo - then it goes, a white point and a ring of
+    * void thrown out, motes flung after it, the dark hanging a moment before it clears.
+    */
+   private static void voidCollapse(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      double radius = Math.max(1.0, Math.min(20.0, c.a()));
+      int implode = l.life - VOID_RING_TICKS;
+      double x = c.x(), y = c.y(), z = c.z();
+      if (l.age < implode) {
+         double k = l.age / (double)implode;
+         double shell = radius * (1.0 - Math.pow(k, 1.5)) + 0.3;
+         vortex(level, Tex.VOID_MOTE, (l.age & 1) == 0 ? rgb : VOID, x, y, z, shell, 3, 0.35F, 1.0);
+         vortex(level, Tex.MOTE, WHITE, x, y, z, shell * 0.8, 1, 0.15F, 1.2);
+         if (l.age % 4 == 0) {
+            p(level, Tex.RING, rgb, x, y, z, 0.0, 0.0, 0.0, (float)(shell * 1.2), 8, 0.1F, 0.0F, 1.0F, 0.6F);
+         }
+         p(level, Tex.GLOW, rgb, x, y, z, 0.0, 0.0, 0.0, (float)(0.6 + 1.6 * k), 3, 1.0F, 0.0F, 1.0F, 0.45F);
+         p(level, Tex.VOID_MOTE, VOID, x, y, z, 0.0, 0.0, 0.0, (float)(0.4 + 1.1 * k), 3, 1.0F, 0.02F, 1.0F, 0.95F);
+         if (k > 0.6 && (l.age & 1) == 0) {
+            Vec3 d = new Vec3(r.nextGaussian(), r.nextGaussian(), r.nextGaussian()).normalize().scale(radius * 0.7);
+            line(level, Tex.GLOW, rgb, new Vec3(x, y, z).add(d), new Vec3(x, y, z), 6, 0.1F, 2, 0.8F);
+         }
+         return;
+      }
+      if (l.age == implode) {
+         flash(level, x, y, z, WHITE, (float)Math.min(6.0, 1.5 + radius * 0.4));
+         p(level, Tex.FLARE, WHITE, x, y, z, 0.0, 0.0, 0.0, 1.6F, 8, 1.5F, 0.06F, 1.0F);
+         p(level, Tex.RING, rgb, x, y, z, 0.0, 0.0, 0.0, 0.8F, 14, (float)Math.min(40.0, radius * 3.5), 0.0F, 1.0F);
+         p(level, Tex.RING, VOID, x, y, z, 0.0, 0.0, 0.0, 0.6F, 12, (float)Math.min(34.0, radius * 2.8), 0.0F, 1.0F, 0.9F);
+         int n = 18;
+         for (int i = 0; i < n; i++) {
+            double a = Math.PI * 2.0 * i / n;
+            double sp = Math.min(0.8, 0.15 + radius * 0.06);
+            p(level, i % 2 == 0 ? Tex.VOID_MOTE : Tex.SPARK, i % 2 == 0 ? rgb : WHITE, x, y, z, Math.cos(a) * sp, (r.nextDouble() - 0.5) * 0.1, Math.sin(a) * sp,
+               0.3F, 14, 0.5F, 0.2F, 0.88F);
+         }
+         sparkBurst(level, x, y, z, 14, 0.35, rgb);
+         return;
+      }
+      if ((l.age & 1) == 0) {
+         p(level, Tex.SMOKE, VOID, x + r.nextGaussian() * 0.6, y + r.nextGaussian() * 0.4, z + r.nextGaussian() * 0.6, 0.0, 0.01, 0.0, 1.0F, 14, 1.5F, 0.03F, 0.95F, 0.6F);
+         p(level, Tex.MOTE, rgb, x + r.nextGaussian() * radius * 0.5, y + r.nextGaussian() * 0.5, z + r.nextGaussian() * radius * 0.5, 0.0, 0.03, 0.0, 0.16F, 14, 0.5F, 0.0F, 1.0F);
+      }
+   }
+
+   /**
+    * Rift portal - the Multidimensional Army's door. A seam of light cracks open from the ground
+    * up and tears wide over ten ticks into an upright oval with a jagged, crawling rim (white-hot
+    * inside, the rift's colour out), a void-dark heart that swirls inward, a far glow of the
+    * other side, glyphs orbiting it and sparks spilling out of the foot toward whoever it faces.
+    * As it finishes opening it breathes a gust of void out along its facing - the cue for what
+    * steps through. It holds for b ticks, then seals to a line and a point and is gone.
+    */
+   private static void riftPortal(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      double height = Math.max(1.5, Math.min(12.0, c.a()));
+      Vec3 f = direction(c, true);
+      Vec3 side = new Vec3(-f.z, 0.0, f.x);
+      Vec3 base = new Vec3(c.x(), c.y(), c.z());
+      Vec3 mid = base.add(0.0, height * 0.5, 0.0);
+      int closeAt = l.life - RIFT_OPEN_TICKS;
+      double open = l.age < RIFT_OPEN_TICKS ? easeOut((l.age + 1.0) / RIFT_OPEN_TICKS)
+         : l.age >= closeAt ? Math.max(0.0, 1.0 - (l.age - closeAt + 1.0) / RIFT_OPEN_TICKS) : 1.0;
+      double halfH = height * 0.5 * Math.min(1.0, 0.25 + open * 1.5);
+      double halfW = height * 0.3 * open;
+      if (l.age == 0) {
+         flash(level, mid.x, mid.y, mid.z, rgb, (float)(height * 0.5));
+         line(level, Tex.SPARK, WHITE, base, base.add(0.0, height, 0.0), clamp((int)(height * 3.0), 6, 24), 0.25F, 6, 1.0F);
+         crackOut(level, rgb, mid.x, mid.y, mid.z, 4, height * 0.4);
+      }
+      // The rim, redrawn every other tick with particles that outlive the gap (as the tear does).
+      if ((l.age & 1) == 0) {
+         int n = clamp((int)(height * 6.0), 16, 30);
+         for (int i = 0; i < n; i++) {
+            double ang = Math.PI * 2.0 * i / n;
+            double jag = 1.0 + 0.12 * Math.sin(ang * 7.0 + l.age * 0.3 + fixed(c, i) * 6.0) + 0.08 * (fixed(c, i + 50) - 0.5);
+            double ex = Math.cos(ang) * halfW * jag, ey = Math.sin(ang) * halfH * jag;
+            Vec3 q = mid.add(side.scale(ex)).add(0.0, ey, 0.0);
+            p(level, Tex.GLOW, rgb, q.x, q.y, q.z, 0.0, 0.0, 0.0, 0.42F, 4, 1.0F, 0.0F, 1.0F, 0.85F);
+            if ((i & 1) == 0) {
+               Vec3 in = mid.add(side.scale(ex * 0.86)).add(0.0, ey * 0.92, 0.0);
+               p(level, Tex.GLOW, WHITE, in.x, in.y, in.z, 0.0, 0.0, 0.0, 0.2F, 4, 1.0F, 0.0F, 1.0F, 0.9F);
+            }
+         }
+      }
+      if (halfW > 0.08) {
+         // The dark heart and the far side's glow.
+         p(level, Tex.SMOKE, VOID, mid.x, mid.y + (r.nextDouble() - 0.5) * halfH, mid.z, 0.0, 0.0, 0.0, (float)(halfW * 1.7), 6, 0.9F, 0.03F, 1.0F, 0.95F);
+         if ((l.age & 1) == 1) {
+            Vec3 deep = mid.subtract(f.scale(0.15));
+            p(level, Tex.GLOW, rgb, deep.x, deep.y, deep.z, 0.0, 0.0, 0.0, (float)(halfW * 1.3), 4, 1.0F, 0.0F, 1.0F, 0.3F);
+            p(level, Tex.VOID_MOTE, VOID, mid.x, mid.y, mid.z, 0.0, 0.0, 0.0, (float)(halfW * 1.1), 4, 1.0F, 0.04F, 1.0F, 0.8F);
+         }
+         // A swirl inside, drawn in toward the middle.
+         for (int i = 0; i < 2; i++) {
+            double ang = l.age * 0.35 + i * Math.PI + r.nextDouble() * 0.6;
+            double rr = 0.75 + 0.2 * r.nextDouble();
+            double ex = Math.cos(ang) * halfW * rr, ey = Math.sin(ang) * halfH * rr;
+            Vec3 q = mid.add(side.scale(ex)).add(0.0, ey, 0.0);
+            p(level, i == 0 ? Tex.MOTE : Tex.VOID_MOTE, rgb, q.x, q.y, q.z, -side.x * ex / 8.0, -ey / 8.0, -side.z * ex / 8.0, 0.2F, 8, 0.3F, 0.2F, 1.0F);
+         }
+         // Glyphs orbiting the frame.
+         if (l.age % 3 == 0) {
+            for (int i = 0; i < 6; i++) {
+               double ang = l.age * 0.03 + Math.PI * 2.0 * i / 6;
+               Vec3 q = mid.add(side.scale(Math.cos(ang) * (halfW + 0.6))).add(0.0, Math.sin(ang) * (halfH + 0.5), 0.0);
+               p(level, (i & 1) == 0 ? Tex.RUNE2 : Tex.RUNE, rgb, q.x, q.y, q.z, 0.0, 0.0, 0.0, 0.32F, 4, 1.0F, 0.05F, 1.0F, (float)(0.8 * open));
+            }
+         }
+         // Crackle on the rim, sparks spilling from the foot toward the facing.
+         if (r.nextInt(3) == 0) {
+            double ang = r.nextDouble() * Math.PI * 2.0;
+            Vec3 q = mid.add(side.scale(Math.cos(ang) * halfW)).add(0.0, Math.sin(ang) * halfH, 0.0);
+            p(level, Tex.CRACK, WHITE, q.x, q.y, q.z, 0.0, 0.0, 0.0, 0.45F, 3, 1.2F, 0.0F, 1.0F);
+         }
+         FfParticle sp = p(level, Tex.SPARK, r.nextBoolean() ? rgb : WHITE, base.x + side.x * (r.nextDouble() - 0.5) * halfW, base.y + 0.2, base.z + side.z * (r.nextDouble() - 0.5) * halfW,
+            f.x * 0.08 + r.nextGaussian() * 0.02, 0.06, f.z * 0.08 + r.nextGaussian() * 0.02, 0.16F, 14, 0.4F, 0.2F, 0.95F);
+         if (sp != null) {
+            sp.fall(0.3F);
+         }
+      }
+      if (l.age == RIFT_OPEN_TICKS) {
+         // Fully open: it breathes the other side out along its facing.
+         for (int i = 0; i < 10; i++) {
+            Vec3 q = mid.add(side.scale((r.nextDouble() - 0.5) * halfW)).add(0.0, (r.nextDouble() - 0.5) * halfH, 0.0);
+            p(level, i % 3 == 0 ? Tex.VOID_MOTE : Tex.SMOKE, i % 3 == 0 ? rgb : VOID, q.x, q.y, q.z,
+               f.x * (0.12 + r.nextDouble() * 0.1), 0.0, f.z * (0.12 + r.nextDouble() * 0.1), i % 3 == 0 ? 0.3F : 0.9F, 16, 1.6F, 0.05F, 0.92F, 0.8F);
+         }
+         p(level, Tex.RING, rgb, mid.x, mid.y, mid.z, 0.0, 0.0, 0.0, (float)halfH, 10, 1.6F, 0.0F, 1.0F, 0.7F);
+      }
+      if (l.age == l.life - 1) {
+         flash(level, mid.x, mid.y, mid.z, WHITE, (float)(height * 0.35));
+         p(level, Tex.RING, rgb, mid.x, mid.y, mid.z, 0.0, 0.0, 0.0, (float)(height * 0.6), 8, 0.05F, 0.0F, 1.0F);
+         sparkBurst(level, mid.x, mid.y, mid.z, 16, 0.3, rgb);
+      }
+   }
+
+   /**
+    * Sonic ring: a crescent of sound is loosed every four ticks over the first half of the life
+    * and races out along the direction, widening as it goes - each a bowed arc of teal light with
+    * shock-crescent sprites on it, a flare and a shock sprite at the mouth as it is loosed, spores
+    * drifting in its path, and a pop where each one runs out.
+    */
+   private static void sonicRing(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      if (far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      RandomSource r = level.getRandom();
+      int rgb = colourOf(c);
+      Vec3 dir = direction(c, false);
+      Vec3 side = across(dir);
+      Vec3 up = side.cross(dir).normalize();
+      Vec3 o = new Vec3(c.x(), c.y(), c.z());
+      double reach = Math.max(2.0, Math.min(48.0, c.a()));
+      int emitFor = Math.max(1, l.life / 2);
+      double speed = reach / Math.max(4.0, l.life - emitFor * 0.6);
+      if (l.age < emitFor && l.age % 4 == 0) {
+         p(level, Tex.FLARE, WHITE, o.x, o.y, o.z, 0.0, 0.0, 0.0, 0.8F, 4, 1.3F, 0.05F, 1.0F);
+         p(level, Tex.SHOCK, rgb, o.x, o.y, o.z, dir.x * 0.1, dir.y * 0.1, dir.z * 0.1, 1.0F, 8, 2.0F, 0.0F, 1.0F, 0.8F);
+         p(level, Tex.GLOW, rgb, o.x, o.y, o.z, 0.0, 0.0, 0.0, 1.0F, 5, 1.4F, 0.0F, 1.0F, 0.6F);
+      }
+      boolean draw = (l.age & 1) == 0;
+      for (int j = 0; j * 4 < emitFor; j++) {
+         int since = l.age - j * 4;
+         if (since < 0) {
+            break;
+         }
+         double d = since * speed;
+         if (d > reach + speed) {
+            continue;
+         }
+         Vec3 at = o.add(dir.scale(Math.min(d, reach)));
+         double rho = 0.6 + Math.min(d, reach) * 0.12;
+         if (d > reach) {
+            // It ran out: a pop.
+            p(level, Tex.RING, rgb, at.x, at.y, at.z, 0.0, 0.0, 0.0, (float)rho, 6, 2.0F, 0.0F, 1.0F, 0.7F);
+            p(level, Tex.SCULK_SPORE, WHITE, at.x, at.y, at.z, 0.0, 0.0, 0.0, 0.4F, 6, 1.8F, 0.0F, 1.0F, 0.8F);
+            continue;
+         }
+         if (!draw) {
+            continue;
+         }
+         float fade = (float)(1.0 - 0.6 * d / reach);
+         int pts = clamp((int)(rho * 6.0), 8, 14);
+         for (int i = 0; i <= pts; i++) {
+            double th = -Math.PI * 0.62 + Math.PI * 1.24 * i / pts;
+            double bow = (1.0 - Math.cos(th)) * 0.35 * rho;   // the ends trail behind the crown
+            Vec3 q = at.add(up.scale(Math.cos(th) * rho)).add(side.scale(Math.sin(th) * rho)).subtract(dir.scale(bow));
+            boolean shock = i % 3 == 0;
+            p(level, shock ? Tex.SHOCK : Tex.GLOW, shock ? WHITE : rgb, q.x, q.y, q.z, dir.x * speed * 0.5, dir.y * speed * 0.5, dir.z * speed * 0.5,
+               shock ? 0.4F : 0.3F, 3, 1.0F, 0.0F, 1.0F, fade);
+         }
+      }
+      if ((l.age & 1) == 1) {
+         Vec3 q = o.add(dir.scale(r.nextDouble() * reach)).add(r.nextGaussian() * 0.5, r.nextGaussian() * 0.5, r.nextGaussian() * 0.5);
+         p(level, Tex.SCULK_SPORE, rgb, q.x, q.y, q.z, dir.x * 0.03, 0.01, dir.z * 0.03, 0.15F, 16, 1.4F, 0.0F, 0.97F, 0.8F);
+      }
    }
 
    // ------------------------------------------------------------------ helpers
@@ -1976,6 +2874,62 @@ public final class FfVfxClient {
       }
    }
 
+   /** Sculk-themed vanilla types: the Warden's souls, charge pops and sonic boom. */
+   private static boolean sculky(ParticleOptions o) {
+      if (o == null) {
+         return false;
+      }
+      ParticleType<?> t = o.getType();
+      return t == ParticleTypes.SCULK_SOUL || t == ParticleTypes.SCULK_CHARGE_POP || t == ParticleTypes.SONIC_BOOM;
+   }
+
+   /** Soul-themed types (sculk included): drawn with soul wisps rather than flame or motes. */
+   private static boolean soulish(ParticleOptions o) {
+      if (o == null) {
+         return false;
+      }
+      ParticleType<?> t = o.getType();
+      return sculky(o) || t == ParticleTypes.SOUL || t == ParticleTypes.SOUL_FIRE_FLAME;
+   }
+
+   private static boolean water(ParticleType<?> t) {
+      return t == ParticleTypes.SPLASH || t == ParticleTypes.FALLING_WATER || t == ParticleTypes.DRIPPING_WATER || t == ParticleTypes.DOLPHIN;
+   }
+
+   /**
+    * The small scattered sprite of a frost-family template (frost nova, ice burst) in the theme of
+    * the cue's particle. Those templates are reused well beyond the Snow Queen - the Warden's sculk,
+    * raid flame and totem light - and each used to throw snowflakes whatever it was.
+    */
+   private static Tex flakeOf(ParticleOptions o) {
+      if (o == null) {
+         return Tex.FLAKE;
+      }
+      ParticleType<?> t = o.getType();
+      return sculky(o) ? Tex.SCULK_SPORE
+         : t == ParticleTypes.SOUL || t == ParticleTypes.SOUL_FIRE_FLAME ? Tex.SOUL_WISP
+         : t == ParticleTypes.FLAME || t == ParticleTypes.LAVA || t == ParticleTypes.SMALL_FLAME ? Tex.EMBER
+         : t == ParticleTypes.TOTEM_OF_UNDYING || t == ParticleTypes.HAPPY_VILLAGER ? Tex.STAR
+         : t == ParticleTypes.CRIT || t == ParticleTypes.ENCHANTED_HIT || t == ParticleTypes.ELECTRIC_SPARK ? Tex.SPARK
+         : water(t) || t == ParticleTypes.BUBBLE ? Tex.DROPLET
+         : t == ParticleTypes.PORTAL || t == ParticleTypes.REVERSE_PORTAL ? Tex.VOID_MOTE
+         : Tex.FLAKE;
+   }
+
+   /** The large thrown sprite of a frost-family template, themed the same way as {@link #flakeOf}. */
+   private static Tex crystalOf(ParticleOptions o) {
+      if (o == null) {
+         return Tex.CRYSTAL;
+      }
+      ParticleType<?> t = o.getType();
+      return sculky(o) ? Tex.SCULK_TENDRIL
+         : t == ParticleTypes.SOUL || t == ParticleTypes.SOUL_FIRE_FLAME ? Tex.SOUL_WISP
+         : t == ParticleTypes.FLAME || t == ParticleTypes.LAVA || t == ParticleTypes.SMALL_FLAME ? Tex.FLAME
+         : t == ParticleTypes.TOTEM_OF_UNDYING ? Tex.GEM
+         : water(t) ? Tex.DROPLET
+         : Tex.CRYSTAL;
+   }
+
    /** The colour a vanilla particle type stands for, so a raw cue keeps its meaning in our art. */
    private static int tintOf(ParticleOptions o) {
       if (o instanceof DustParticleOptions dust) {
@@ -1991,6 +2945,27 @@ public final class FfVfxClient {
       }
       if (t == ParticleTypes.SOUL_FIRE_FLAME || t == ParticleTypes.SCULK_SOUL || t == ParticleTypes.SOUL) {
          return 0x3FE0FF;
+      }
+      if (t == ParticleTypes.SCULK_CHARGE_POP || t == ParticleTypes.SONIC_BOOM) {
+         return 0x2FD8D0;   // sculk teal; these used to fall through to the pale default and read as frost
+      }
+      if (water(t) || t == ParticleTypes.BUBBLE || t == ParticleTypes.BUBBLE_POP) {
+         return 0x5FA8FF;
+      }
+      if (t == ParticleTypes.SQUID_INK) {
+         return 0x1A1420;
+      }
+      if (t == ParticleTypes.GLOW_SQUID_INK) {
+         return 0x40FFD0;
+      }
+      if (t == ParticleTypes.CHERRY_LEAVES) {
+         return 0xFFB0D0;
+      }
+      if (t == ParticleTypes.CRIMSON_SPORE || t == ParticleTypes.DAMAGE_INDICATOR) {
+         return 0xB01830;
+      }
+      if (t == ParticleTypes.HAPPY_VILLAGER) {
+         return 0x6FE36A;
       }
       if (t == ParticleTypes.FLAME || t == ParticleTypes.LAVA || t == ParticleTypes.EXPLOSION || t == ParticleTypes.EXPLOSION_EMITTER) {
          return 0xFFB060;
