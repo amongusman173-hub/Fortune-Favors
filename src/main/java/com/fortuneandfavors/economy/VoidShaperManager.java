@@ -14,7 +14,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ColorParticleOption;
+import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -38,8 +38,10 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -70,6 +72,12 @@ import net.minecraft.world.phys.Vec3;
  * Then the announcement lands - <b>THE VOID SHAPER HAS LOST CONTROL</b> - and they
  * start firing off in every direction at once. There is no arena and never was:
  * the final phase is the terrain you brought with you.
+ *
+ * <h2>The ground itself, marked first</h2>
+ * Two moves do not throw anything. <b>Fault Line</b> lights runes along the floor toward
+ * you and bursts them a second and a half later (step off the line, or jump it), and
+ * <b>Event Horizon</b> opens a hole over his head that hits everyone outside the dome round
+ * his feet who can see it (run in to him, or hide). Both are drawn before they land.
  *
  * <p>Blocks are taken from terrain only (never from anything a player built is
  * safe to say: player-placed detection is not attempted, so he does churn through
@@ -106,7 +114,51 @@ public final class VoidShaperManager {
    private static final int BARRAGE_COOLDOWN = 260;
    private static final int STEP_COOLDOWN = 180;
    private static final int SLAM_COOLDOWN = 320;
-   private static final int DEATH_CEREMONY_TICKS = 70;
+   private static final int DEATH_CEREMONY_TICKS = 100;
+
+   /** His voice: a few words at a time, never a speech. */
+   private static final String SAY = "§5The Void Shaper§r§7 › §f";
+
+   // The palette: the violet of the tear, the pale light inside it, and the black behind both.
+   private static final int VOID = 0x7A2BD9;
+   private static final int VOID_LIGHT = 0xB06BFF;
+   private static final int VOID_DARK = 0x2A0A4A;
+
+   /** The arrival: he climbs out of the ground over three seconds, untouchable while he does. */
+   private static final int RISE_TICKS = 60;
+   private static final double RISE_DEPTH = 3.0;
+   /** With nobody in reach for this long, he sinks back into the ground and the fight ends. */
+   private static final long LONELY_TICKS = 600L;
+
+   // --- Fault Line -----------------------------------------------------------
+
+   /**
+    * He splits the ground along a line toward you. Runes light up along the crack first,
+    * and the floor under them bursts a second and a half later, rippling outward from him.
+    * The answer is a sidestep (or a well-timed jump). In phase two he splits three at once,
+    * fanned, so the sidestep has to pick a gap.
+    */
+   private static final int FAULT_COOLDOWN = 220;
+   private static final int FAULT_WARN = 30;
+   private static final int FAULT_NODES = 7;
+   private static final double FAULT_SPACING = 2.6;
+   private static final double FAULT_RADIUS = 1.7;
+   private static final float FAULT_DAMAGE = 12.0F;
+
+   // --- Event Horizon --------------------------------------------------------
+
+   /**
+    * He stops, and a hole opens over his head. A dome on the floor around him marks the
+    * only safe ground; when the hole goes off, everyone outside it who can see it is hit.
+    * Two answers, both readable: run <i>in</i> to him, or get something solid between you
+    * and the hole.
+    */
+   private static final int HORIZON_COOLDOWN = 520;
+   private static final int HORIZON_WARN = 56;
+   private static final double HORIZON_SAFE = 6.0;
+   private static final double HORIZON_REACH = 32.0;
+   private static final double HORIZON_EYE = 7.0;
+   private static final float HORIZON_DAMAGE = 15.0F;
    /**
     * Every thrown-block shove, scaled down.
     *
@@ -176,13 +228,52 @@ public final class VoidShaperManager {
       final Vec3 vel;
       final Kind kind;
       int life;
+      /**
+       * A leaf fragment. Fragments never fragment again: a fragment that did - with the
+       * same "leaves" kind as its parent - split into seven more on every impact, and a
+       * single leaf block snowballed into hundreds of displays.
+       */
+      final boolean fragment;
 
       Shot(UUID displayId, Vec3 pos, Vec3 vel, Kind kind, int life) {
+         this(displayId, pos, vel, kind, life, false);
+      }
+
+      Shot(UUID displayId, Vec3 pos, Vec3 vel, Kind kind, int life, boolean fragment) {
          this.displayId = displayId;
          this.pos = pos;
          this.vel = vel;
          this.kind = kind;
          this.life = life;
+         this.fragment = fragment;
+      }
+   }
+
+   /**
+    * A blow marked on the floor that has not landed yet - a rune on the fault line, or the
+    * hole over his head. Marked first and landed later, so each is a warning before a hit.
+    */
+   private static final class Strike {
+      static final int FAULT = 0;
+      static final int HORIZON = 1;
+      final int kind;
+      final Vec3 at;
+      final Vec3 dir;
+      final long landAt;
+      final double radius;
+      final float damage;
+      /** Shared by every node of one cast, so one fault line hits a player once. */
+      final Set<UUID> hit;
+      boolean primed;
+
+      Strike(int kind, Vec3 at, Vec3 dir, long landAt, double radius, float damage, Set<UUID> hit) {
+         this.kind = kind;
+         this.at = at;
+         this.dir = dir;
+         this.landAt = landAt;
+         this.radius = radius;
+         this.damage = damage;
+         this.hit = hit;
       }
    }
 
@@ -194,6 +285,8 @@ public final class VoidShaperManager {
       final double radius;
       final double height;
       int fuse;
+      /** The throw has been flagged with its flash - once, just before it leaves. */
+      boolean told;
 
       Held(UUID displayId, Kind kind, double angle, double radius, double height, int fuse) {
          this.displayId = displayId;
@@ -226,6 +319,16 @@ public final class VoidShaperManager {
       int slamCharge;
       Vec3 slamTarget;
       int wallTicks;
+      Vec3 wallCentre;
+      /** The arrival: ticks left climbing out of the ground. */
+      int riseTicks = RISE_TICKS;
+      /** The last tick anyone was in reach - he leaves once nobody has been for a while. */
+      long lastSeen;
+      long nextFault;
+      long nextHorizon;
+      /** Ticks he stands still channelling the Event Horizon. */
+      int channelTicks;
+      final List<Strike> strikes = new ArrayList<>();
       final List<Held> held = new ArrayList<>();
       final List<Shot> shots = new ArrayList<>();
       final List<UUID> wallBlocks = new ArrayList<>();
@@ -336,14 +439,14 @@ public final class VoidShaperManager {
       }
       for (Fight f : FIGHTS.values()) {
          if (summoner.getUUID().equals(f.summoner)) {
-            return "You already have a Void Shaper running - finish him first!";
+            return "Your Void Shaper is still out. Finish him first.";
          }
       }
 
       ServerLevel level = summoner.level();
       Mob boss = (Mob) EntityTypes.ENDERMAN.create(level, EntitySpawnReason.COMMAND);
       if (boss == null) {
-         return "The ground refused to move - he did not come.";
+         return "The ground didn't move. He didn't come.";
       }
 
       AttributeInstance maxHp = boss.getAttribute(Attributes.MAX_HEALTH);
@@ -377,7 +480,24 @@ public final class VoidShaperManager {
       // The shared marker plus the visible-and-persistent guarantee: see
       // BossManager.markBoss for why a boss has to say so itself.
       BossManager.markBoss(boss);
-      boss.setPos(summoner.getX(), summoner.getY() + 1.0, summoner.getZ());
+      // He comes up out of the ground a few blocks in front of whoever threw the anchor, not on
+      // top of them: the arrival is something to watch, and a 1.8x enderman spawned on a player's
+      // head was a fight that started inside its own summoner.
+      Vec3 look = summoner.getViewVector(1.0F);
+      Vec3 flat = new Vec3(look.x, 0.0, look.z);
+      flat = flat.lengthSqr() < 0.01 ? new Vec3(1.0, 0.0, 0.0) : flat.normalize();
+      double sx = summoner.getX() + flat.x * 5.0;
+      double sz = summoner.getZ() + flat.z * 5.0;
+      double sy = BossGrounding.groundY(level, sx, sz, summoner.getY() + 1.0);
+      if (!BossGrounding.standable(level, sx, sy, sz)) {
+         sx = summoner.getX();
+         sz = summoner.getZ();
+         sy = summoner.getY();
+      }
+      // Buried to the chest and untouchable until he is out: the rise is a set piece, not a
+      // free three seconds of damage, and an entity inside a block would otherwise suffocate.
+      boss.setInvulnerable(true);
+      boss.setPos(sx, sy - RISE_DEPTH, sz);
       level.addFreshEntity(boss);
 
       ServerBossEvent bar = new ServerBossEvent(
@@ -391,24 +511,37 @@ public final class VoidShaperManager {
       Fight fight = new Fight(boss.getUUID(), summoner.getUUID(), bar);
       fight.participants.add(summoner.getUUID());
       long now = ServerClock.clock(level);
-      fight.nextThrow = now + 60L;
-      fight.nextPull = now + 260L;
-      fight.nextWall = now + 400L;
-      fight.nextBarrage = now + 320L;
-      fight.nextStep = now + 200L;
-      fight.nextSlam = now + 480L;
-      fight.nextInvert = now + 780L;
+      long arrive = now + RISE_TICKS;
+      fight.lastSeen = now;
+      fight.nextThrow = arrive + 40L;
+      fight.nextPull = arrive + 260L;
+      fight.nextWall = arrive + 400L;
+      fight.nextBarrage = arrive + 320L;
+      fight.nextStep = arrive + 200L;
+      fight.nextSlam = arrive + 480L;
+      fight.nextInvert = arrive + 780L;
+      fight.nextFault = arrive + 140L;
+      fight.nextHorizon = arrive + 600L;
       FIGHTS.put(boss.getUUID(), fight);
-
-      grab(level, boss, fight, 3, HOLD_TICKS + 20);
 
       announce(level, "\u00a75\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
       announce(level, "    \u00a75\u00a7l\ud83d\udd2e THE VOID SHAPER RISES \ud83d\udd2e");
-      announce(level, "    \u00a77The ground near him has stopped being scenery.");
-       announce(level, "    \u00a77\u00a7oWatch what he is holding - the block decides the blow.");
+      announce(level, "    \u00a77The ground is his now.");
+      announce(level, "    \u00a78Watch what he holds. \u00a77The block decides the hit.");
       announce(level, "\u00a75\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
-      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.5F, 0.7F);
-      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.DEEPSLATE_BREAK, SoundSource.HOSTILE, 1.8F, 0.6F);
+
+      // The ground tears open before anything comes out of it: a rift in the floor, a turning
+      // ring of runes round it, the void showing through the middle, and a slow column of
+      // violet winding up out of the hole for as long as he climbs.
+      Vec3 hole = new Vec3(sx, sy, sz);
+      Fx.rift(level, ParticleTypes.REVERSE_PORTAL, hole.add(0.0, 0.1, 0.0), 3.0, VOID);
+      Fx.runeCircle(level, ParticleTypes.PORTAL, hole.add(0.0, 0.05, 0.0), 6.0, RISE_TICKS + 10, VOID);
+      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, hole.add(0.0, 0.15, 0.0), false, VOID_DARK);
+      Fx.spiral(level, ParticleTypes.REVERSE_PORTAL, hole, 9.0, RISE_TICKS, VOID_LIGHT);
+      Fx.vortex(level, ParticleTypes.PORTAL, hole.add(0.0, 0.2, 0.0), 4.5, RISE_TICKS, VOID_DARK);
+      level.playSound(null, sx, sy, sz, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.5F, 0.7F);
+      level.playSound(null, sx, sy, sz, SoundEvents.WARDEN_EMERGE, SoundSource.HOSTILE, 1.8F, 0.7F);
+      level.playSound(null, sx, sy, sz, SoundEvents.DEEPSLATE_BREAK, SoundSource.HOSTILE, 1.8F, 0.6F);
       Advancements.grant(summoner, "summon_voidshaper");
       return null;
    }
@@ -428,16 +561,18 @@ public final class VoidShaperManager {
       }
    }
 
-   private static void tickFight(MinecraftServer server, Fight fight, long now) {
+   private static void tickFight(MinecraftServer server, Fight fight, long serverNow) {
       Mob boss = bossOf(server, fight);
       if (boss == null) {
          shutDown(server, fight);
          return;
       }
       ServerLevel level = (ServerLevel) boss.level();
+      // His own world's clock, not the overworld's: every timer below was stamped from it.
+      long now = ServerClock.clock(level);
 
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-         if (p.level() == level && p.isAlive() && p.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS) {
+         if (isTarget(p, level) && p.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS) {
             fight.participants.add(p.getUUID());
          }
       }
@@ -455,9 +590,35 @@ public final class VoidShaperManager {
       fight.bar.setName(Component.literal(barName(fight)));
       fight.bar.setColor(fight.phase >= 2 ? BossBarColor.RED : BossBarColor.PURPLE);
 
+      if (fight.riseTicks > 0) {
+         tickRise(level, boss, fight);
+         return;
+      }
+
+      // Nobody in reach for half a minute: he goes back into the ground and the fight is over,
+      // instead of standing in an empty field forever holding the summoner's one boss slot.
+      if (nearestPlayer(boss, ARENA_RADIUS) != null) {
+         fight.lastSeen = now;
+      } else if (now - fight.lastSeen > LONELY_TICKS) {
+         Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 0.2, 0.0), true, VOID_DARK);
+         Fx.rift(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 0.1, 0.0), 2.4, VOID);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_DIG, SoundSource.HOSTILE, 1.4F, 0.8F);
+         announce(level, "\u00a78The ground settles. \u00a77The Void Shaper is gone.");
+         shutDown(server, fight);
+         return;
+      }
+
       float share = boss.getHealth() / boss.getMaxHealth();
       if (share <= 0.4F && fight.phase < 2) {
          enterPhase(level, boss, fight, 2);
+      }
+
+      // Marked blows land on their own clock, whatever he is doing when they come due.
+      tickStrikes(level, boss, fight, now);
+
+      if (fight.channelTicks > 0) {
+         tickChannel(level, boss, fight);
+         return;
       }
 
       if (fight.invertTicks > 0) {
@@ -480,6 +641,45 @@ public final class VoidShaperManager {
       BossGrounding.clampToGround(level, boss, 1.5);
 
       chooseMove(level, boss, fight, now);
+   }
+
+   /**
+    * The arrival. He climbs out of the hole a few centimetres a tick while the floor round it
+    * keeps breaking, and on the last tick the rift flares, the light bursts outward in spokes
+    * and a shockwave rolls across the ground. Then the first blocks come up into his hands and
+    * the fight starts - nobody is hit by any of it.
+    */
+   private static void tickRise(ServerLevel level, Mob boss, Fight fight) {
+      fight.riseTicks--;
+      boss.setPos(boss.getX(), boss.getY() + RISE_DEPTH / RISE_TICKS, boss.getZ());
+      boss.setDeltaMovement(Vec3.ZERO);
+      boss.hurtMarked = true;
+      if (fight.riseTicks % 10 == 0) {
+         // The floor round the hole keeps giving way as he pushes up through it.
+         double a = RANDOM.nextDouble() * Math.PI * 2.0;
+         double r = 2.0 + RANDOM.nextDouble() * 2.5;
+         double x = boss.getX() + Math.cos(a) * r;
+         double z = boss.getZ() + Math.sin(a) * r;
+         double y = BossGrounding.groundY(level, x, z, boss.getY() + RISE_DEPTH);
+         Fx.rockburst(level, groundDust(level, x, y, z), new Vec3(x, y + 0.2, z), 1.4, VOID_DARK);
+         level.playSound(null, x, y, z, SoundEvents.DEEPSLATE_BREAK, SoundSource.HOSTILE, 1.2F, 0.6F + RANDOM.nextFloat() * 0.3F);
+      }
+      if (fight.riseTicks == 30) {
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_AMBIENT, SoundSource.HOSTILE, 1.6F, 0.4F);
+      }
+      if (fight.riseTicks > 0) {
+         return;
+      }
+      boss.setInvulnerable(false);
+      Vec3 at = boss.position().add(0.0, 2.6, 0.0);
+      Fx.flare(level, ParticleTypes.END_ROD, at, 3.0, VOID_LIGHT);
+      Fx.starburst(level, ParticleTypes.REVERSE_PORTAL, at, 8.0, VOID);
+      Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 0.1, 0.0), 12.0, VOID_DARK);
+      Fx.rockburst(level, groundDust(level, boss.getX(), boss.getY(), boss.getZ()), boss.position().add(0.0, 0.3, 0.0), 3.0, VOID_DARK);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 2.0F, 0.5F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.4F, 0.6F);
+      grab(level, boss, fight, 3, HOLD_TICKS + 20);
+      announceNear(level, boss, ARENA_RADIUS, SAY + "\"Mine.\"");
    }
 
    private static String barName(Fight fight) {
@@ -544,7 +744,7 @@ public final class VoidShaperManager {
          if (!isGrabbable(level, pos)) {
             continue;
          }
-         if (spawnHeld(level, boss, fight, state, angle, 2.2 + RANDOM.nextDouble() * 1.6, 1.6 + RANDOM.nextDouble() * 1.4, fuse)) {
+         if (spawnHeld(level, boss, fight, state, pos, angle, 2.2 + RANDOM.nextDouble() * 1.6, 1.6 + RANDOM.nextDouble() * 1.4, fuse)) {
             got++;
          }
       }
@@ -575,7 +775,7 @@ public final class VoidShaperManager {
    }
 
    private static boolean spawnHeld(
-      ServerLevel level, Mob boss, Fight fight, BlockState state, double angle, double radius, double height, int fuse
+      ServerLevel level, Mob boss, Fight fight, BlockState state, BlockPos socket, double angle, double radius, double height, int fuse
    ) {
       if (fight.held.size() >= 10) {
          return false;
@@ -593,6 +793,11 @@ public final class VoidShaperManager {
       );
       level.addFreshEntity(display);
       fight.held.add(new Held(display.getUUID(), kindOf(state), angle, radius, height, fuse));
+      // The block is torn out of its socket and drawn up into his orbit along a thread of void,
+      // so every block he holds is seen leaving the ground it came from.
+      Vec3 hole = Vec3.atCenterOf(socket);
+      Fx.rift(level, ParticleTypes.REVERSE_PORTAL, hole, 0.7, VOID);
+      Fx.beam(level, ParticleTypes.REVERSE_PORTAL, hole, display.position(), VOID_LIGHT);
       return true;
    }
 
@@ -608,7 +813,6 @@ public final class VoidShaperManager {
             it.remove();
             continue;
          }
-         held.fuse--;
          double spin = now * 0.14 + held.angle;
          double x = boss.getX() + Math.cos(spin) * held.radius;
          double y = boss.getY() + held.height + Math.sin(spin * 0.7) * 0.25;
@@ -616,6 +820,18 @@ public final class VoidShaperManager {
          display.setPos(x, y, z);
          display.hurtMarked = true;
          level.sendParticles(ParticleTypes.PORTAL, x, y, z, 1, 0.1, 0.1, 0.1, 0.0);
+         if (fight.dying) {
+            // The ceremony takes them down one at a time: nothing leaves his hands as a throw.
+            continue;
+         }
+         held.fuse--;
+         if (!held.told && held.fuse <= 6) {
+            // The tell: the block flashes its own colour a beat before it flies, so the
+            // "what is he holding" read has a moment attached to it.
+            held.told = true;
+            Fx.flare(level, ParticleTypes.END_ROD, new Vec3(x, y + 0.5, z), 0.9, kindColor(held.kind));
+            level.playSound(null, x, y, z, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.HOSTILE, 1.0F, 0.6F);
+         }
 
          if (held.fuse > 0) {
             continue;
@@ -640,7 +856,13 @@ public final class VoidShaperManager {
    private static void launch(ServerLevel level, Fight fight, Held held, Vec3 from, Vec3 dir) {
       Vec3 vel = dir.scale(held.kind.speed);
       fight.shots.add(new Shot(held.displayId, from, vel, held.kind, 120));
-      level.sendParticles(ParticleTypes.PORTAL, from.x, from.y, from.z, 18, 0.3, 0.3, 0.3, 0.08);
+      Fx.muzzle(level, ParticleTypes.REVERSE_PORTAL, from, dir, kindColor(held.kind));
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.PORTAL, from.x, from.y, from.z, 18, 0.3, 0.3, 0.3, 0.08);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, from.x, from.y, from.z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 0.8F, 1.6F);
    }
 
@@ -692,11 +914,24 @@ public final class VoidShaperManager {
       double x = shot.pos.x;
       double y = shot.pos.y;
       double z = shot.pos.z;
-      level.sendParticles(ParticleTypes.EXPLOSION, x, y + 0.2, z, 1, 0.0, 0.0, 0.0, 0.0);
-      level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + 0.3, z, 12, 0.4, 0.3, 0.4, 0.05);
-      level.playSound(null, x, y, z, onTerrain ? SoundEvents.STONE_BREAK : SoundEvents.STONE_HIT, SoundSource.HOSTILE, 1.2F, 1.0F);
+      Vec3 at = new Vec3(x, y + 0.2, z);
+      if (shot.fragment) {
+         // A leaf fragment: a puff and a scratch, not a second explosion.
+         level.sendParticles(ParticleTypes.CHERRY_LEAVES, x, y + 0.2, z, 4, 0.2, 0.2, 0.2, 0.03);
+      } else {
+         impactFx(level, kind, at, shot.vel);
+         com.fortuneandfavors.net.FfVfx.enter();
+         try {
+            level.sendParticles(ParticleTypes.EXPLOSION, x, y + 0.2, z, 1, 0.0, 0.0, 0.0, 0.0);
+            level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + 0.3, z, 12, 0.4, 0.3, 0.4, 0.05);
+            level.sendParticles(ParticleTypes.CRIT, x, y + 0.2, z, 10, 0.3, 0.3, 0.3, 0.06);
+         } finally {
+            com.fortuneandfavors.net.FfVfx.exit();
+         }
+      }
+      level.playSound(null, x, y, z, onTerrain ? SoundEvents.STONE_BREAK : SoundEvents.STONE_HIT, SoundSource.HOSTILE, shot.fragment ? 0.6F : 1.2F, 1.0F);
 
-      List<ServerPlayer> hit = playersNear(level, x, y, z, 2.0);
+      List<ServerPlayer> hit = playersNear(level, x, y, z, shot.fragment ? 1.4 : 2.0);
       for (ServerPlayer p : hit) {
          p.hurtServer(level, level.damageSources().mobAttack(boss), kind.damage);
          if (kind.knockback > 0.0) {
@@ -704,7 +939,8 @@ public final class VoidShaperManager {
             if (away.lengthSqr() < 0.01) {
                away = shot.vel;
             }
-            away = new Vec3(away.x, 0.0, away.z).normalize();
+            away = new Vec3(away.x, 0.0, away.z);
+            away = away.lengthSqr() < 0.0001 ? new Vec3(1.0, 0.0, 0.0) : away.normalize();
             p.push(
                away.x * scaledKnockback(kind.knockback),
                0.35 + scaledKnockback(kind.knockback) * 0.15,
@@ -720,24 +956,82 @@ public final class VoidShaperManager {
          }
       }
 
-      // Leaves and grass do not hit like a rock - they spray.
-      if (kind.fragments > 1) {
+      // Leaves do not hit like a rock - they spray. Only the block itself sprays: see
+      // Shot.fragment for the snowball this used to be.
+      if (kind.fragments > 1 && !shot.fragment) {
+         // Spawned a little back along the path, not at the impact point: on a terrain hit
+         // that point is inside the block, and a fragment born inside a block "hit" it on
+         // its first step and vanished.
+         Vec3 back = shot.vel.lengthSqr() < 0.0001 ? Vec3.ZERO : shot.vel.normalize().scale(0.6);
+         Vec3 frag = new Vec3(x, y + 0.2, z).subtract(back);
          for (int i = 0; i < kind.fragments; i++) {
             double a = RANDOM.nextDouble() * Math.PI * 2.0;
             Vec3 dir = new Vec3(Math.cos(a), 0.05, Math.sin(a)).normalize();
-            Vec3 frag = new Vec3(x, y + 0.2, z);
-            fight.shots.add(new Shot(spawnFragment(level, shot, frag), frag, dir.scale(0.7), kind, 30));
+            UUID id = spawnFragment(level, frag);
+            if (id != null) {
+               fight.shots.add(new Shot(id, frag, dir.scale(0.7), kind, 30, true));
+            }
          }
          level.sendParticles(ParticleTypes.CHERRY_LEAVES, x, y + 0.3, z, 20, 0.6, 0.4, 0.6, 0.06);
       }
-      level.sendParticles(ParticleTypes.CRIT, x, y + 0.2, z, 10, 0.3, 0.3, 0.3, 0.06);
    }
 
-   /** A fragment reuses the shard's own display where possible, else a fresh one. */
-   private static UUID spawnFragment(ServerLevel level, Shot parent, Vec3 at) {
+   /**
+    * What a landing block looks like, by kind: stone and deepslate burst into rubble, magma
+    * splashes fire, ice shatters into frost, leaves scatter, an ore cracks with a bright
+    * clash, and a log lands with a flat shockwave. Same table as the damage, so the hit you
+    * see is the hit you took.
+    */
+   private static void impactFx(ServerLevel level, Kind kind, Vec3 at, Vec3 vel) {
+      int color = kindColor(kind);
+      switch (kind.id) {
+         case "magma" -> {
+            Fx.gooSplash(level, ParticleTypes.LAVA, at, 1.6, color);
+            Fx.nova(level, ParticleTypes.FLAME, at, 2.0, color);
+         }
+         case "ice" -> Fx.iceBurst(level, ParticleTypes.SNOWFLAKE, at, 1.8, color);
+         case "leaves" -> Fx.shatter(level, ParticleTypes.CHERRY_LEAVES, at, 1.2, color);
+         case "ore" -> {
+            Vec3 facing = vel.lengthSqr() < 0.0001 ? new Vec3(1.0, 0.0, 0.0) : vel.normalize();
+            Fx.clash(level, ParticleTypes.ELECTRIC_SPARK, at, facing, color);
+            Fx.starburst(level, ParticleTypes.CRIT, at, 2.2, color);
+         }
+         case "log" -> Fx.shockwave(level, ParticleTypes.CLOUD, at.add(0.0, -0.1, 0.0), 3.0, color);
+         default -> Fx.rockburst(level, ParticleTypes.CLOUD, at, 1.8, color);
+      }
+      Fx.shatter(level, ParticleTypes.REVERSE_PORTAL, at, 0.8, VOID);
+   }
+
+   /** Each kind's colour, for the flash before the throw and the burst when it lands. */
+   private static int kindColor(Kind kind) {
+      return switch (kind.id) {
+         case "magma" -> 0xFF6A1A;
+         case "ice" -> 0xA8E4FF;
+         case "leaves" -> 0x5FB043;
+         case "ore" -> 0xF2E6A0;
+         case "log" -> 0x8A6A3C;
+         default -> 0x9C8AB8;
+      };
+   }
+
+   /** Dust of whatever the floor is made of at this spot, so the rubble matches the ground. */
+   private static BlockParticleOption groundDust(ServerLevel level, double x, double y, double z) {
+      BlockState floor = level.getBlockState(BlockPos.containing(x, y - 0.5, z));
+      if (floor.isAir() || !floor.getFluidState().isEmpty()) {
+         floor = Blocks.DEEPSLATE.defaultBlockState();
+      }
+      return new BlockParticleOption(ParticleTypes.BLOCK, floor);
+   }
+
+   /**
+    * A leaf fragment's display, or null when one could not be made. It used to fall back to
+    * the parent's own display - which was discarded the same tick, so the fragment either
+    * vanished at once or, worse, kept a handle on an entity it did not own.
+    */
+   private static UUID spawnFragment(ServerLevel level, Vec3 at) {
       Display.BlockDisplay display = (Display.BlockDisplay) EntityTypes.BLOCK_DISPLAY.create(level, EntitySpawnReason.COMMAND);
       if (display == null) {
-         return parent.displayId;
+         return null;
       }
       display.setBlockState(Blocks.OAK_LEAVES.defaultBlockState());
       display.addTag(SHARD_TAG);
@@ -802,8 +1096,14 @@ public final class VoidShaperManager {
          }
       }
       fight.wallTicks = 120;
+      fight.wallCentre = centre.add(0.0, 1.0, 0.0);
+      // The wall comes up out of a tear along its own base, rubble first.
+      Fx.tear(level, ParticleTypes.REVERSE_PORTAL, centre.add(0.0, 0.2, 0.0), side, 5.0, 20, VOID);
+      Fx.rockburst(level, groundDust(level, centre.x, centre.y, centre.z), centre.add(0.0, 0.5, 0.0), 2.6, VOID_DARK);
       level.playSound(null, centre.x, centre.y, centre.z, SoundEvents.DEEPSLATE_PLACE, SoundSource.HOSTILE, 1.8F, 0.6F);
-      announceNear(level, boss, ARENA_RADIUS, "&5&lBLOCK WALL&7 - " + blocks + " blocks, ripped up and stacked.");
+      if (blocks > 0) {
+         announceNear(level, boss, ARENA_RADIUS, "\u00a75\u00a7lBLOCK WALL \u00a78- \u00a77it shoves. Go round it.");
+      }
    }
 
    /** A wall is a real obstacle: it is a wall of shoving, not of geometry. */
@@ -820,23 +1120,36 @@ public final class VoidShaperManager {
             fight.wallBlocks.remove(id);
             continue;
          }
-         level.sendParticles(ParticleTypes.SCULK_SOUL, display.getX(), display.getY() + 0.5, display.getZ(), 1, 0.1, 0.1, 0.1, 0.0);
+         if (fight.wallTicks % 4 == 0) {
+            level.sendParticles(ParticleTypes.SCULK_SOUL, display.getX(), display.getY() + 0.5, display.getZ(), 1, 0.1, 0.1, 0.1, 0.0);
+         }
          for (ServerPlayer p : playersNear(level, display.getX(), display.getY(), display.getZ(), 1.4)) {
             Vec3 away = p.position().subtract(display.position());
-            if (away.lengthSqr() < 0.01) {
-               away = new Vec3(1.0, 0.0, 0.0);
-            }
-            away = new Vec3(away.x, 0.0, away.z).normalize();
-            p.push(away.x * 0.9, 0.2, away.z * 0.9);
+            away = new Vec3(away.x, 0.0, away.z);
+            away = away.lengthSqr() < 0.0001 ? new Vec3(1.0, 0.0, 0.0) : away.normalize();
+            // Set, not added: a push() every tick from every block in reach stacked up into a
+            // launch, so brushing a 15-block wall threw a player halfway across the arena.
+            Vec3 v = p.getDeltaMovement();
+            p.setDeltaMovement(away.x * 0.7, Math.max(v.y, 0.25), away.z * 0.7);
             p.hurtMarked = true;
          }
          if (fight.wallTicks <= 0) {
-            level.sendParticles(ParticleTypes.LARGE_SMOKE, display.getX(), display.getY() + 0.4, display.getZ(), 14, 0.3, 0.3, 0.3, 0.05);
+            com.fortuneandfavors.net.FfVfx.enter();
+            try {
+               level.sendParticles(ParticleTypes.LARGE_SMOKE, display.getX(), display.getY() + 0.4, display.getZ(), 14, 0.3, 0.3, 0.3, 0.05);
+            } finally {
+               com.fortuneandfavors.net.FfVfx.exit();
+            }
             display.discard();
          }
       }
       if (fight.wallTicks <= 0) {
          fight.wallBlocks.clear();
+         if (fight.wallCentre != null) {
+            Fx.shatter(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.DEEPSLATE.defaultBlockState()), fight.wallCentre, 2.4, VOID_DARK);
+            level.playSound(null, fight.wallCentre.x, fight.wallCentre.y, fight.wallCentre.z, SoundEvents.DEEPSLATE_BREAK, SoundSource.HOSTILE, 1.4F, 0.7F);
+            fight.wallCentre = null;
+         }
       }
    }
 
@@ -846,6 +1159,12 @@ public final class VoidShaperManager {
       if (fight.phase >= 2 && now >= fight.nextInvert) {
          fight.nextInvert = now + INVERT_COOLDOWN;
          startInvert(level, boss, fight);
+         return;
+      }
+      if (now >= fight.nextHorizon) {
+         // A phase-two horizon comes round sooner: there is less fight left to wait for it.
+         fight.nextHorizon = now + (fight.phase >= 2 ? HORIZON_COOLDOWN * 3L / 4L : HORIZON_COOLDOWN);
+         startHorizon(level, boss, fight, now);
          return;
       }
       if (fight.phase >= 2 && now >= fight.nextLoose) {
@@ -866,6 +1185,14 @@ public final class VoidShaperManager {
          }
          return;
       }
+      if (now >= fight.nextFault) {
+         fight.nextFault = now + FAULT_COOLDOWN;
+         ServerPlayer target = nearestPlayer(boss, ARENA_RADIUS);
+         if (target != null) {
+            startFault(level, boss, fight, target, now);
+         }
+         return;
+      }
       if (now >= fight.nextPull) {
          fight.nextPull = now + PULL_COOLDOWN;
          enderPull(level, boss, fight);
@@ -874,7 +1201,8 @@ public final class VoidShaperManager {
       if (now >= fight.nextBarrage) {
          fight.nextBarrage = now + BARRAGE_COOLDOWN;
          grab(level, boss, fight, 3 + RANDOM.nextInt(3), HOLD_TICKS);
-         announceNear(level, boss, ARENA_RADIUS, "&5&lBLOCK BARRAGE&7 - he is loading up.");
+         Fx.vortex(level, ParticleTypes.PORTAL, boss.position().add(0.0, 0.2, 0.0), 3.5, HOLD_TICKS, VOID_DARK);
+         announceNear(level, boss, ARENA_RADIUS, "§5§lBARRAGE §8- §7read the blocks.");
          return;
       }
       if (now >= fight.nextStep) {
@@ -895,6 +1223,175 @@ public final class VoidShaperManager {
       }
    }
 
+   // --------------------------------------------------------------- marked blows
+
+   /**
+    * Fault Line: the ground splits toward you.
+    *
+    * <p>Runes light up in a line from his feet out along the floor toward the target, one
+    * every few blocks, and a thin tear joins them so the line reads as one crack rather than
+    * a scatter of circles. A second and a half later the crack bursts, node by node, rippling
+    * away from him. Anyone standing on a node is thrown up and hurt; the answer is to step off
+    * the line, or jump it as it reaches you. In phase two he cracks three lines at once, fanned
+    * out, and the sidestep has to find the gap between them.
+    */
+   private static void startFault(ServerLevel level, Mob boss, Fight fight, ServerPlayer target, long now) {
+      Vec3 to = target.position().subtract(boss.position());
+      Vec3 flat = new Vec3(to.x, 0.0, to.z);
+      flat = flat.lengthSqr() < 0.01 ? new Vec3(1.0, 0.0, 0.0) : flat.normalize();
+      double[] spread = fight.phase >= 2 ? new double[]{-0.45, 0.0, 0.45} : new double[]{0.0};
+      for (double turn : spread) {
+         double cos = Math.cos(turn);
+         double sin = Math.sin(turn);
+         Vec3 dir = new Vec3(flat.x * cos - flat.z * sin, 0.0, flat.x * sin + flat.z * cos);
+         Set<UUID> hit = new HashSet<>();
+         Vec3 first = null;
+         Vec3 last = null;
+         for (int i = 1; i <= FAULT_NODES; i++) {
+            double x = boss.getX() + dir.x * FAULT_SPACING * i;
+            double z = boss.getZ() + dir.z * FAULT_SPACING * i;
+            double y = BossGrounding.groundY(level, x, z, boss.getY() + 1.0);
+            Vec3 node = new Vec3(x, y, z);
+            long land = now + FAULT_WARN + i * 2L;
+            fight.strikes.add(new Strike(Strike.FAULT, node, dir, land, FAULT_RADIUS, FAULT_DAMAGE, hit));
+            Fx.runeCircle(level, ParticleTypes.PORTAL, node.add(0.0, 0.05, 0.0), FAULT_RADIUS, (int) (land - now), VOID);
+            if (first == null) {
+               first = node;
+            }
+            last = node;
+         }
+         if (first != null) {
+            Fx.beam(level, ParticleTypes.REVERSE_PORTAL, first.add(0.0, 0.1, 0.0), last.add(0.0, 0.1, 0.0), VOID_LIGHT);
+         }
+      }
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.EVOKER_PREPARE_ATTACK, SoundSource.HOSTILE, 1.4F, 0.6F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_DIG, SoundSource.HOSTILE, 1.2F, 0.8F);
+      announceNear(level, boss, ARENA_RADIUS, SAY + "\"Split.\"");
+      announceNear(level, boss, ARENA_RADIUS, "§8The ground cracks toward you. §7Step off the line.");
+   }
+
+   /**
+    * Event Horizon: he stops, and a hole opens over his head.
+    *
+    * <p>The dome on the floor round him is the only safe ground. A rune ring traces its edge
+    * so the boundary is never a guess, the hole swirls and grows over the two and a half
+    * seconds, and it flares white just before it goes. When it does, everyone outside the
+    * dome who can see it takes the hit and is thrown outward. So there are two answers and
+    * the player picks one: run in to him (into the slam and the throws), or put something
+    * solid between them and the hole. He does not walk while it charges, so the dome is
+    * exactly where it was drawn.
+    */
+   private static void startHorizon(ServerLevel level, Mob boss, Fight fight, long now) {
+      Vec3 anchor = new Vec3(boss.getX(), boss.getY(), boss.getZ());
+      Vec3 eye = anchor.add(0.0, HORIZON_EYE, 0.0);
+      fight.channelTicks = HORIZON_WARN;
+      fight.strikes.add(new Strike(Strike.HORIZON, anchor, Vec3.ZERO, now + HORIZON_WARN, HORIZON_SAFE, HORIZON_DAMAGE, new HashSet<>()));
+      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, eye, false, VOID_DARK);
+      Fx.vortex(level, ParticleTypes.PORTAL, eye, 3.0, HORIZON_WARN, VOID);
+      Fx.dome(level, ParticleTypes.END_ROD, anchor, HORIZON_SAFE, HORIZON_WARN, VOID_LIGHT);
+      Fx.runeCircle(level, ParticleTypes.PORTAL, anchor.add(0.0, 0.05, 0.0), HORIZON_SAFE, HORIZON_WARN, VOID_LIGHT);
+      Fx.resonance(level, ParticleTypes.REVERSE_PORTAL, eye, HORIZON_WARN, VOID);
+      level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.END_PORTAL_SPAWN, SoundSource.HOSTILE, 1.2F, 1.4F);
+      level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 1.6F, 0.5F);
+      announceNear(level, boss, ARENA_RADIUS, SAY + "\"Look up.\"");
+      announceNear(level, boss, ARENA_RADIUS, "§8A hole opens over him. §7Get under it, or get behind something.");
+   }
+
+   /** He holds still while the horizon charges: the hole swirls, he does not walk or throw. */
+   private static void tickChannel(ServerLevel level, Mob boss, Fight fight) {
+      fight.channelTicks--;
+      BossGrounding.clampToGround(level, boss, 1.5);
+      if (fight.channelTicks % 6 == 0) {
+         com.fortuneandfavors.net.FfVfx.enter();
+         try {
+            level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + HORIZON_EYE, boss.getZ(), 20, 1.2, 0.6, 1.2, 0.05);
+         } finally {
+            com.fortuneandfavors.net.FfVfx.exit();
+         }
+      }
+   }
+
+   /** Lands every marked blow that has come due. */
+   private static void tickStrikes(ServerLevel level, Mob boss, Fight fight, long now) {
+      if (fight.strikes.isEmpty()) {
+         return;
+      }
+      for (Iterator<Strike> it = fight.strikes.iterator(); it.hasNext();) {
+         Strike s = it.next();
+         long lead = s.kind == Strike.HORIZON ? 12L : 5L;
+         if (!s.primed && now >= s.landAt - lead) {
+            s.primed = true;
+            if (s.kind == Strike.HORIZON) {
+               // The last-second flash: the hole goes white before it goes off.
+               Vec3 eye = s.at.add(0.0, HORIZON_EYE, 0.0);
+               Fx.flare(level, ParticleTypes.END_ROD, eye, 2.0, VOID_LIGHT);
+               level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.8F, 0.8F);
+            } else {
+               // The crack opens under the rune a moment before it bursts.
+               Fx.tear(level, ParticleTypes.REVERSE_PORTAL, s.at.add(0.0, 0.1, 0.0), s.dir, 1.6, (int) lead, VOID_LIGHT);
+            }
+         }
+         if (now < s.landAt) {
+            continue;
+         }
+         it.remove();
+         if (s.kind == Strike.HORIZON) {
+            landHorizon(level, boss, s);
+         } else {
+            landFault(level, boss, s);
+         }
+      }
+   }
+
+   private static void landFault(ServerLevel level, Mob boss, Strike s) {
+      Fx.geyser(level, ParticleTypes.REVERSE_PORTAL, s.at, 4.5, VOID);
+      Fx.rockburst(level, groundDust(level, s.at.x, s.at.y, s.at.z), s.at.add(0.0, 0.3, 0.0), 1.6, VOID_DARK);
+      level.playSound(null, s.at.x, s.at.y, s.at.z, SoundEvents.DEEPSLATE_BREAK, SoundSource.HOSTILE, 1.0F, 0.6F + RANDOM.nextFloat() * 0.3F);
+      double r2 = s.radius * s.radius;
+      for (ServerPlayer p : playersNear(level, s.at.x, s.at.y, s.at.z, s.radius + 3.0)) {
+         double dx = p.getX() - s.at.x;
+         double dz = p.getZ() - s.at.z;
+         double dy = p.getY() - s.at.y;
+         // A player who jumped as it reached them is above the burst, not in it.
+         if (dx * dx + dz * dz > r2 || dy > 1.1 || dy < -1.5 || !s.hit.add(p.getUUID())) {
+            continue;
+         }
+         p.hurtServer(level, level.damageSources().mobAttack(boss), s.damage);
+         Vec3 v = p.getDeltaMovement();
+         p.setDeltaMovement(v.x * 0.3, 0.75, v.z * 0.3);
+         p.hurtMarked = true;
+      }
+   }
+
+   private static void landHorizon(ServerLevel level, Mob boss, Strike s) {
+      Vec3 eye = s.at.add(0.0, HORIZON_EYE, 0.0);
+      Fx.starburst(level, ParticleTypes.END_ROD, eye, 10.0, VOID_LIGHT);
+      Fx.nova(level, ParticleTypes.REVERSE_PORTAL, eye, 8.0, VOID);
+      Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, s.at.add(0.0, 0.1, 0.0), 18.0, VOID_DARK);
+      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, eye, true, VOID_DARK);
+      level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 2.0F, 0.6F);
+      level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.4F, 0.5F);
+      double safe2 = s.radius * s.radius;
+      for (ServerPlayer p : playersNear(level, eye.x, eye.y, eye.z, HORIZON_REACH)) {
+         double dx = p.getX() - s.at.x;
+         double dz = p.getZ() - s.at.z;
+         if (dx * dx + dz * dz <= safe2) {
+            continue;
+         }
+         // Line of sight from the hole to the player's eyes: anything solid in between is cover.
+         Vec3 eyes = p.getEyePosition();
+         if (level.clip(new ClipContext(eye, eyes, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, p)).getType() != HitResult.Type.MISS) {
+            continue;
+         }
+         p.hurtServer(level, level.damageSources().mobAttack(boss), s.damage);
+         Vec3 away = new Vec3(dx, 0.0, dz);
+         away = away.lengthSqr() < 0.0001 ? new Vec3(1.0, 0.0, 0.0) : away.normalize();
+         p.push(away.x * 1.1, 0.45, away.z * 1.1);
+         p.hurtMarked = true;
+         Fx.lightning(level, ParticleTypes.END_ROD, eye, eyes.add(0.0, -0.4, 0.0), VOID_LIGHT);
+      }
+   }
+
    /**
     * Inverts the arena's gravity: everyone lifts, hangs, and is dropped.
     *
@@ -907,8 +1404,15 @@ public final class VoidShaperManager {
     */
    private static void startInvert(ServerLevel level, Mob boss, Fight fight) {
       fight.invertTicks = INVERT_TICKS;
-      announce(level, "\u00a75The Void Shaper\u00a7r\u00a77 \u203a \u00a7f\u201cUp is a very temporary arrangement.\u201d");
-      announceNear(level, boss, ARENA_RADIUS, "&5&lGRAVITY INVERTED&7 - you are about to be dropped. Water, or wings!");
+      announceNear(level, boss, ARENA_RADIUS, SAY + "\"Up.\"");
+      announceNear(level, boss, ARENA_RADIUS, "§5§lGRAVITY INVERTED §8- §7you're going up. Water or slow falling for the drop.");
+      // The whole arena turns over: a dome of dark sky over it, a column winding upward
+      // through the middle, and a glow round every player he has lifted.
+      Fx.dome(level, ParticleTypes.REVERSE_PORTAL, boss.position(), 20.0, INVERT_TICKS, VOID_DARK);
+      Fx.spiral(level, ParticleTypes.REVERSE_PORTAL, boss.position(), 16.0, INVERT_TICKS, VOID_LIGHT);
+      for (ServerPlayer p : participantsNear(level, boss, ARENA_RADIUS)) {
+         Fx.aura(level, ParticleTypes.REVERSE_PORTAL, p.position(), 2.2, INVERT_TICKS, VOID_LIGHT);
+      }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDER_DRAGON_FLAP, SoundSource.HOSTILE, 2.0F, 0.6F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RESPAWN_ANCHOR_DEPLETE, SoundSource.HOSTILE, 1.6F, 1.4F);
    }
@@ -925,37 +1429,57 @@ public final class VoidShaperManager {
             p.push(0.0, -1.35, 0.0);
             p.hurtMarked = true;
             p.hurtServer(level, level.damageSources().mobAttack(boss), INVERT_SLAM_DAMAGE);
-            level.sendParticles(ParticleTypes.LARGE_SMOKE, p.getX(), p.getY() + 0.2, p.getZ(), 16, 0.5, 0.2, 0.5, 0.05);
+            Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, p.position().add(0.0, 0.1, 0.0), 2.5, VOID);
             continue;
          }
          fight.participants.add(p.getUUID());
          p.addEffect(new MobEffectInstance(MobEffects.LEVITATION, 12, 1, false, false, true));
          p.hurtMarked = true;
-         level.sendParticles(ParticleTypes.PORTAL, p.getX(), p.getY() + 0.4, p.getZ(), 4, 0.4, 0.4, 0.4, 0.02);
       }
 
-      // Everything that falls, falls upward while it holds - the read for the move.
+      // Everything that falls, falls upward while it holds - the read for the move. The
+      // geysers carry it for modded clients; the spray below is the vanilla version.
       double x = boss.getX();
       double y = boss.getY() + 1.0;
       double z = boss.getZ();
-      for (int i = 0; i < 26; i++) {
-         double ox = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
-         double oz = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
-         level.sendParticles(ParticleTypes.END_ROD, x + ox, y + RANDOM.nextDouble() * 2.0, z + oz, 1, 0.0, 0.9, 0.0, 0.25);
-         level.sendParticles(ParticleTypes.REVERSE_PORTAL, x + ox, y, z + oz, 1, 0.0, 1.2, 0.0, 0.3);
+      if (fight.invertTicks % 8 == 0) {
+         double a = RANDOM.nextDouble() * Math.PI * 2.0;
+         double r = 4.0 + RANDOM.nextDouble() * 14.0;
+         double gx = x + Math.cos(a) * r;
+         double gz = z + Math.sin(a) * r;
+         Fx.geyser(level, ParticleTypes.REVERSE_PORTAL, new Vec3(gx, BossGrounding.groundY(level, gx, gz, y), gz), 9.0, VOID_LIGHT);
+      }
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         for (int i = 0; i < 26; i++) {
+            double ox = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
+            double oz = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
+            level.sendParticles(ParticleTypes.END_ROD, x + ox, y + RANDOM.nextDouble() * 2.0, z + oz, 1, 0.0, 0.9, 0.0, 0.25);
+            level.sendParticles(ParticleTypes.REVERSE_PORTAL, x + ox, y, z + oz, 1, 0.0, 1.2, 0.0, 0.3);
+         }
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
       }
       if (RANDOM.nextInt(6) == 0) {
          level.playSound(null, x, y, z, SoundEvents.ENDERMAN_AMBIENT, SoundSource.HOSTILE, 1.2F, 0.5F);
       }
       if (release) {
-         announceNear(level, boss, ARENA_RADIUS, "&5The floor comes back. &7Mind how you land.");
+         Fx.nova(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 1.0, 0.0), 10.0, VOID);
+         announceNear(level, boss, ARENA_RADIUS, SAY + "\"Down.\"");
          level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.6F, 0.7F);
       }
    }
 
+   /** Drags everyone in reach toward him along visible chains, into the throws and the slam. */
    private static void enderPull(ServerLevel level, Mob boss, Fight fight) {
-      for (ServerPlayer p : participantsNear(level, boss, 26.0)) {
-         Vec3 pull = boss.position().add(0.0, 1.0, 0.0).subtract(p.position());
+      List<ServerPlayer> caught = participantsNear(level, boss, 26.0);
+      if (caught.isEmpty()) {
+         return;
+      }
+      Vec3 heart = boss.position().add(0.0, 1.0, 0.0);
+      Fx.vortex(level, ParticleTypes.PORTAL, boss.position().add(0.0, 0.2, 0.0), 4.0, 20, VOID_DARK);
+      for (ServerPlayer p : caught) {
+         Vec3 pull = heart.subtract(p.position());
          double len = pull.length();
          if (len < 1.0) {
             continue;
@@ -963,31 +1487,71 @@ public final class VoidShaperManager {
          Vec3 unit = pull.scale(1.0 / len);
          p.push(unit.x * 1.8, 0.4, unit.z * 1.8);
          p.hurtMarked = true;
-         for (double d = 1.0; d < len; d += 1.4) {
-            Vec3 point = p.position().add(unit.scale(d));
-            level.sendParticles(ParticleTypes.PORTAL, point.x, point.y + 1.0, point.z, 1, 0.05, 0.05, 0.05, 0.0);
+         Fx.chains(level, ParticleTypes.REVERSE_PORTAL, heart, p.position().add(0.0, 1.0, 0.0), VOID_LIGHT);
+         com.fortuneandfavors.net.FfVfx.enter();
+         try {
+            for (double d = 1.0; d < len; d += 1.4) {
+               Vec3 point = p.position().add(unit.scale(d));
+               level.sendParticles(ParticleTypes.PORTAL, point.x, point.y + 1.0, point.z, 1, 0.05, 0.05, 0.05, 0.0);
+            }
+         } finally {
+            com.fortuneandfavors.net.FfVfx.exit();
          }
       }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 1.4F, 1.4F);
-      announceNear(level, boss, ARENA_RADIUS, "&5&lENDER PULL&7 - he is reeling you in.");
+      announceNear(level, boss, ARENA_RADIUS, SAY + "\"Come here.\"");
    }
 
+   /**
+    * He folds space and steps out behind his target, holding two fresh blocks. The spot
+    * behind them is checked first: a step that would have put him inside a hillside is
+    * shortened to the target's own side, and refused outright if that is no better.
+    */
    private static void enderStep(ServerLevel level, Mob boss, Fight fight) {
       ServerPlayer target = nearestPlayer(boss, ARENA_RADIUS);
       if (target == null) {
          return;
       }
-      Vec3 behind = target.position().subtract(target.getViewVector(1.0F).scale(2.5));
-      level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 60, 0.6, 1.0, 0.6, 0.15);
-      boss.setPos(behind.x, target.getY(), behind.z);
+      Vec3 look = target.getViewVector(1.0F);
+      Vec3 back = new Vec3(look.x, 0.0, look.z);
+      back = back.lengthSqr() < 0.01 ? new Vec3(1.0, 0.0, 0.0) : back.normalize();
+      Vec3 dest = null;
+      for (double d : new double[]{2.5, 1.5}) {
+         double x = target.getX() - back.x * d;
+         double z = target.getZ() - back.z * d;
+         double y = BossGrounding.groundY(level, x, z, target.getY() + 1.0);
+         if (BossGrounding.standable(level, x, y, z) && Math.abs(y - target.getY()) < 3.0) {
+            dest = new Vec3(x, y, z);
+            break;
+         }
+      }
+      if (dest == null) {
+         return;
+      }
+      Vec3 from = boss.position();
+      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, from.add(0.0, 1.5, 0.0), true, VOID_DARK);
+      boss.setPos(dest.x, dest.y, dest.z);
       boss.hurtMarked = true;
-      level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 60, 0.6, 1.0, 0.6, 0.15);
+      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, dest.add(0.0, 1.5, 0.0), false, VOID);
+      Fx.tear(level, ParticleTypes.REVERSE_PORTAL, dest.add(0.0, 1.8, 0.0), new Vec3(0.0, 1.0, 0.0), 3.0, 10, VOID_LIGHT);
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.REVERSE_PORTAL, from.x, from.y + 1.5, from.z, 60, 0.6, 1.0, 0.6, 0.15);
+         level.sendParticles(ParticleTypes.REVERSE_PORTAL, dest.x, dest.y + 1.5, dest.z, 60, 0.6, 1.0, 0.6, 0.15);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.5F, 0.8F);
       // He arrives holding something, always.
       grab(level, boss, fight, 2, 18);
-      announceNear(level, boss, ARENA_RADIUS, "&5&lENDER STEP&7 - he is behind you.");
+      announceNear(level, boss, ARENA_RADIUS, SAY + "\"Behind you.\"");
    }
 
+   /**
+    * Void Slam: he blinks twelve blocks over the target, a rune ring marks where he will
+    * land, and a little over a second later he comes straight down on it. Out of the ring
+    * is the whole answer - the ring is drawn the size of the hit.
+    */
    private static void startSlam(ServerLevel level, Mob boss, Fight fight) {
       ServerPlayer target = nearestPlayer(boss, ARENA_RADIUS);
       if (target == null) {
@@ -995,10 +1559,13 @@ public final class VoidShaperManager {
       }
       fight.slamTarget = target.position();
       fight.slamCharge = 26;
+      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 1.5, 0.0), true, VOID_DARK);
       boss.setPos(target.getX(), target.getY() + 12.0, target.getZ());
       boss.setDeltaMovement(Vec3.ZERO);
       boss.hurtMarked = true;
-      announceNear(level, boss, ARENA_RADIUS, "&5&lVOID SLAM&7 - he is above you!");
+      Fx.runeCircle(level, ParticleTypes.PORTAL, fight.slamTarget.add(0.0, 0.05, 0.0), 5.5, 26, VOID);
+      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 1.5, 0.0), false, VOID);
+      announceNear(level, boss, ARENA_RADIUS, "§5§lVOID SLAM §8- §7he's above you. Get out of the ring.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 1.6F, 0.7F);
    }
 
@@ -1008,25 +1575,42 @@ public final class VoidShaperManager {
          return;
       }
       Vec3 target = fight.slamTarget;
-      double r = 5.0;
-      for (int i = 0; i < 32; i++) {
-         double a = i * (Math.PI * 2.0 / 32.0);
-         level.sendParticles(ParticleTypes.PORTAL, target.x + Math.cos(a) * r, target.y + 0.2, target.z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
+      double r = 5.5;
+      if (fight.slamCharge % 4 == 0) {
+         com.fortuneandfavors.net.FfVfx.enter();
+         try {
+            for (int i = 0; i < 32; i++) {
+               double a = i * (Math.PI * 2.0 / 32.0);
+               level.sendParticles(ParticleTypes.PORTAL, target.x + Math.cos(a) * r, target.y + 0.2, target.z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
+            }
+         } finally {
+            com.fortuneandfavors.net.FfVfx.exit();
+         }
       }
       fight.slamCharge--;
+      if (fight.slamCharge == 6) {
+         // The drop is seen, not just felt: a streak from where he hangs to where he lands.
+         Fx.comet(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 1.5, 0.0), target.add(0.0, 0.3, 0.0), 6, VOID_LIGHT);
+      }
       if (fight.slamCharge > 0) {
          return;
       }
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, target.x, target.y + 0.3, target.z, 4, 1.5, 0.5, 1.5, 0.0);
-      level.sendParticles(ParticleTypes.GUST, target.x, target.y + 0.3, target.z, 40, 4.0, 0.4, 4.0, 0.2);
-      level.sendParticles(ParticleTypes.REVERSE_PORTAL, target.x, target.y + 0.5, target.z, 80, 4.0, 0.8, 4.0, 0.2);
+      Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, target.add(0.0, 0.1, 0.0), 8.0, VOID);
+      Fx.rockburst(level, groundDust(level, target.x, target.y, target.z), target.add(0.0, 0.3, 0.0), 3.2, VOID_DARK);
+      Fx.starburst(level, ParticleTypes.END_ROD, target.add(0.0, 0.6, 0.0), 5.0, VOID_LIGHT);
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, target.x, target.y + 0.3, target.z, 4, 1.5, 0.5, 1.5, 0.0);
+         level.sendParticles(ParticleTypes.GUST, target.x, target.y + 0.3, target.z, 40, 4.0, 0.4, 4.0, 0.2);
+         level.sendParticles(ParticleTypes.REVERSE_PORTAL, target.x, target.y + 0.5, target.z, 80, 4.0, 0.8, 4.0, 0.2);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, target.x, target.y, target.z, ModSounds.BOSS_SLAM, SoundSource.HOSTILE, 2.2F, 0.6F);
       for (ServerPlayer p : playersNear(level, target.x, target.y, target.z, 5.5)) {
          Vec3 away = p.position().subtract(target);
-         if (away.lengthSqr() < 0.01) {
-            away = new Vec3(0.0, 1.0, 0.0);
-         }
-         away = away.normalize();
+         away = new Vec3(away.x, 0.0, away.z);
+         away = away.lengthSqr() < 0.0001 ? new Vec3(1.0, 0.0, 0.0) : away.normalize();
          p.push(away.x * 2.5, 1.0, away.z * 2.5);
          p.hurtMarked = true;
          p.hurtServer(level, level.damageSources().mobAttack(boss), 18.0F);
@@ -1047,10 +1631,16 @@ public final class VoidShaperManager {
       fight.phase = phase;
       // He stops holding one thing. He holds everything.
       grab(level, boss, fight, 5 + RANDOM.nextInt(4), 60);
-      announceNear(level, boss, ARENA_RADIUS, "&5&l\u26a0 THE VOID SHAPER HAS LOST CONTROL \u26a0");
-      announceNear(level, boss, ARENA_RADIUS, "&7He is no longer aiming. Do not stand in the open.");
-      level.sendParticles(ColorParticleOption.create(ParticleTypes.FLASH, 0xBB66FF), boss.getX(), boss.getY() + 1.5, boss.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+      announceNear(level, boss, ARENA_RADIUS, "§5§l⚠ THE VOID SHAPER HAS LOST CONTROL ⚠");
+      announceNear(level, boss, ARENA_RADIUS, SAY + "\"Can't hold it. §5Won't try.\"");
+      announceNear(level, boss, ARENA_RADIUS, "§8He's stopped aiming. §7Get behind something.");
+      Vec3 heart = boss.position().add(0.0, 2.2, 0.0);
+      Fx.flare(level, ParticleTypes.END_ROD, heart, 3.2, VOID_LIGHT);
+      Fx.starburst(level, ParticleTypes.REVERSE_PORTAL, heart, 9.0, VOID);
+      Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 0.1, 0.0), 14.0, VOID_DARK);
+      Fx.spiral(level, ParticleTypes.REVERSE_PORTAL, boss.position(), 10.0, 40, VOID);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 2.0F, 0.6F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.2F, 1.3F);
    }
 
    /** Phase two's signature: every held block leaves at once, in random directions. */
@@ -1064,15 +1654,20 @@ public final class VoidShaperManager {
       for (Held held : fight.held) {
          held.fuse = Math.min(held.fuse, 1);
       }
-      level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 2.0, boss.getZ(), 60, 1.5, 1.5, 1.5, 0.25);
+      Fx.nova(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 2.0, 0.0), 6.0, VOID_LIGHT);
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 2.0, boss.getZ(), 60, 1.5, 1.5, 1.5, 0.25);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.SHULKER_SHOOT, SoundSource.HOSTILE, 1.4F, 0.8F);
    }
 
-   // He has no dialogue at all. He is a thing that takes the world apart, not a
-   // character with opinions about it, and the running commentary only competed
-   // with the one message the fight actually needs to deliver - which block is in
-   // his hands. Every mechanic telegraph below is kept, because those are the
-   // fight's rules rather than his voice.
+   // His voice is a handful of words at a time. He is a thing that takes the world
+   // apart, not a character with opinions about it, and a speech would only compete
+   // with the one message the fight needs to deliver - which block is in his hands.
+   // Where a mechanic needs explaining, a grey narrator line does it instead of him.
 
    // -------------------------------------------------------------- lethal blow
 
@@ -1095,14 +1690,74 @@ public final class VoidShaperManager {
       boss.setHealth(1.0F);
       boss.setNoAi(true);
       fight.bar.setProgress(0.0F);
+      // Everything still pending is called off: no rune lands, no hole goes off and nobody is
+      // left floating once he is beaten.
+      fight.strikes.clear();
+      // A blow that bypasses invulnerability (the void, /kill) can land mid-rise: the final
+      // generic hit of the ceremony must still be able to kill him.
+      fight.riseTicks = 0;
+      boss.setInvulnerable(false);
+      fight.channelTicks = 0;
+      fight.slamCharge = 0;
+      fight.slamTarget = null;
+      if (fight.invertTicks > 0) {
+         fight.invertTicks = 0;
+         for (ServerPlayer p : participantsNear(level, boss, ARENA_RADIUS)) {
+            p.removeEffect(MobEffects.LEVITATION);
+         }
+      }
+      // Blocks in flight burst where they are rather than finish their throw.
+      for (Shot shot : new ArrayList<>(fight.shots)) {
+         Entity display = findEntity(level.getServer(), shot.displayId);
+         if (display != null) {
+            if (!shot.fragment) {
+               Fx.shatter(level, ParticleTypes.REVERSE_PORTAL, display.position(), 0.8, VOID);
+            }
+            display.discard();
+         }
+      }
+      fight.shots.clear();
+      // Back on the floor for the ceremony, wherever the blow caught him (a slam leaves him
+      // twelve blocks up).
+      boss.setPos(boss.getX(), BossGrounding.groundY(level, boss.getX(), boss.getZ(), boss.getY()), boss.getZ());
+      boss.setDeltaMovement(Vec3.ZERO);
+      boss.hurtMarked = true;
+      Vec3 heart = boss.position().add(0.0, 2.2, 0.0);
+      Fx.flare(level, ParticleTypes.END_ROD, heart, 2.4, VOID_LIGHT);
+      Fx.spiral(level, ParticleTypes.REVERSE_PORTAL, boss.position(), 10.0, DEATH_CEREMONY_TICKS, VOID_LIGHT);
+      Fx.vortex(level, ParticleTypes.PORTAL, boss.position().add(0.0, 0.2, 0.0), 6.0, DEATH_CEREMONY_TICKS, VOID_DARK);
+      Fx.aura(level, ParticleTypes.REVERSE_PORTAL, boss.position(), 5.5, DEATH_CEREMONY_TICKS, VOID);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 2.0F, 0.6F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_HURT, SoundSource.HOSTILE, 1.8F, 0.5F);
+      announceNear(level, boss, ARENA_RADIUS, SAY + "\"No. §5Not yet-\"");
       // FALSE cancels the blow so the death ceremony - and its loot - runs.
       return Boolean.FALSE;
    }
 
+   /**
+    * The ceremony: he loses his grip on everything at once.
+    *
+    * <p>Five seconds. He lifts off the ground a little at a time while the blocks he is still
+    * holding drop out of orbit one by one, each falling back to the floor it came from. Rings
+    * of void close in on him, faster and tighter as it goes, and the cracks in the air round
+    * him get wider. At the end he folds in on himself: a flare, spokes of light, a shockwave
+    * across the arena, and the ground he took for the fight comes back down out of the sky.
+    */
    private static void tickDeath(MinecraftServer server, Mob boss, Fight fight) {
       ServerLevel level = (ServerLevel) boss.level();
+      // Held on his feet for the length of the ceremony: a fall or a stray hit that takes
+      // him to zero would otherwise end it with no ceremony and no loot.
+      if (boss.getHealth() <= 0.0F) {
+         boss.setHealth(1.0F);
+      }
       fight.deathTicks--;
+      double progress = 1.0 - Math.max(0.0, fight.deathTicks / (double) DEATH_CEREMONY_TICKS);
+      if (fight.deathTicks > 15) {
+         boss.setPos(boss.getX(), boss.getY() + 0.025, boss.getZ());
+         boss.setDeltaMovement(Vec3.ZERO);
+         boss.hurtMarked = true;
+      }
+      Vec3 heart = boss.position().add(0.0, 2.2, 0.0);
 
       // Everything he was holding falls back out of the air, losing its grip
       // one block at a time.
@@ -1110,11 +1765,42 @@ public final class VoidShaperManager {
          Held held = fight.held.remove(0);
          Entity display = findEntity(server, held.displayId);
          if (display != null) {
-            level.sendParticles(ParticleTypes.LARGE_SMOKE, display.getX(), display.getY(), display.getZ(), 10, 0.2, 0.2, 0.2, 0.04);
+            Vec3 from = display.position();
+            double floor = BossGrounding.groundY(level, from.x, from.z, from.y);
+            Vec3 to = new Vec3(from.x, floor + 0.2, from.z);
+            Fx.comet(level, ParticleTypes.REVERSE_PORTAL, from, to, 6, kindColor(held.kind));
+            Fx.rockburst(level, groundDust(level, to.x, to.y, to.z), to, 1.2, kindColor(held.kind));
+            level.playSound(null, to.x, to.y, to.z, SoundEvents.STONE_BREAK, SoundSource.HOSTILE, 1.0F, 0.7F);
             display.discard();
          }
       }
-      level.sendParticles(ParticleTypes.PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 12, 1.2, 1.2, 1.2, 0.1);
+      // The void closes in: a ring every ten ticks, each one smaller than the last.
+      if (fight.deathTicks % 10 == 0 && fight.deathTicks > 0) {
+         double r = 2.0 + 10.0 * (1.0 - progress);
+         Fx.ring(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 0.2, 0.0), r, VOID);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_HURT, SoundSource.HOSTILE, 1.2F, 0.5F + (float) progress);
+      }
+      // Cracks open in the air round him, wider as he goes.
+      if (fight.deathTicks % 6 == 0 && fight.deathTicks > 0) {
+         double a = RANDOM.nextDouble() * Math.PI * 2.0;
+         Vec3 at = heart.add(Math.cos(a) * 1.6, (RANDOM.nextDouble() - 0.5) * 2.0, Math.sin(a) * 1.6);
+         Fx.tear(level, ParticleTypes.REVERSE_PORTAL, at, new Vec3(RANDOM.nextDouble() - 0.5, 1.0, RANDOM.nextDouble() - 0.5), 1.0 + progress * 2.0, 12, VOID_LIGHT);
+      }
+      if (fight.deathTicks == 60) {
+         announceNear(level, boss, ARENA_RADIUS, SAY + "\"It's... slipping.\"");
+         Fx.resonance(level, ParticleTypes.REVERSE_PORTAL, heart, 60, VOID);
+      }
+      if (fight.deathTicks == 25) {
+         announceNear(level, boss, ARENA_RADIUS, "§8The ground he took wants to come back down.");
+         Fx.flare(level, ParticleTypes.END_ROD, heart, 2.0, VOID_LIGHT);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.8F, 0.6F);
+      }
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 12, 1.2, 1.2, 1.2, 0.1);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
 
       if (fight.deathTicks > 0) {
          return;
@@ -1140,10 +1826,35 @@ public final class VoidShaperManager {
          }
       }
       fight.wallBlocks.clear();
+      fight.strikes.clear();
 
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 8, 2.0, 2.0, 2.0, 0.15);
-      level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 200, 5.0, 3.0, 5.0, 0.3);
+      // The collapse. He folds into the hole he came out of, and the light goes the other way.
+      Vec3 feet = boss.position();
+      Fx.flare(level, ParticleTypes.END_ROD, heart, 4.0, VOID_LIGHT);
+      Fx.starburst(level, ParticleTypes.REVERSE_PORTAL, heart, 12.0, VOID);
+      Fx.nova(level, ParticleTypes.REVERSE_PORTAL, heart, 9.0, VOID_LIGHT);
+      Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, new Vec3(feet.x, BossGrounding.groundY(level, feet.x, feet.z, feet.y) + 0.1, feet.z), 18.0, VOID_DARK);
+      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, heart, true, VOID_DARK);
+      Fx.shatter(level, ParticleTypes.REVERSE_PORTAL, heart, 2.6, VOID);
+      // ...and the ground he borrowed rains back down round the spot he stood.
+      for (int i = 0; i < 8; i++) {
+         double a = i * (Math.PI * 2.0 / 8.0) + RANDOM.nextDouble() * 0.4;
+         double r = 4.0 + RANDOM.nextDouble() * 8.0;
+         double x = feet.x + Math.cos(a) * r;
+         double z = feet.z + Math.sin(a) * r;
+         double y = BossGrounding.groundY(level, x, z, feet.y);
+         Fx.meteor(level, groundDust(level, x, y, z), new Vec3(x - Math.cos(a) * 3.0, y + 18.0, z - Math.sin(a) * 3.0), new Vec3(x, y + 0.2, z), 14 + RANDOM.nextInt(10), VOID_LIGHT);
+      }
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 8, 2.0, 2.0, 2.0, 0.15);
+         level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 200, 5.0, 3.0, 5.0, 0.3);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 2.2F, 0.7F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 2.0F, 0.4F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.8F, 0.5F);
 
       boss.setNoAi(false);
       onBossDeath(level, boss);
@@ -1292,6 +2003,17 @@ public final class VoidShaperManager {
       fight.held.clear();
       fight.shots.clear();
       fight.wallBlocks.clear();
+      fight.strikes.clear();
+      // A gravity inversion cut off mid-hold left its players floating until the effect ran out.
+      if (fight.invertTicks > 0) {
+         fight.invertTicks = 0;
+         for (UUID id : fight.participants) {
+            ServerPlayer p = server.getPlayerList().getPlayer(id);
+            if (p != null) {
+               p.removeEffect(MobEffects.LEVITATION);
+            }
+         }
+      }
       release(server, fight);
    }
 
@@ -1604,7 +2326,7 @@ public final class VoidShaperManager {
       ServerPlayer best = null;
       double bestDist = range * range;
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level) {
+         if (!isTarget(p, level)) {
             continue;
          }
          double d = p.distanceToSqr(from);
@@ -1616,6 +2338,14 @@ public final class VoidShaperManager {
       return best;
    }
 
+   /**
+    * Someone he can hit: alive, in his world, not in creative or spectator, and a real player
+    * rather than one of the mod's puppet bodies.
+    */
+   private static boolean isTarget(ServerPlayer p, ServerLevel level) {
+      return p != null && p.isAlive() && p.level() == level && !p.isCreative() && !p.isSpectator() && !BossManager.isFakePlayer(p);
+   }
+
    private static List<ServerPlayer> participantsNear(ServerLevel level, Entity at, double range) {
       return playersNear(level, at.getX(), at.getY(), at.getZ(), range);
    }
@@ -1624,7 +2354,7 @@ public final class VoidShaperManager {
       List<ServerPlayer> out = new ArrayList<>();
       double r2 = range * range;
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level) {
+         if (!isTarget(p, level)) {
             continue;
          }
          if (p.distanceToSqr(x, y, z) <= r2) {
