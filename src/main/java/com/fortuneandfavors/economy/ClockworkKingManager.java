@@ -74,10 +74,12 @@ import org.joml.Vector3f;
  * <h2>He also fights back</h2>
  * He walks on real mob AI - he falls, he paths around obstacles, and he closes on
  * whatever player he has picked - but every <i>attack</i> is scripted here rather
- * than left to vanilla: a telegraphed piston slam, a blade sweep, a magnet pull, a
- * synchronised turret barrage, and - in his last phase - a core detonation that
- * is survivable only by leaving the marked ring, after which he is genuinely
- * vulnerable for a few seconds. He is given no melee goal on purpose: the
+ * than left to vanilla, and every hit is shown before it lands: a piston slam onto a
+ * marked ring (leave it), a blade sweep through a marked band (hug him or back off),
+ * a magnet pull, a turret barrage that paints its sightlines first (break line of
+ * sight), a pendulum struck down a drawn lane (step off it), a live floor that goes
+ * off half a second after a bell (jump), and - in his last phase - a core detonation
+ * inside a dome (get out), after which he is genuinely vulnerable for a few seconds. He is given no melee goal on purpose: the
  * machinery is the damage, and a fist on top of it turns the fight into a
  * shoving match.
  *
@@ -139,6 +141,41 @@ public final class ClockworkKingManager {
    private static final int BARRAGE_COOLDOWN = 340;
    private static final int DETONATE_COOLDOWN = 420;
    private static final int REBUILD_COOLDOWN = 240;
+   private static final int PENDULUM_COOLDOWN = 260;
+   private static final int CURRENT_COOLDOWN = 360;
+   /** The breath between any two of his moves, so two warnings never land on the same beat. */
+   private static final int MOVE_GAP = 50;
+
+   /** Piston Slam: the ring he lands in. */
+   private static final double SLAM_RADIUS = 4.5;
+   /** Blade Sweep: the warning, and the band the blades cut (inside is safe, outside is safe). */
+   private static final int SWEEP_WARN = 16;
+   private static final double SWEEP_INNER = 4.0;
+   private static final double SWEEP_OUTER = 10.0;
+   /** Turret Barrage: how long the sightlines are shown before the guns fire. */
+   private static final int VOLLEY_WARN = 25;
+   /** Pendulum: a lane through a player, struck end to end. */
+   private static final int PENDULUM_WARN = 40;
+   private static final double PENDULUM_REACH = 9.0;
+   private static final double PENDULUM_HALF_WIDTH = 1.75;
+   private static final float PENDULUM_DAMAGE = 13.0F;
+   /** Live Current: the floor round him electrified; the bell is the cue to jump. */
+   private static final int CURRENT_WARN = 50;
+   private static final int CURRENT_BELL = 10;
+   private static final double CURRENT_RADIUS = 14.0;
+   private static final float CURRENT_DAMAGE = 10.0F;
+   /** Core Detonation: the dome you have to be outside of. */
+   private static final double DETONATE_RADIUS = 16.0;
+
+   /** How long he takes to bolt himself together before the fight starts. */
+   private static final int RISE_TICKS = 60;
+   /** A minute with nobody in the arena and he powers down instead of standing there forever. */
+   private static final int EMPTY_ARENA_TICKS = 1200;
+
+   /** His colours: polished brass, the furnace in his chest, and the arc off his coils. */
+   private static final int BRASS = 0xE0A93B;
+   private static final int EMBER = 0xFF5A1F;
+   private static final int ARC = 0x8FE3FF;
 
    /** Machines he holds at each phase. Everything past the first is rebuilt. */
    private static final int P1_MACHINES = 4;
@@ -147,7 +184,7 @@ public final class ClockworkKingManager {
    private static final int HARD_MACHINE_CAP = 10;
 
    /** How long the death ceremony pauses before the loot lands. */
-   private static final int DEATH_CEREMONY_TICKS = 70;
+   private static final int DEATH_CEREMONY_TICKS = 90;
 
    private static final Random RANDOM = new Random();
 
@@ -190,12 +227,50 @@ public final class ClockworkKingManager {
    private static final class Machine {
       final UUID id;
       final Role role;
-      int nextAction;
+      /** Clock time of its next shot or ram. A long: the clock is, and an int cast wraps. */
+      long nextAction;
+      /** Piston ram only: the lane it has shown, the wind-up before it goes, and the dash itself. */
+      Vec3 dashDir;
+      int windup;
+      int dashTicks;
 
-      Machine(UUID id, Role role, int nextAction) {
+      Machine(UUID id, Role role, long nextAction) {
          this.id = id;
          this.role = role;
          this.nextAction = nextAction;
+      }
+   }
+
+   /**
+    * A hit that has been shown and has not landed yet.
+    *
+    * <p>Every new attack is a promise first: the floor is marked, the warning plays, and the
+    * hit lands {@code landAt} later exactly where it was drawn. Keeping them in a list (rather
+    * than one charge counter per move) is what lets the death ceremony and the teardown cancel
+    * all of them in one line.
+    */
+   private static final class Strike {
+      static final int SWEEP = 0;
+      static final int VOLLEY = 1;
+      static final int PENDULUM = 2;
+      static final int CURRENT = 3;
+      final int kind;
+      final Vec3 at;
+      /** Pendulum only: the lane's direction, flat and normalised. */
+      final Vec3 dir;
+      final long landAt;
+      final double radius;
+      final float damage;
+      /** Set once the last-moment cue (the falling bob, the bell) has played. */
+      boolean cued;
+
+      Strike(int kind, Vec3 at, Vec3 dir, long landAt, double radius, float damage) {
+         this.kind = kind;
+         this.at = at;
+         this.dir = dir;
+         this.landAt = landAt;
+         this.radius = radius;
+         this.damage = damage;
       }
    }
 
@@ -217,6 +292,11 @@ public final class ClockworkKingManager {
       final Set<UUID> participants = new HashSet<>();
       final Map<UUID, Machine> machines = new HashMap<>();
       final List<Plate> plates = new ArrayList<>();
+      final List<Strike> strikes = new ArrayList<>();
+      /** Ticks left of his assembly. Counted down per tick, never on the clock. */
+      int riseTicks = RISE_TICKS;
+      /** Consecutive ticks with nobody in the arena. */
+      int emptyTicks;
       int phase = 1;
       boolean dying;
       int deathTicks;
@@ -227,9 +307,14 @@ public final class ClockworkKingManager {
       long nextDetonate;
       long nextRebuild;
       long nextTaunt;
+      long nextPendulum;
+      long nextCurrent;
+      long nextMove;
       int slamCharge;
       int detonateCharge;
       Vec3 slamTarget;
+      /** Where the core blast was armed. Fixed, so the dome he showed is the dome that goes off. */
+      Vec3 detonateAt;
       /** Game time until which a broken machine has left him slowed and lit up. */
       long breakWindowUntil;
 
@@ -413,39 +498,46 @@ public final class ClockworkKingManager {
       double z = summoner.getZ();
       boss.setPos(x, y, z);
       boss.setYRot(summoner.getYRot());
+      // He is put together on the spot: held still and untouchable until the last plate is on.
+      // tickRise lets him go.
+      boss.setNoAi(true);
+      boss.setInvulnerable(true);
       level.addFreshEntity(boss);
 
       ServerBossEvent bar = new ServerBossEvent(
          UUID.randomUUID(), Component.literal(BOSS_NAME), BossBarColor.YELLOW, BossBarOverlay.PROGRESS
       );
       bar.setVisible(true);
+      bar.setProgress(0.0F);
+      // Only the room gets the bar. It used to go to every player on the server, the Nether
+      // and the End included; tickFight now adds people as they walk in.
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         bar.addPlayer(p);
+         if (p.level() == level && p.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS) {
+            bar.addPlayer(p);
+         }
       }
+      bar.addPlayer(summoner);
 
       Fight fight = new Fight(boss.getUUID(), summoner.getUUID(), bar);
       fight.participants.add(summoner.getUUID());
       long now = ServerClock.clock(level);
-      fight.nextSlam = now + 100L;
-      fight.nextSweep = now + 200L;
-      fight.nextPull = now + 320L;
-      fight.nextBarrage = now + 420L;
-      fight.nextDetonate = now + 600L;
-      fight.nextRebuild = now + REBUILD_COOLDOWN;
-      fight.nextTaunt = now + 140L;
+      // Real cooldowns are set when he finishes assembling (arrive); these only keep the
+      // fields sane if something reads them before then.
+      fight.nextRebuild = now + RISE_TICKS + REBUILD_COOLDOWN;
+      fight.nextTaunt = now + RISE_TICKS + 200L;
       FIGHTS.put(boss.getUUID(), fight);
-
-      // First assembly: the shop floor opens with two turrets and two blades.
-      deploy(level, boss, fight, Role.TURRET, 2);
-      deploy(level, boss, fight, Role.BLADE, 2);
       buildPlating(fight);
 
       announce(level, "\u00a78\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
       announce(level, "    \u00a76\u00a7l\u2699 THE CLOCKWORK KING ASSEMBLES \u2699");
-      announce(level, "    \u00a77A hundred gears find their places at once.");
-      announce(level, "    \u00a78\u201c\u00a7fEvery part of me was built to end you. I am the prototype.\u00a78\u201d");
-      announce(level, "    \u00a77\u00a7oTear the machines off him - his armour is his arsenal.");
+      announce(level, "    \u00a77Gears drop into place. Something starts ticking.");
       announce(level, "\u00a78\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
+      // The workshop floor: a brass summoning circle under him, a slower ring of ember runes
+      // round it, and a spiral of arc climbing his frame while the plates go on.
+      Vec3 pad = new Vec3(x, y, z);
+      Fx.summonCircle(level, ParticleTypes.ELECTRIC_SPARK, pad.add(0.0, 0.05, 0.0), 4.5, RISE_TICKS + 10, BRASS);
+      Fx.runeCircle(level, ParticleTypes.ELECTRIC_SPARK, pad.add(0.0, 0.1, 0.0), 7.0, RISE_TICKS, EMBER);
+      Fx.spiral(level, ParticleTypes.ELECTRIC_SPARK, pad, 4.0, RISE_TICKS, ARC);
       level.playSound(null, x, y, z, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.4F, 0.6F);
       level.playSound(null, x, y, z, SoundEvents.SMITHING_TABLE_USE, SoundSource.HOSTILE, 1.6F, 0.5F);
       level.playSound(null, x, y, z, SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 1.2F, 0.6F);
@@ -487,7 +579,10 @@ public final class ClockworkKingManager {
       for (Iterator<Map.Entry<UUID, UUID>> it = MACHINE_OWNER.entrySet().iterator(); it.hasNext();) {
          Map.Entry<UUID, UUID> entry = it.next();
          Fight fight = FIGHTS.get(entry.getValue());
-         if (fight != null && !fight.dying) {
+         // A dying fight still owns its machines: the ceremony powers them down one at a
+         // time. Sweeping them here as well ("!fight.dying") pulled the whole arsenal out on
+         // the ceremony's first tick, so its clank-by-clank shutdown never had anything to do.
+         if (fight != null) {
             continue;
          }
          Entity machine = findEntity(server, entry.getKey());
@@ -581,12 +676,21 @@ public final class ClockworkKingManager {
          shutDown(server, fight, true);
          return;
       }
+      ServerLevel level = (ServerLevel) boss.level();
 
       // Track everyone who has been in the arena, so loot goes to the people who
-      // actually fought rather than whoever is standing nearest at the end.
+      // actually fought rather than whoever is standing nearest at the end. The bar
+      // follows the room: walk in and it appears, leave the dimension and it goes.
+      int present = 0;
+      double r2 = ARENA_RADIUS * ARENA_RADIUS;
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-         if (p.level() == boss.level() && p.isAlive() && p.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS) {
+         boolean here = p.level() == level;
+         if (here && p.isAlive() && !p.isSpectator() && !BossManager.isFakePlayer(p) && p.distanceToSqr(boss) < r2) {
             fight.participants.add(p.getUUID());
+            fight.bar.addPlayer(p);
+            present++;
+         } else if (!here || p.distanceToSqr(boss) > r2 * 2.25) {
+            fight.bar.removePlayer(p);
          }
       }
 
@@ -604,9 +708,26 @@ public final class ClockworkKingManager {
       // The bar's art follows the phase: red is the client's cue for the overheated bar.
       fight.bar.setColor(fight.phase >= 2 ? BossBarColor.RED : BossBarColor.YELLOW);
 
+      if (fight.riseTicks > 0) {
+         tickRise(level, boss, fight, now);
+         return;
+      }
+
+      // Nobody left in the room: he winds down rather than guarding an empty arena
+      // until the next restart.
+      fight.emptyTicks = present > 0 ? 0 : fight.emptyTicks + 1;
+      if (fight.emptyTicks >= EMPTY_ARENA_TICKS) {
+         Fx.clockBurst(level, ParticleTypes.ELECTRIC_SPARK, boss.position().add(0.0, 1.6, 0.0), 3.0, BRASS);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 1.6F, 0.6F);
+         announce(level, "\u00a78The Clockwork King winds down. \u00a77Nobody left to fight.");
+         shutDown(server, fight, true);
+         return;
+      }
+
       applyShield(server, boss, fight);
       tickMachines(server, boss, fight, now);
-      tickPlating((ServerLevel) boss.level(), boss, fight, now);
+      tickPlating(level, boss, fight, now);
+      tickStrikes(server, level, boss, fight, now);
 
       float share = boss.getHealth() / boss.getMaxHealth();
       int wanted = share > 0.6F ? 1 : share > 0.25F ? 2 : 3;
@@ -616,7 +737,7 @@ public final class ClockworkKingManager {
 
       if (now >= fight.nextRebuild && fight.machines.size() < phaseMachineCap(fight.phase)) {
          fight.nextRebuild = now + REBUILD_COOLDOWN;
-         rebuild((ServerLevel) boss.level(), boss, fight);
+         rebuild(level, boss, fight);
       }
 
       if (fight.slamCharge > 0) {
@@ -631,6 +752,78 @@ public final class ClockworkKingManager {
          fight.nextTaunt = now + 260L + RANDOM.nextInt(160);
          taunt(boss, fight);
       }
+   }
+
+   // ------------------------------------------------------------------- arrival
+
+   /**
+    * His assembly. For three seconds he stands in the summoning circle, untouchable, while
+    * arms of arc feed him from the four compass points and his plates bolt on tier by tier
+    * (see {@link #visibleTiers}) - the room gets to watch him become a boss instead of being
+    * hit by one the moment he exists. The bar fills as he is built.
+    */
+   private static void tickRise(ServerLevel level, Mob boss, Fight fight, long now) {
+      fight.riseTicks--;
+      int built = RISE_TICKS - fight.riseTicks;
+      fight.bar.setProgress(Math.min(1.0F, built / (float) RISE_TICKS));
+      tickPlating(level, boss, fight, now);
+      if (fight.riseTicks > 0 && fight.riseTicks % 10 == 0) {
+         // One arm per beat, walking round the compass: a pillar where it stands and a
+         // beam of arc into his chest.
+         double a = (built / 10) * (Math.PI / 2.0);
+         Vec3 foot = boss.position().add(Math.cos(a) * 4.5, 0.0, Math.sin(a) * 4.5);
+         Fx.pillar(level, ParticleTypes.ELECTRIC_SPARK, foot, 5.0, BRASS);
+         Fx.beam(level, ParticleTypes.ELECTRIC_SPARK, foot.add(0.0, 3.0, 0.0), boss.position().add(0.0, 1.6, 0.0), ARC);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.NOTE_BLOCK_HAT, SoundSource.HOSTILE, 1.4F, 0.6F + built / (float) RISE_TICKS);
+         level.playSound(null, foot.x, foot.y, foot.z, SoundEvents.ANVIL_USE, SoundSource.HOSTILE, 0.7F, 1.4F);
+      }
+      if (fight.riseTicks == 30) {
+         announceNear(level, boss, ARENA_RADIUS, SAY + "\"\u00a7fWho wound me?\"");
+      }
+      if (fight.riseTicks == 0) {
+         arrive(level, boss, fight, now);
+      }
+   }
+
+   /**
+    * The last plate goes on: a brass flare, a starburst of sparks and a shockwave that shoves
+    * (never hurts) anyone standing too close, then the first four machines unfold and the
+    * clock starts on his moves.
+    */
+   private static void arrive(ServerLevel level, Mob boss, Fight fight, long now) {
+      boss.setInvulnerable(false);
+      boss.setNoAi(false);
+      Vec3 chest = boss.position().add(0.0, 1.6, 0.0);
+      Fx.flare(level, ParticleTypes.END_ROD, chest, 3.0, BRASS);
+      Fx.starburst(level, ParticleTypes.ELECTRIC_SPARK, chest, 7.0, EMBER);
+      Fx.shockwave(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 10.0, BRASS);
+      Fx.clockBurst(level, ParticleTypes.ELECTRIC_SPARK, chest, 3.5, ARC);
+      for (ServerPlayer p : participantsNear(level, boss, 6.0)) {
+         Vec3 away = flatAway(p.position(), boss.position());
+         p.push(away.x * 0.9, 0.4, away.z * 0.9);
+         p.hurtMarked = true;
+      }
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ANVIL_LAND, SoundSource.HOSTILE, 1.6F, 0.5F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, 0.5F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.HOSTILE, 1.0F, 1.4F);
+
+      // First assembly: the shop floor opens with two turrets and two blades.
+      deploy(level, boss, fight, Role.TURRET, 2);
+      deploy(level, boss, fight, Role.BLADE, 2);
+
+      fight.nextMove = now + 40L;
+      fight.nextSlam = now + 60L;
+      fight.nextSweep = now + 140L;
+      fight.nextPendulum = now + 200L;
+      fight.nextPull = now + 280L;
+      fight.nextBarrage = now + 340L;
+      fight.nextCurrent = now + 300L;
+      fight.nextDetonate = now + 600L;
+      fight.nextRebuild = now + REBUILD_COOLDOWN;
+      fight.nextTaunt = now + 200L;
+
+      announce(level, SAY + "\"\u00a7fWound. \u00a76Running.\"");
+      announceNear(level, boss, ARENA_RADIUS, "\u00a78His armour is his machines. \u00a77Break them first.");
    }
 
    // ------------------------------------------------------------------ machinery
@@ -695,8 +888,17 @@ public final class ClockworkKingManager {
       fight.machines.put(machine.getUUID(), new Machine(machine.getUUID(), role, 0));
       MACHINE_OWNER.put(machine.getUUID(), boss.getUUID());
 
-      level.sendParticles(ParticleTypes.ELECTRIC_SPARK, x, y + 0.4, z, 18, 0.4, 0.4, 0.4, 0.05);
-      level.sendParticles(ParticleTypes.CRIT, x, y + 0.4, z, 10, 0.3, 0.3, 0.3, 0.06);
+      // Unfolded out of him: a beam from his chest to the spot and a small circle where it lands.
+      Vec3 at = new Vec3(x, y + 0.4, z);
+      Fx.beam(level, ParticleTypes.ELECTRIC_SPARK, boss.position().add(0.0, 1.6, 0.0), at, ARC);
+      Fx.summonCircle(level, ParticleTypes.ELECTRIC_SPARK, at, 1.1, 14, BRASS);
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, x, y + 0.4, z, 18, 0.4, 0.4, 0.4, 0.05);
+         level.sendParticles(ParticleTypes.CRIT, x, y + 0.4, z, 10, 0.3, 0.3, 0.3, 0.06);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, x, y, z, SoundEvents.SMITHING_TABLE_USE, SoundSource.HOSTILE, 1.0F, 1.2F);
       spawnChassis(level, machine, role);
       return machine;
@@ -773,7 +975,9 @@ public final class ClockworkKingManager {
          deploy(level, boss, fight, Role.PISTON, 1);
       }
       if (fight.machines.size() >= phaseMachineCap(fight.phase)) {
-         announceNear(level, boss, 64.0, "&6&lTHE KING REBUILDS&7 - his arsenal is whole again!");
+         Fx.clockBurst(level, ParticleTypes.ELECTRIC_SPARK, boss.position().add(0.0, 1.6, 0.0), 3.0, BRASS);
+         announceNear(level, boss, 64.0, SAY + "\"\u00a7fParts replaced.\"");
+         announceNear(level, boss, 64.0, "\u00a78The arsenal is whole again. \u00a77So is his armour.");
       }
    }
 
@@ -816,6 +1020,11 @@ public final class ClockworkKingManager {
     * than looking untouched.
     */
    private static int visibleTiers(Fight fight) {
+      // While he is being assembled the suit goes on a tier every 14 ticks, stopping at the
+      // four tiers his opening arsenal will hold - so nothing tears off the moment he arrives.
+      if (fight.riseTicks > 0) {
+         return Math.min(4, 1 + (RISE_TICKS - fight.riseTicks) / 14);
+      }
       return Math.min(5, Math.max(0, fight.machines.size() - 1)) + 1;
    }
 
@@ -832,9 +1041,15 @@ public final class ClockworkKingManager {
          if (!attached) {
             if (display != null) {
                // It is being torn off right now: a real clatter of parts leaving.
-               level.sendParticles(ParticleTypes.ELECTRIC_SPARK, display.getX(), display.getY(), display.getZ(), 26, 0.35, 0.35, 0.35, 0.12);
-               level.sendParticles(ParticleTypes.ITEM_SNOWBALL, display.getX(), display.getY(), display.getZ(), 14, 0.35, 0.35, 0.35, 0.06);
-               level.sendParticles(ParticleTypes.LARGE_SMOKE, display.getX(), display.getY(), display.getZ(), 10, 0.3, 0.3, 0.3, 0.04);
+               Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, display.position(), 0.8, BRASS);
+               com.fortuneandfavors.net.FfVfx.enter();
+               try {
+                  level.sendParticles(ParticleTypes.ELECTRIC_SPARK, display.getX(), display.getY(), display.getZ(), 26, 0.35, 0.35, 0.35, 0.12);
+                  level.sendParticles(ParticleTypes.ITEM_SNOWBALL, display.getX(), display.getY(), display.getZ(), 14, 0.35, 0.35, 0.35, 0.06);
+                  level.sendParticles(ParticleTypes.LARGE_SMOKE, display.getX(), display.getY(), display.getZ(), 10, 0.3, 0.3, 0.3, 0.04);
+               } finally {
+                  com.fortuneandfavors.net.FfVfx.exit();
+               }
                level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.ITEM_BREAK, SoundSource.HOSTILE, 1.0F, 0.6F);
                level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.COPPER_BREAK, SoundSource.HOSTILE, 1.0F, 0.8F);
                display.discard();
@@ -931,22 +1146,27 @@ public final class ClockworkKingManager {
          Map.Entry<UUID, Machine> entry = it.next();
          Machine machine = entry.getValue();
          Entity raw = findEntity(server, machine.id);
-         if (!(raw instanceof Mob mob) || !mob.isAlive()) {
+         if (!(raw instanceof Mob mob) || !mob.isAlive() || mob.level() != boss.level()) {
             it.remove();
             MACHINE_OWNER.remove(machine.id);
             continue;
          }
-         if (now < machine.nextAction) {
-            continue;
-         }
+         ServerLevel level = (ServerLevel) mob.level();
+         // Movement runs every tick and only the attack waits on the cooldown. The old
+         // gate wrapped the whole switch, so a blade that had just cut someone froze in
+         // mid-air for a second and a drone that had just fired hung still for three,
+         // then both teleported back into their orbit.
          switch (machine.role) {
             case TURRET -> {
-               ServerPlayer target = nearestPlayer(mob, 34.0);
-               if (target != null) {
-                  fireArrow(mob, target, 5.0F, 2.0);
-                  machine.nextAction = (int) (now + 30L + RANDOM.nextInt(20));
-               } else {
-                  machine.nextAction = (int) (now + 20L);
+               if (now >= machine.nextAction) {
+                  // Turrets only fire down a clear line, so cover is a real answer to them.
+                  ServerPlayer target = nearestVisible(mob, 34.0);
+                  if (target != null) {
+                     fireArrow(mob, target, 5.0F, 2.0, 0.0);
+                     machine.nextAction = now + 30L + RANDOM.nextInt(20);
+                  } else {
+                     machine.nextAction = now + 20L;
+                  }
                }
             }
             case BLADE -> {
@@ -958,53 +1178,120 @@ public final class ClockworkKingManager {
                double z = boss.getZ() + Math.sin(angle) * radius;
                mob.setPos(x, boss.getY() + 1.0, z);
                mob.hurtMarked = true;
-               ServerLevel level = (ServerLevel) mob.level();
-               level.sendParticles(ParticleTypes.SWEEP_ATTACK, mob.getX(), mob.getY() + 0.4, mob.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
-               for (ServerPlayer p : participantsNear(level, mob, 3.0)) {
-                  if (now >= machine.nextAction) {
-                     machine.nextAction = (int) (now + 22L);
+               if (now % 2L == 0L) {
+                  level.sendParticles(ParticleTypes.SWEEP_ATTACK, mob.getX(), mob.getY() + 0.4, mob.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+               }
+               if (now >= machine.nextAction) {
+                  boolean cut = false;
+                  for (ServerPlayer p : participantsNear(level, mob, 3.0)) {
                      p.hurtServer(level, level.damageSources().mobAttack(mob), 7.0F);
                      level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.HOSTILE, 1.0F, 0.9F);
+                     cut = true;
+                  }
+                  if (cut) {
+                     Fx.slash(level, ParticleTypes.CRIT, mob.position().add(0.0, 0.4, 0.0), new Vec3(-Math.sin(angle), 0.0, Math.cos(angle)), 2.5, BRASS);
+                     machine.nextAction = now + 22L;
                   }
                }
             }
-            case PISTON -> {
-               ServerPlayer target = nearestPlayer(mob, 14.0);
-               if (target != null) {
-                  Vec3 toward = target.position().subtract(mob.position()).normalize();
-                  mob.setDeltaMovement(toward.scale(1.1).add(0.0, 0.45, 0.0));
-                  mob.setNoGravity(true);
-                  mob.hurtMarked = true;
-                  ServerLevel level = (ServerLevel) mob.level();
-                  if (mob.distanceToSqr(target) < 6.0) {
-                     target.hurtServer(level, level.damageSources().mobAttack(mob), 12.0F);
-                     target.push(toward.x * 1.4, 1.1, toward.z * 1.4);
-                     target.hurtMarked = true;
-                     level.sendParticles(ParticleTypes.GUST, target.getX(), target.getY() + 0.4, target.getZ(), 6, 0.4, 0.3, 0.4, 0.05);
-                     level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), ModSounds.BOSS_SLAM, SoundSource.HOSTILE, 0.8F, 1.4F);
-                     machine.nextAction = (int) (now + 60L);
-                  } else {
-                     machine.nextAction = (int) (now + 14L);
-                  }
-               } else {
-                  machine.nextAction = (int) (now + 30L);
-               }
-            }
+            case PISTON -> tickPiston(level, boss, mob, machine, now);
             case DRONE -> {
                // Hover above him and snipe: higher ground, longer reach.
                double angle = now * 0.05 + machine.id.hashCode() % 9;
                mob.setPos(boss.getX() + Math.cos(angle) * 5.5, boss.getY() + 5.0, boss.getZ() + Math.sin(angle) * 5.5);
                mob.hurtMarked = true;
-               ServerPlayer target = nearestPlayer(mob, 44.0);
-               if (target != null) {
-                  fireArrow(mob, target, 4.0F, 2.2);
-                  machine.nextAction = (int) (now + 45L + RANDOM.nextInt(25));
-               } else {
-                  machine.nextAction = (int) (now + 25L);
+               if (now >= machine.nextAction) {
+                  ServerPlayer target = nearestVisible(mob, 44.0);
+                  if (target != null) {
+                     fireArrow(mob, target, 4.0F, 2.2, 0.0);
+                     machine.nextAction = now + 45L + RANDOM.nextInt(25);
+                  } else {
+                     machine.nextAction = now + 25L;
+                  }
                }
             }
          }
       }
+   }
+
+   /**
+    * The Piston Ram, rebuilt as a readable charge. It picks a player, shows the lane it will
+    * take (a red line from its face), winds up for 12 ticks with steam hissing off it, then
+    * drives along that lane - so the answer is to sidestep the line. It stops on the first
+    * player it hits or the first wall it meets.
+    *
+    * <p>The old ram set a velocity on a mob with no AI, which does not move, so it only ever
+    * hurt someone who happened to be standing on it; and it was free to wander off after a
+    * target forever. It is leashed back to the King when it strays.
+    */
+   private static void tickPiston(ServerLevel level, Mob boss, Mob mob, Machine machine, long now) {
+      if (machine.dashTicks > 0 && machine.dashDir != null) {
+         machine.dashTicks--;
+         Vec3 step = machine.dashDir.scale(0.9);
+         if (!level.noCollision(mob, mob.getBoundingBox().move(step))) {
+            machine.dashTicks = 0;
+            Fx.rockburst(level, ParticleTypes.LARGE_SMOKE, mob.position(), 0.8, EMBER);
+            level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.ANVIL_LAND, SoundSource.HOSTILE, 0.8F, 1.2F);
+         } else {
+            mob.setPos(mob.getX() + step.x, mob.getY() + step.y, mob.getZ() + step.z);
+            mob.hurtMarked = true;
+            com.fortuneandfavors.net.FfVfx.enter();
+            try {
+               level.sendParticles(ParticleTypes.LARGE_SMOKE, mob.getX(), mob.getY() + 0.3, mob.getZ(), 2, 0.1, 0.1, 0.1, 0.0);
+            } finally {
+               com.fortuneandfavors.net.FfVfx.exit();
+            }
+            for (ServerPlayer p : participantsNear(level, mob, 1.8)) {
+               p.hurtServer(level, level.damageSources().mobAttack(mob), 10.0F);
+               p.push(machine.dashDir.x * 1.4, 0.8, machine.dashDir.z * 1.4);
+               p.hurtMarked = true;
+               Fx.clash(level, ParticleTypes.CRIT, p.position().add(0.0, 1.0, 0.0), machine.dashDir, EMBER);
+               level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), ModSounds.BOSS_SLAM, SoundSource.HOSTILE, 0.8F, 1.4F);
+               machine.dashTicks = 0;
+            }
+         }
+         if (machine.dashTicks == 0) {
+            machine.nextAction = now + 60L;
+         }
+         return;
+      }
+      if (machine.windup > 0) {
+         machine.windup--;
+         if (machine.windup % 4 == 0) {
+            level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.FIRE_EXTINGUISH, SoundSource.HOSTILE, 0.5F, 1.6F);
+         }
+         if (machine.windup == 0) {
+            machine.dashTicks = 10;
+            level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.IRON_DOOR_CLOSE, SoundSource.HOSTILE, 1.2F, 0.6F);
+         }
+         return;
+      }
+      // Leash: a ram that has wandered off drifts back to the King between charges.
+      Vec3 home = boss.position().add(0.0, 1.0, 0.0);
+      if (mob.position().distanceToSqr(home) > 16.0 * 16.0) {
+         Vec3 back = home.subtract(mob.position()).normalize().scale(0.5);
+         mob.setPos(mob.getX() + back.x, mob.getY() + back.y, mob.getZ() + back.z);
+         mob.hurtMarked = true;
+         return;
+      }
+      if (now < machine.nextAction) {
+         return;
+      }
+      ServerPlayer target = nearestVisible(mob, 14.0);
+      if (target == null) {
+         machine.nextAction = now + 30L;
+         return;
+      }
+      Vec3 toward = target.position().add(0.0, 0.5, 0.0).subtract(mob.position());
+      if (toward.lengthSqr() < 1.0E-4) {
+         machine.nextAction = now + 20L;
+         return;
+      }
+      machine.dashDir = toward.normalize();
+      machine.windup = 12;
+      Vec3 face = mob.position().add(0.0, 0.4, 0.0);
+      Fx.beam(level, new DustParticleOptions(EMBER, 0.9F), face, face.add(machine.dashDir.scale(9.0)), EMBER);
+      Fx.muzzle(level, ParticleTypes.LARGE_SMOKE, face, machine.dashDir, EMBER);
    }
 
    /** A machine was torn off him: strip a tier, chip his real health, open a window. */
@@ -1029,61 +1316,105 @@ public final class ClockworkKingManager {
       boss.setHealth(Math.max(1.0F, before - chip));
       fight.breakWindowUntil = ServerClock.clock(level) + BREAK_WINDOW_TICKS;
 
-      level.sendParticles(ParticleTypes.ELECTRIC_SPARK, machine.getX(), machine.getY() + 0.5, machine.getZ(), 40, 0.6, 0.6, 0.6, 0.12);
-      level.sendParticles(ParticleTypes.LARGE_SMOKE, machine.getX(), machine.getY() + 0.5, machine.getZ(), 16, 0.4, 0.4, 0.4, 0.04);
-      level.sendParticles(ParticleTypes.ITEM_SNOWBALL, machine.getX(), machine.getY() + 0.5, machine.getZ(), 12, 0.4, 0.4, 0.4, 0.06);
+      // The part bursts, and the shock runs back up the line into him.
+      Vec3 at = machine.position().add(0.0, 0.5, 0.0);
+      Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, at, 1.2, BRASS);
+      Fx.flare(level, ParticleTypes.END_ROD, at, 1.2, EMBER);
+      Fx.lightning(level, ParticleTypes.ELECTRIC_SPARK, at, boss.position().add(0.0, 1.6, 0.0), ARC);
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, at.x, at.y, at.z, 40, 0.6, 0.6, 0.6, 0.12);
+         level.sendParticles(ParticleTypes.LARGE_SMOKE, at.x, at.y, at.z, 16, 0.4, 0.4, 0.4, 0.04);
+         level.sendParticles(ParticleTypes.ITEM_SNOWBALL, at.x, at.y, at.z, 12, 0.4, 0.4, 0.4, 0.06);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, machine.getX(), machine.getY(), machine.getZ(), SoundEvents.ITEM_BREAK, SoundSource.HOSTILE, 1.2F, 0.8F);
       level.playSound(null, machine.getX(), machine.getY(), machine.getZ(), SoundEvents.STONE_BREAK, SoundSource.HOSTILE, 1.0F, 0.7F);
 
-      String who = killer != null ? killer.getName().getString() : "someone";
-      announceNear(level, boss, 64.0, "&6\u2726 " + who + " &7tore off " + machine.getCustomName().getString()
-         + "&7 - armour down to &f" + fight.machines.size() + "&7 part(s).");
+      // A machine with its name stripped (a name tag, a command) used to throw here and
+      // skip the discard below, leaving a dead part standing in the arena.
+      String who = killer != null ? killer.getName().getString() : "Someone";
+      Component name = machine.getCustomName();
+      String part = name != null ? name.getString() : "a part";
+      int left = fight.machines.size();
+      announceNear(level, boss, 64.0, "\u00a76\u2726 " + who + " \u00a77tore off " + part
+         + "\u00a77. \u00a7f" + left + "\u00a77 left.");
       machine.discard();
    }
 
    // --------------------------------------------------------------------- moves
 
+   /**
+    * Picks his next move. One move per {@link #MOVE_GAP}, and none while a shown hit is
+    * still waiting to land, so the room only ever has one warning to read at a time.
+    */
    private static void chooseMove(MinecraftServer server, Mob boss, Fight fight, long now) {
+      if (now < fight.nextMove || !fight.strikes.isEmpty()) {
+         return;
+      }
+      ServerLevel level = (ServerLevel) boss.level();
+      boolean moved = false;
       if (fight.phase >= 3 && now >= fight.nextDetonate) {
          fight.nextDetonate = now + DETONATE_COOLDOWN;
-         startDetonate(server, boss, fight);
-         return;
-      }
-      if (now >= fight.nextBarrage) {
+         moved = startDetonate(server, boss, fight);
+      } else if (fight.phase >= 2 && now >= fight.nextCurrent) {
+         fight.nextCurrent = now + CURRENT_COOLDOWN;
+         moved = startCurrent(level, boss, fight, now);
+      } else if (now >= fight.nextBarrage) {
          fight.nextBarrage = now + BARRAGE_COOLDOWN;
-         turretBarrage(server, boss, fight);
-         return;
-      }
-      if (now >= fight.nextPull) {
+         moved = startVolley(server, level, boss, fight, now);
+      } else if (now >= fight.nextPendulum) {
+         fight.nextPendulum = now + PENDULUM_COOLDOWN;
+         moved = startPendulum(level, boss, fight, now);
+      } else if (now >= fight.nextPull) {
          fight.nextPull = now + PULL_COOLDOWN;
-         magnetPull(server, boss, fight);
-         return;
-      }
-      if (now >= fight.nextSweep) {
+         moved = magnetPull(server, boss, fight);
+      } else if (now >= fight.nextSweep) {
          fight.nextSweep = now + SWEEP_COOLDOWN;
-         bladeSweep(server, boss, fight);
-         return;
-      }
-      if (now >= fight.nextSlam) {
+         moved = startSweep(server, level, boss, fight, now);
+      } else if (now >= fight.nextSlam) {
          fight.nextSlam = now + SLAM_COOLDOWN;
-         startSlam(server, boss, fight);
+         moved = startSlam(server, boss, fight);
+      }
+      if (moved) {
+         fight.nextMove = now + MOVE_GAP;
       }
    }
 
-   /** Telegraphed slam: the ring shows where it lands before it lands. */
-   private static void startSlam(MinecraftServer server, Mob boss, Fight fight) {
+   /**
+    * Piston Slam. He throws himself up over a player and comes down on a marked ring a
+    * second and a half later. The answer is to leave the ring.
+    *
+    * <p>He used to be thrown a flat six blocks up wherever he was, which under a roof put
+    * him inside the ceiling; he now takes the highest free spot up to six blocks.
+    */
+   private static boolean startSlam(MinecraftServer server, Mob boss, Fight fight) {
       ServerPlayer target = nearestPlayer(boss, 48.0);
       if (target == null) {
-         return;
+         return false;
       }
-      fight.slamTarget = target.position();
-      fight.slamCharge = 30;
       ServerLevel level = (ServerLevel) boss.level();
-      boss.teleportTo(target.getX(), target.getY() + 6.0, target.getZ());
+      Vec3 floor = new Vec3(target.getX(), BossGrounding.groundY(level, target.getX(), target.getZ(), target.getY()), target.getZ());
+      fight.slamTarget = floor;
+      fight.slamCharge = 30;
+      for (double lift = 6.0; lift >= 2.0; lift -= 1.0) {
+         double dx = floor.x - boss.getX();
+         double dy = floor.y + lift - boss.getY();
+         double dz = floor.z - boss.getZ();
+         if (level.noCollision(boss, boss.getBoundingBox().move(dx, dy, dz))) {
+            boss.teleportTo(floor.x, floor.y + lift, floor.z);
+            break;
+         }
+      }
       boss.setDeltaMovement(Vec3.ZERO);
       boss.hurtMarked = true;
-      announceNear(level, boss, 64.0, "&6&lPISTON SLAM&7 - get out of the ring!");
+      Fx.runeCircle(level, ParticleTypes.ELECTRIC_SPARK, floor.add(0.0, 0.05, 0.0), SLAM_RADIUS, fight.slamCharge, EMBER);
+      Fx.pillar(level, ParticleTypes.ELECTRIC_SPARK, floor, 7.0, BRASS);
+      announceNear(level, boss, 64.0, SAY + "\"\u00a7fStay there.\"");
+      announceNear(level, boss, 64.0, "\u00a78The floor is marked. \u00a77Get out of the ring.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 1.4F, 0.6F);
+      return true;
    }
 
    private static void tickSlamCharge(MinecraftServer server, Mob boss, Fight fight) {
@@ -1095,21 +1426,27 @@ public final class ClockworkKingManager {
       // and his own move must not hurt him on the way down.
       boss.resetFallDistance();
       ServerLevel level = (ServerLevel) boss.level();
-      double r = 4.5;
+      double r = SLAM_RADIUS;
       int points = 28;
-      for (int i = 0; i < points; i++) {
-         double a = i * (Math.PI * 2.0 / points);
-         level.sendParticles(
-            ParticleTypes.ELECTRIC_SPARK,
-            fight.slamTarget.x + Math.cos(a) * r,
-            fight.slamTarget.y + 0.2,
-            fight.slamTarget.z + Math.sin(a) * r,
-            1,
-            0.0,
-            0.0,
-            0.0,
-            0.0
-         );
+      // The rune circle draws this ring for modded clients; this is everyone else's copy.
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         for (int i = 0; i < points; i++) {
+            double a = i * (Math.PI * 2.0 / points);
+            level.sendParticles(
+               ParticleTypes.ELECTRIC_SPARK,
+               fight.slamTarget.x + Math.cos(a) * r,
+               fight.slamTarget.y + 0.2,
+               fight.slamTarget.z + Math.sin(a) * r,
+               1,
+               0.0,
+               0.0,
+               0.0,
+               0.0
+            );
+         }
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
       }
       fight.slamCharge--;
       if (fight.slamCharge > 0) {
@@ -1119,17 +1456,31 @@ public final class ClockworkKingManager {
       double x = fight.slamTarget.x;
       double y = fight.slamTarget.y;
       double z = fight.slamTarget.z;
+      Vec3 at = fight.slamTarget;
       level.playSound(null, x, y, z, ModSounds.BOSS_SLAM, SoundSource.HOSTILE, 2.0F, 0.6F);
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, x, y + 0.5, z, 2, 0.5, 0.2, 0.5, 0.0);
-      level.sendParticles(ParticleTypes.GUST, x, y + 0.4, z, 24, 2.5, 0.3, 2.5, 0.1);
-      level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + 0.5, z, 40, 2.6, 0.4, 2.6, 0.08);
+      level.playSound(null, x, y, z, SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.HOSTILE, 1.6F, 0.7F);
+      Fx.shockwave(level, ParticleTypes.ELECTRIC_SPARK, at, SLAM_RADIUS + 1.0, BRASS);
+      Fx.rockburst(level, ParticleTypes.LARGE_SMOKE, at.add(0.0, 0.3, 0.0), 1.8, EMBER);
+      Fx.flare(level, ParticleTypes.END_ROD, at.add(0.0, 0.6, 0.0), 1.6, BRASS);
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, x, y + 0.5, z, 2, 0.5, 0.2, 0.5, 0.0);
+         level.sendParticles(ParticleTypes.GUST, x, y + 0.4, z, 24, 2.5, 0.3, 2.5, 0.1);
+         level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + 0.5, z, 40, 2.6, 0.4, 2.6, 0.08);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
 
-      for (ServerPlayer p : playersNear(level, x, y, z, 5.0)) {
-         Vec3 away = p.position().subtract(x, y, z);
-         if (away.lengthSqr() < 0.01) {
-            away = new Vec3(0.0, 1.0, 0.0);
+      // The hit is the ring that was drawn: flat distance, plus a little for the player's
+      // own width. It used to be a 5-block sphere round a 4.5-block ring.
+      double reach = SLAM_RADIUS + 0.3;
+      for (ServerPlayer p : playersNear(level, x, y, z, SLAM_RADIUS + 3.0)) {
+         double dx = p.getX() - x;
+         double dz = p.getZ() - z;
+         if (dx * dx + dz * dz > reach * reach || Math.abs(p.getY() - y) > 3.0) {
+            continue;
          }
-         away = away.normalize();
+         Vec3 away = flatAway(p.position(), at);
          p.push(away.x * 2.0, 0.9, away.z * 2.0);
          p.hurtMarked = true;
          p.hurtServer(level, level.damageSources().mobAttack(boss), 14.0F);
@@ -1138,38 +1489,69 @@ public final class ClockworkKingManager {
       fight.slamTarget = null;
    }
 
-   /** Every blade dashes outward from the King, then snaps back. */
-   private static void bladeSweep(MinecraftServer server, Mob boss, Fight fight) {
-      ServerLevel level = (ServerLevel) boss.level();
-      int swept = 0;
-      for (Machine machine : fight.machines.values()) {
-         if (machine.role != Role.BLADE) {
-            continue;
-         }
-         Entity raw = findEntity(server, machine.id);
-         if (!(raw instanceof Mob blade) || !blade.isAlive()) {
-            continue;
-         }
-         swept++;
-         Vec3 outward = new Vec3(RANDOM.nextDouble() - 0.5, 0.1, RANDOM.nextDouble() - 0.5).normalize();
-         blade.setPos(boss.getX() + outward.x * 7.0, boss.getY() + 1.0, boss.getZ() + outward.z * 7.0);
-         blade.hurtMarked = true;
-         for (ServerPlayer p : participantsNear(level, blade, 4.0)) {
-            p.hurtServer(level, level.damageSources().mobAttack(blade), 9.0F);
-         }
-         level.sendParticles(ParticleTypes.SWEEP_ATTACK, blade.getX(), blade.getY() + 0.4, blade.getZ(), 6, 1.2, 0.4, 1.2, 0.05);
+   /**
+    * Blade Sweep. The blades are flung out to a ring around him and cut everything in the
+    * band between {@link #SWEEP_INNER} and {@link #SWEEP_OUTER}. The band is drawn for most
+    * of a second first, so the answer is either to hug him or to back right off.
+    */
+   private static boolean startSweep(MinecraftServer server, ServerLevel level, Mob boss, Fight fight, long now) {
+      if (liveMachines(server, fight, Role.BLADE).isEmpty()) {
+         announceNear(level, boss, 64.0, "\u00a78He reaches for his blades. \u00a77They're gone.");
+         return true;
       }
-      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.HOSTILE, 1.6F, 0.7F);
-      announceNear(level, boss, 64.0, swept == 0
-         ? "&6&lBLADE SWEEP&7 - the blades are gone, so it spins at nothing."
-         : "&6&lBLADE SWEEP&7 - " + swept + " blade(s) cut outward!");
+      Vec3 at = boss.position();
+      fight.strikes.add(new Strike(Strike.SWEEP, at, null, now + SWEEP_WARN, SWEEP_OUTER, 0.0F));
+      Fx.runeCircle(level, ParticleTypes.CRIT, at.add(0.0, 0.05, 0.0), SWEEP_OUTER, SWEEP_WARN, BRASS);
+      Fx.ring(level, ParticleTypes.ELECTRIC_SPARK, at.add(0.0, 0.1, 0.0), SWEEP_INNER, ARC);
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.TRIPWIRE_CLICK_ON, SoundSource.HOSTILE, 1.4F, 0.6F);
+      announceNear(level, boss, 64.0, SAY + "\"\u00a7fBlades out.\"");
+      announceNear(level, boss, 64.0, "\u00a78The blades spin out. \u00a77Hug him or back off.");
+      return true;
    }
 
-   /** Drags everyone toward the King, into the middle of the arsenal. */
-   private static void magnetPull(MinecraftServer server, Mob boss, Fight fight) {
+   private static void landSweep(MinecraftServer server, ServerLevel level, Mob boss, Fight fight, Strike strike) {
+      List<Mob> blades = liveMachines(server, fight, Role.BLADE);
+      if (blades.isEmpty()) {
+         return;
+      }
+      Vec3 at = strike.at;
+      double mid = (SWEEP_INNER + SWEEP_OUTER) * 0.5;
+      for (int i = 0; i < blades.size(); i++) {
+         double a = i * (Math.PI * 2.0 / blades.size()) + RANDOM.nextDouble() * 0.5;
+         Vec3 out = new Vec3(Math.cos(a), 0.0, Math.sin(a));
+         Mob blade = blades.get(i);
+         blade.setPos(at.x + out.x * mid, at.y + 1.0, at.z + out.z * mid);
+         blade.hurtMarked = true;
+         Fx.crescent(level, ParticleTypes.CRIT, at.add(0.0, 1.0, 0.0), out, SWEEP_OUTER, BRASS);
+      }
+      Fx.shockwave(level, ParticleTypes.CRIT, at, SWEEP_OUTER, BRASS);
+      // More blades, a meaner cut - but never more than a slam.
+      float damage = Math.min(11.0F, 4.0F + 2.5F * blades.size());
+      for (ServerPlayer p : playersNear(level, at.x, at.y, at.z, SWEEP_OUTER + 3.0)) {
+         double dx = p.getX() - at.x;
+         double dz = p.getZ() - at.z;
+         double d = Math.sqrt(dx * dx + dz * dz);
+         if (d < SWEEP_INNER || d > SWEEP_OUTER + 0.3 || Math.abs(p.getY() - at.y) > 3.0) {
+            continue;
+         }
+         p.hurtServer(level, level.damageSources().mobAttack(boss), damage);
+         Fx.slash(level, ParticleTypes.CRIT, p.position().add(0.0, 1.0, 0.0), flatAway(p.position(), at), 1.6, EMBER);
+      }
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.HOSTILE, 1.6F, 0.7F);
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.CHAIN_BREAK, SoundSource.HOSTILE, 1.2F, 0.6F);
+   }
+
+   /**
+    * Magnetic Haul. A displacement, not a hit: everyone within 40 blocks is dragged a few
+    * blocks toward him and slowed for two seconds, which sets up the blades and the slam.
+    * Chains of arc show who is caught.
+    */
+   private static boolean magnetPull(MinecraftServer server, Mob boss, Fight fight) {
       ServerLevel level = (ServerLevel) boss.level();
+      Vec3 core = boss.position().add(0.0, 1.0, 0.0);
+      Fx.vortex(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 6.0, 30, ARC);
       for (ServerPlayer p : participantsNear(level, boss, 40.0)) {
-         Vec3 pull = boss.position().add(0.0, 1.0, 0.0).subtract(p.position());
+         Vec3 pull = core.subtract(p.position());
          double len = pull.length();
          if (len < 1.0) {
             continue;
@@ -1178,102 +1560,352 @@ public final class ClockworkKingManager {
          p.push(unit.x * 1.5, 0.35, unit.z * 1.5);
          p.hurtMarked = true;
          p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 0, false, true, true));
-         for (double d = 1.0; d < len; d += 1.2) {
-            Vec3 point = p.position().add(unit.scale(d));
-            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, point.x, point.y + 1.0, point.z, 1, 0.05, 0.05, 0.05, 0.0);
-         }
+         Fx.chains(level, ParticleTypes.ELECTRIC_SPARK, core.add(0.0, 0.6, 0.0), p.position().add(0.0, 1.0, 0.0), ARC);
       }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 1.6F, 0.7F);
-      announceNear(level, boss, 64.0, "&6&lMAGNETIC HAUL&7 - he reels you into the machinery!");
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.CHAIN_FALL, SoundSource.HOSTILE, 1.4F, 0.6F);
+      announceNear(level, boss, 64.0, SAY + "\"\u00a7fCome here.\"");
+      announceNear(level, boss, 64.0, "\u00a78Magnets. \u00a77Walk against it.");
+      return true;
    }
 
-   /** Every turret and drone fires together, so the volley has to be read as one. */
-   private static void turretBarrage(MinecraftServer server, Mob boss, Fight fight) {
-      ServerLevel level = (ServerLevel) boss.level();
+   /**
+    * Turret Barrage, now aimed. Every turret and drone paints a red sightline onto the
+    * player it has picked and holds it for {@link #VOLLEY_WARN} ticks; then they all fire
+    * together, three shots each, but only down a line that is still clear. The answer is to
+    * put a wall, a pillar or the King himself between you and the guns.
+    */
+   private static boolean startVolley(MinecraftServer server, ServerLevel level, Mob boss, Fight fight, long now) {
+      List<Mob> guns = liveMachines(server, fight, Role.TURRET);
+      guns.addAll(liveMachines(server, fight, Role.DRONE));
+      if (guns.isEmpty()) {
+         announceNear(level, boss, 64.0, "\u00a78The guns are gone. \u00a77Nothing fires.");
+         return true;
+      }
+      fight.strikes.add(new Strike(Strike.VOLLEY, boss.position(), null, now + VOLLEY_WARN, 0.0, 5.0F));
+      drawSightlines(level, guns);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.LEVER_CLICK, SoundSource.HOSTILE, 1.6F, 0.6F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.TRIPWIRE_CLICK_ON, SoundSource.HOSTILE, 1.4F, 1.4F);
+      announceNear(level, boss, 64.0, SAY + "\"\u00a7fAim.\"");
+      announceNear(level, boss, 64.0, "\u00a78Red lines are his sightlines. \u00a77Get behind cover.");
+      return true;
+   }
+
+   private static void drawSightlines(ServerLevel level, List<Mob> guns) {
+      for (Mob gun : guns) {
+         ServerPlayer target = nearestVisible(gun, 40.0);
+         if (target == null) {
+            continue;
+         }
+         Fx.beam(level, new DustParticleOptions(EMBER, 0.8F), gun.position().add(0.0, gun.getBbHeight() * 0.6, 0.0),
+            target.position().add(0.0, target.getBbHeight() * 0.5, 0.0), EMBER);
+      }
+   }
+
+   private static void landVolley(MinecraftServer server, ServerLevel level, Mob boss, Fight fight, Strike strike) {
+      List<Mob> guns = liveMachines(server, fight, Role.TURRET);
+      guns.addAll(liveMachines(server, fight, Role.DRONE));
       int firing = 0;
-      for (Machine machine : fight.machines.values()) {
-         if (machine.role != Role.TURRET && machine.role != Role.DRONE) {
-            continue;
-         }
-         Entity raw = findEntity(server, machine.id);
-         if (!(raw instanceof Mob shooter) || !shooter.isAlive()) {
-            continue;
-         }
-         ServerPlayer target = nearestPlayer(shooter, 40.0);
+      for (Mob gun : guns) {
+         ServerPlayer target = nearestVisible(gun, 40.0);
          if (target == null) {
             continue;
          }
          firing++;
+         // A real fan this time: the old "spread" only changed the arrows' speed, so all
+         // three flew down the same line and two of them were eaten by hurt-immunity.
          for (int i = -1; i <= 1; i++) {
-            fireArrow(shooter, target, 5.0F, 2.1 + i * 0.12);
+            fireArrow(gun, target, strike.damage, 2.1, i * 0.07);
          }
+         Vec3 from = gun.position().add(0.0, gun.getBbHeight() * 0.6, 0.0);
+         Fx.muzzle(level, ParticleTypes.FLAME, from, target.position().add(0.0, 1.0, 0.0).subtract(from), EMBER);
       }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.CROSSBOW_SHOOT, SoundSource.HOSTILE, 1.6F, 0.6F);
-      announceNear(level, boss, 64.0, firing == 0
-         ? "&6&lTURRET BARRAGE&7 - nothing left to fire. He is bare."
-         : "&6&lTURRET BARRAGE&7 - " + firing + " emplacement(s) open fire!");
+      if (firing > 0) {
+         announceNear(level, boss, 64.0, SAY + "\"\u00a7fFire.\"");
+      }
    }
 
-   /** Phase-three finale: a marked ring, then a blast that must be walked out of. */
-   private static void startDetonate(MinecraftServer server, Mob boss, Fight fight) {
+   /**
+    * <b>Pendulum</b> (new). A lane is drawn through a player, from one runed post to the
+    * other, and ticks for two seconds; then a brass pendulum comes down along its length.
+    * The answer is a single sidestep - the lane is three and a half blocks wide. In the
+    * last phase a second lane crosses the first half a second later, so the sidestep has to
+    * go diagonally out of the cross.
+    */
+   private static boolean startPendulum(ServerLevel level, Mob boss, Fight fight, long now) {
+      List<ServerPlayer> room = new ArrayList<>();
+      for (ServerPlayer p : participantsNear(level, boss, 40.0)) {
+         if (fight.participants.contains(p.getUUID())) {
+            room.add(p);
+         }
+      }
+      if (room.isEmpty()) {
+         return false;
+      }
+      ServerPlayer target = room.get(RANDOM.nextInt(room.size()));
+      Vec3 dir = new Vec3(target.getX() - boss.getX(), 0.0, target.getZ() - boss.getZ());
+      if (dir.lengthSqr() < 1.0E-3) {
+         double yaw = Math.toRadians(boss.getYRot());
+         dir = new Vec3(-Math.sin(yaw), 0.0, Math.cos(yaw));
+      }
+      dir = dir.normalize();
+      addLane(level, fight, target.position(), dir, now, now + PENDULUM_WARN);
+      if (fight.phase >= 3) {
+         addLane(level, fight, target.position(), new Vec3(-dir.z, 0.0, dir.x), now, now + PENDULUM_WARN + 10L);
+      }
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 1.4F, 0.5F);
+      announceNear(level, boss, 64.0, SAY + "\"\u00a7fTick.\"");
+      announceNear(level, boss, 64.0, "\u00a78A pendulum lane. \u00a77Step off the line.");
+      return true;
+   }
+
+   private static void addLane(ServerLevel level, Fight fight, Vec3 through, Vec3 dir, long now, long landAt) {
+      Vec3 floor = new Vec3(through.x, BossGrounding.groundY(level, through.x, through.z, through.y), through.z);
+      fight.strikes.add(new Strike(Strike.PENDULUM, floor, dir, landAt, PENDULUM_HALF_WIDTH, PENDULUM_DAMAGE));
+      int warn = (int) (landAt - now);
+      Vec3 a = floor.subtract(dir.scale(PENDULUM_REACH));
+      Vec3 b = floor.add(dir.scale(PENDULUM_REACH));
+      Fx.runeCircle(level, ParticleTypes.ELECTRIC_SPARK, a.add(0.0, 0.05, 0.0), 1.4, warn, BRASS);
+      Fx.runeCircle(level, ParticleTypes.ELECTRIC_SPARK, b.add(0.0, 0.05, 0.0), 1.4, warn, BRASS);
+      drawLane(level, floor, dir);
+   }
+
+   /** The lane's two edges, in ember on the floor. Redrawn while the warning runs. */
+   private static void drawLane(ServerLevel level, Vec3 floor, Vec3 dir) {
+      Vec3 side = new Vec3(-dir.z, 0.0, dir.x).scale(PENDULUM_HALF_WIDTH);
+      Vec3 a = floor.subtract(dir.scale(PENDULUM_REACH)).add(0.0, 0.15, 0.0);
+      Vec3 b = floor.add(dir.scale(PENDULUM_REACH)).add(0.0, 0.15, 0.0);
+      DustParticleOptions ember = new DustParticleOptions(EMBER, 0.9F);
+      Fx.beam(level, ember, a.add(side), b.add(side), EMBER);
+      Fx.beam(level, ember, a.subtract(side), b.subtract(side), EMBER);
+   }
+
+   private static void landPendulum(ServerLevel level, Mob boss, Strike strike) {
+      Vec3 dir = strike.dir;
+      Vec3 a = strike.at.subtract(dir.scale(PENDULUM_REACH));
+      Vec3 b = strike.at.add(dir.scale(PENDULUM_REACH));
+      Fx.slash(level, ParticleTypes.CRIT, a.add(0.0, 1.0, 0.0), dir, PENDULUM_REACH * 2.0, BRASS);
+      Fx.rockburst(level, ParticleTypes.LARGE_SMOKE, strike.at.add(0.0, 0.2, 0.0), 1.4, EMBER);
+      Fx.rockburst(level, ParticleTypes.LARGE_SMOKE, a.add(0.0, 0.2, 0.0), 0.9, EMBER);
+      Fx.rockburst(level, ParticleTypes.LARGE_SMOKE, b.add(0.0, 0.2, 0.0), 0.9, EMBER);
+      level.playSound(null, strike.at.x, strike.at.y, strike.at.z, SoundEvents.ANVIL_LAND, SoundSource.HOSTILE, 1.6F, 0.6F);
+      level.playSound(null, strike.at.x, strike.at.y, strike.at.z, SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.HOSTILE, 1.6F, 0.5F);
+      Vec3 perp = new Vec3(-dir.z, 0.0, dir.x);
+      for (ServerPlayer p : playersNear(level, strike.at.x, strike.at.y, strike.at.z, PENDULUM_REACH + 3.0)) {
+         double rx = p.getX() - strike.at.x;
+         double rz = p.getZ() - strike.at.z;
+         double along = rx * dir.x + rz * dir.z;
+         double side = rx * perp.x + rz * perp.z;
+         if (Math.abs(along) > PENDULUM_REACH + 0.5 || Math.abs(side) > strike.radius + 0.3 || Math.abs(p.getY() - strike.at.y) > 3.0) {
+            continue;
+         }
+         p.hurtServer(level, level.damageSources().mobAttack(boss), strike.damage);
+         // Knocked clear of the lane, to whichever side they were already leaning.
+         double sign = side >= 0.0 ? 1.0 : -1.0;
+         p.push(perp.x * sign * 1.1, 0.35, perp.z * sign * 1.1);
+         p.hurtMarked = true;
+      }
+   }
+
+   /**
+    * <b>Live Current</b> (new, phase two on). He grounds his coils and the floor round him
+    * hums: a fourteen-block rune circle, a click every half second, and then a bell. Half a
+    * second after the bell the current goes through the floor, and anyone standing on it is
+    * shocked and slowed. The answer is to jump on the bell (or be on something high).
+    */
+   private static boolean startCurrent(ServerLevel level, Mob boss, Fight fight, long now) {
+      Vec3 c = new Vec3(boss.getX(), BossGrounding.groundY(level, boss.getX(), boss.getZ(), boss.getY()), boss.getZ());
+      fight.strikes.add(new Strike(Strike.CURRENT, c, null, now + CURRENT_WARN, CURRENT_RADIUS, CURRENT_DAMAGE));
+      Fx.runeCircle(level, ParticleTypes.ELECTRIC_SPARK, c.add(0.0, 0.05, 0.0), CURRENT_RADIUS, CURRENT_WARN, ARC);
+      Fx.resonance(level, ParticleTypes.ELECTRIC_SPARK, c.add(0.0, 1.0, 0.0), CURRENT_WARN, ARC);
+      Fx.aura(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 3.0, CURRENT_WARN, ARC);
+      level.playSound(null, c.x, c.y, c.z, SoundEvents.BEACON_POWER_SELECT, SoundSource.HOSTILE, 1.6F, 0.6F);
+      level.playSound(null, c.x, c.y, c.z, SoundEvents.CONDUIT_ACTIVATE, SoundSource.HOSTILE, 1.4F, 1.2F);
+      announceNear(level, boss, 64.0, SAY + "\"\u00a7fGround's live.\"");
+      announceNear(level, boss, 64.0, "\u00a78The floor hums. \u00a77Jump on the bell.");
+      return true;
+   }
+
+   private static void landCurrent(ServerLevel level, Mob boss, Strike strike) {
+      Vec3 c = strike.at;
+      Fx.shockwave(level, ParticleTypes.ELECTRIC_SPARK, c, strike.radius, ARC);
+      for (int i = 0; i < 6; i++) {
+         double a = i * (Math.PI / 3.0) + RANDOM.nextDouble() * 0.4;
+         double r = strike.radius * (0.45 + RANDOM.nextDouble() * 0.55);
+         Fx.lightning(level, ParticleTypes.ELECTRIC_SPARK, c.add(0.0, 2.5, 0.0), c.add(Math.cos(a) * r, 0.1, Math.sin(a) * r), ARC);
+      }
+      level.playSound(null, c.x, c.y, c.z, SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.HOSTILE, 1.6F, 1.2F);
+      level.playSound(null, c.x, c.y, c.z, SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.HOSTILE, 0.8F, 1.6F);
+      for (ServerPlayer p : playersNear(level, c.x, c.y, c.z, strike.radius + 3.0)) {
+         double dx = p.getX() - c.x;
+         double dz = p.getZ() - c.z;
+         if (dx * dx + dz * dz > strike.radius * strike.radius || Math.abs(p.getY() - c.y) > 2.5) {
+            continue;
+         }
+         // Airborne is safe: that is the whole answer.
+         if (!p.onGround()) {
+            continue;
+         }
+         p.hurtServer(level, level.damageSources().mobAttack(boss), strike.damage);
+         p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 1, false, true, true));
+         Fx.lightning(level, ParticleTypes.ELECTRIC_SPARK, c.add(0.0, 2.5, 0.0), p.position().add(0.0, 1.0, 0.0), ARC);
+      }
+   }
+
+   /** Runs every shown hit: refreshes its warning, plays its last cue, and lands it on time. */
+   private static void tickStrikes(MinecraftServer server, ServerLevel level, Mob boss, Fight fight, long now) {
+      if (fight.strikes.isEmpty()) {
+         return;
+      }
+      for (Iterator<Strike> it = fight.strikes.iterator(); it.hasNext();) {
+         Strike strike = it.next();
+         long left = strike.landAt - now;
+         switch (strike.kind) {
+            case Strike.PENDULUM -> {
+               if (left > 0 && left % 8 == 0) {
+                  drawLane(level, strike.at, strike.dir);
+               }
+               if (left > 0 && left % 10 == 0) {
+                  level.playSound(null, strike.at.x, strike.at.y, strike.at.z, SoundEvents.NOTE_BLOCK_HAT, SoundSource.HOSTILE, 1.4F, 0.7F);
+               }
+               if (!strike.cued && left <= 6) {
+                  // The bob is seen swinging down for the last few ticks.
+                  strike.cued = true;
+                  Vec3 top = strike.at.subtract(strike.dir.scale(PENDULUM_REACH)).add(0.0, 9.0, 0.0);
+                  Fx.comet(level, ParticleTypes.END_ROD, top, strike.at.add(0.0, 0.8, 0.0), 6, BRASS);
+               }
+            }
+            case Strike.CURRENT -> {
+               if (left > CURRENT_BELL && left % 10 == 0) {
+                  level.playSound(null, strike.at.x, strike.at.y, strike.at.z, SoundEvents.NOTE_BLOCK_HAT, SoundSource.HOSTILE, 1.6F,
+                     0.8F + (CURRENT_WARN - left) / (float) CURRENT_WARN);
+               }
+               if (!strike.cued && left <= CURRENT_BELL) {
+                  strike.cued = true;
+                  Fx.ring(level, ParticleTypes.ELECTRIC_SPARK, strike.at.add(0.0, 0.2, 0.0), strike.radius, ARC);
+                  level.playSound(null, strike.at.x, strike.at.y, strike.at.z, SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, 1.0F);
+                  for (ServerPlayer p : playersNear(level, strike.at.x, strike.at.y, strike.at.z, strike.radius + 3.0)) {
+                     p.sendOverlayMessage(Component.literal("\u00a7b\u26a1 \u00a7fJump!"));
+                  }
+               }
+            }
+            case Strike.VOLLEY -> {
+               if (left > 0 && left % 5 == 0) {
+                  List<Mob> guns = liveMachines(server, fight, Role.TURRET);
+                  guns.addAll(liveMachines(server, fight, Role.DRONE));
+                  drawSightlines(level, guns);
+               }
+            }
+            case Strike.SWEEP -> {
+               if (left > 0 && left % 5 == 0) {
+                  Fx.ring(level, ParticleTypes.ELECTRIC_SPARK, strike.at.add(0.0, 0.1, 0.0), SWEEP_INNER, ARC);
+               }
+            }
+            default -> {
+            }
+         }
+         if (left > 0) {
+            continue;
+         }
+         it.remove();
+         switch (strike.kind) {
+            case Strike.PENDULUM -> landPendulum(level, boss, strike);
+            case Strike.CURRENT -> landCurrent(level, boss, strike);
+            case Strike.VOLLEY -> landVolley(server, level, boss, fight, strike);
+            case Strike.SWEEP -> landSweep(server, level, boss, fight, strike);
+            default -> {
+            }
+         }
+      }
+   }
+
+   /**
+    * Core Detonation, phase three. He stops dead, a dome goes up around the spot he
+    * armed it on and his core beats for three seconds; then it goes off. Inside the dome is
+    * 26 damage. The answer is to get out, and then to punish: he is winded afterwards.
+    *
+    * <p>The ring used to follow him while he walked, and the blast went off wherever he
+    * ended up; it is now fixed to where it was shown, and he is held still while it charges.
+    */
+   private static boolean startDetonate(MinecraftServer server, Mob boss, Fight fight) {
       fight.detonateCharge = 60;
+      fight.detonateAt = boss.position();
       ServerLevel level = (ServerLevel) boss.level();
       boss.addEffect(new MobEffectInstance(MobEffects.GLOWING, 70, 0, false, false, false));
-      announceNear(level, boss, 64.0, "&6&l\u26a0 CORE DETONATION&7 - clear the marked ring!");
+      boss.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 70, 6, false, false, false));
+      Vec3 at = fight.detonateAt;
+      Fx.dome(level, ParticleTypes.FLAME, at, DETONATE_RADIUS, fight.detonateCharge, EMBER);
+      Fx.runeCircle(level, ParticleTypes.FLAME, at.add(0.0, 0.05, 0.0), DETONATE_RADIUS, fight.detonateCharge, EMBER);
+      Fx.heartbeat(level, ParticleTypes.FLAME, at.add(0.0, 0.1, 0.0), 4.0, fight.detonateCharge, BRASS);
+      announceNear(level, boss, 64.0, SAY + "\"\u00a7fStand back. \u00a7cOr don't.\"");
+      announceNear(level, boss, 64.0, "\u00a78His core is going. \u00a77Get out of the dome.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 2.0F, 0.4F);
+      return true;
    }
 
    private static void tickDetonateCharge(MinecraftServer server, Mob boss, Fight fight) {
       ServerLevel level = (ServerLevel) boss.level();
+      if (fight.detonateAt == null) {
+         fight.detonateAt = boss.position();
+      }
+      Vec3 at = fight.detonateAt;
       fight.detonateCharge--;
       int elapsed = 60 - fight.detonateCharge;
       double r = 3.0 + elapsed * 0.22;
       int points = 36;
-      for (int i = 0; i < points; i++) {
-         double a = i * (Math.PI * 2.0 / points) + elapsed * 0.05;
-         level.sendParticles(
-            ParticleTypes.ELECTRIC_SPARK,
-            boss.getX() + Math.cos(a) * r,
-            boss.getY() + 0.15,
-            boss.getZ() + Math.sin(a) * r,
-            1,
-            0.0,
-            0.0,
-            0.0,
-            0.0
-         );
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         for (int i = 0; i < points; i++) {
+            double a = i * (Math.PI * 2.0 / points) + elapsed * 0.05;
+            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, at.x + Math.cos(a) * r, at.y + 0.15, at.z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
+         }
+         level.sendParticles(ParticleTypes.CRIT, boss.getX(), boss.getY() + 1.2, boss.getZ(), 8, 1.0, 1.0, 1.0, 0.1);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
       }
-      level.sendParticles(ParticleTypes.CRIT, boss.getX(), boss.getY() + 1.2, boss.getZ(), 8, 1.0, 1.0, 1.0, 0.1);
+      if (fight.detonateCharge == 20) {
+         level.playSound(null, at.x, at.y, at.z, SoundEvents.CREEPER_PRIMED, SoundSource.HOSTILE, 2.0F, 0.5F);
+         Fx.flare(level, ParticleTypes.FLAME, boss.position().add(0.0, 1.6, 0.0), 1.6, EMBER);
+      }
       if (fight.detonateCharge > 0) {
          return;
       }
 
-      double x = boss.getX();
-      double y = boss.getY() + 1.0;
-      double z = boss.getZ();
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, x, y, z, 8, 2.0, 1.0, 2.0, 0.1);
-      level.sendParticles(ParticleTypes.GUST, x, y, z, 60, 8.0, 1.5, 8.0, 0.2);
-      level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y, z, 200, 9.0, 2.0, 9.0, 0.18);
-      level.sendParticles(ParticleTypes.FLAME, x, y, z, 120, 7.0, 1.5, 7.0, 0.14);
+      double x = at.x;
+      double y = at.y + 1.0;
+      double z = at.z;
+      Vec3 core = new Vec3(x, y, z);
+      Fx.flare(level, ParticleTypes.FLAME, core, 4.0, EMBER);
+      Fx.shockwave(level, ParticleTypes.FLAME, at, DETONATE_RADIUS + 1.0, EMBER);
+      Fx.starburst(level, ParticleTypes.ELECTRIC_SPARK, core, 9.0, BRASS);
+      Fx.rockburst(level, ParticleTypes.LARGE_SMOKE, at.add(0.0, 0.3, 0.0), 2.5, EMBER);
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, x, y, z, 8, 2.0, 1.0, 2.0, 0.1);
+         level.sendParticles(ParticleTypes.GUST, x, y, z, 60, 8.0, 1.5, 8.0, 0.2);
+         level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y, z, 200, 9.0, 2.0, 9.0, 0.18);
+         level.sendParticles(ParticleTypes.FLAME, x, y, z, 120, 7.0, 1.5, 7.0, 0.14);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 3.0F, 0.5F);
       level.playSound(null, x, y, z, SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.HOSTILE, 1.4F, 0.5F);
 
-      for (ServerPlayer p : participantsNear(level, boss, 16.0)) {
+      for (ServerPlayer p : playersNear(level, x, y, z, DETONATE_RADIUS)) {
          p.hurtServer(level, level.damageSources().mobAttack(boss), 26.0F);
-         Vec3 away = p.position().subtract(boss.position());
-         if (away.lengthSqr() < 0.01) {
-            away = new Vec3(0.0, 1.0, 0.0);
-         }
-         away = away.normalize();
+         Vec3 away = flatAway(p.position(), at);
          p.push(away.x * 2.6, 1.0, away.z * 2.6);
          p.hurtMarked = true;
       }
 
       // The cost of firing it: he is winded, which is the window to punish.
+      boss.removeEffect(MobEffects.SLOWNESS);
       boss.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 80, 1, false, true, true));
       boss.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 80, 1, false, true, true));
-      announceNear(level, boss, 64.0, "&6\u26a0 The King is running cold&7 - \u00a7fhit him now!");
+      announceNear(level, boss, 64.0, "\u00a78He's running cold. \u00a77Hit him now.");
       fight.detonateCharge = 0;
+      fight.detonateAt = null;
    }
 
    // -------------------------------------------------------------------- phases
@@ -1281,52 +1913,68 @@ public final class ClockworkKingManager {
    private static void enterPhase(MinecraftServer server, Mob boss, Fight fight, int phase) {
       fight.phase = phase;
       ServerLevel level = (ServerLevel) boss.level();
+      long now = ServerClock.clock(level);
       if (phase == 2) {
-         announceNear(level, boss, 72.0, "&6&l\u2699 OVERDRIVE&7 - the King spins up his whole assembly line.");
-         announce(level, SAY + "\"\u00a7fFine. Let us run the \u00a76full\u00a7f program.\"");
+         announceNear(level, boss, 72.0, "\u00a76\u00a7l\u2699 OVERDRIVE \u00a78- \u00a77drones and rams join in.");
+         announce(level, SAY + "\"\u00a7fOverclock. \u00a76Full program.\"");
          deploy(level, boss, fight, Role.DRONE, 2);
          deploy(level, boss, fight, Role.PISTON, 1);
-         fight.nextRebuild = ServerClock.clock(level) + 60L;
+         fight.nextRebuild = now + 60L;
+         // The new floor attack opens the phase, so it is learned early rather than mid-chaos.
+         fight.nextCurrent = now + 80L;
       } else {
-         announceNear(level, boss, 72.0, "&6&l\u2699 MELTDOWN&7 - he is venting the core. Do not stand still.");
-         announce(level, SAY + "\"\u00a7fI am the prototype. \u00a7fPrototypes \u00a7cdetonate\u00a7f.\"");
+         announceNear(level, boss, 72.0, "\u00a76\u00a7l\u2699 MELTDOWN \u00a78- \u00a77his core is venting. Keep moving.");
+         announce(level, SAY + "\"\u00a7fRedline. \u00a7cEverything goes.\"");
          deploy(level, boss, fight, Role.TURRET, 2);
          deploy(level, boss, fight, Role.BLADE, 2);
-         fight.nextRebuild = ServerClock.clock(level) + 40L;
-         fight.nextDetonate = ServerClock.clock(level) + 100L;
+         fight.nextRebuild = now + 40L;
+         fight.nextDetonate = now + 100L;
       }
+      Vec3 chest = boss.position().add(0.0, 1.6, 0.0);
+      Fx.clockBurst(level, ParticleTypes.ELECTRIC_SPARK, chest, 5.0, BRASS);
+      Fx.flare(level, ParticleTypes.END_ROD, chest, 2.6, phase >= 3 ? EMBER : BRASS);
+      Fx.shockwave(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 9.0, phase >= 3 ? EMBER : ARC);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 2.0F, 0.6F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 1.6F, 0.5F);
-      level.sendParticles(ParticleTypes.ELECTRIC_SPARK, boss.getX(), boss.getY() + 1.5, boss.getZ(), 90, 3.0, 1.5, 3.0, 0.2);
-      level.sendParticles(
-         net.minecraft.core.particles.ColorParticleOption.create(ParticleTypes.FLASH, 0xFFAA33),
-         boss.getX(),
-         boss.getY() + 1.5,
-         boss.getZ(),
-         1,
-         0.0,
-         0.0,
-         0.0,
-         0.0
-      );
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, boss.getX(), boss.getY() + 1.5, boss.getZ(), 90, 3.0, 1.5, 3.0, 0.2);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
    }
 
    private static String phaseName(Fight fight, Mob boss) {
+      if (fight.riseTicks > 0) {
+         return BOSS_NAME + " \u00a78| \u00a77Assembling...";
+      }
       int live = fight.machines.size();
       String phase = fight.phase == 1 ? "Phase I" : fight.phase == 2 ? "Phase II" : "Phase III";
       return BOSS_NAME + " \u00a78| \u00a7f" + phase + " \u00a78| \u00a77" + live + " part" + (live == 1 ? "" : "s") + " running";
    }
 
+   private static final String[] TAUNTS_P1 = {
+      "That's one bolt. I have thousands.",
+      "Every part of me is spare.",
+      "Keep tinkering.",
+   };
+   private static final String[] TAUNTS_P2 = {
+      "Faster. Keep up.",
+      "Tighter. Tighter.",
+      "You're behind schedule.",
+   };
+   private static final String[] TAUNTS_P3 = {
+      "Still ticking.",
+      "I don't stop. I break.",
+      "Hot. Too hot. Good.",
+   };
+
    private static void taunt(Mob boss, Fight fight) {
       if (!(boss.level() instanceof ServerLevel level)) {
          return;
       }
-      String line = switch (fight.machines.isEmpty() ? 3 : fight.phase) {
-         case 1 -> "&8\u201c&7You break a turret and call it progress. I have a hundred more.&8\u201d";
-         case 2 -> "&8\u201c&7Escalation is just a gear ratio.&8\u201d";
-         default -> "&8\u201c&7Every bolt you pull out is one I fitted myself. I remember all of them.&8\u201d";
-      };
-      announce(level, SAY + "\"" + line + "\"");
+      String[] pool = fight.machines.isEmpty() || fight.phase >= 3 ? TAUNTS_P3 : fight.phase == 2 ? TAUNTS_P2 : TAUNTS_P1;
+      announceNear(level, boss, ARENA_RADIUS, SAY + "\"\u00a7f" + pool[RANDOM.nextInt(pool.length)] + "\"");
    }
 
    // -------------------------------------------------------------- lethal blow
@@ -1358,20 +2006,44 @@ public final class ClockworkKingManager {
       }
       fight.dying = true;
       fight.deathTicks = DEATH_CEREMONY_TICKS;
+      // Every warning on the floor dies with him: nothing he showed lands after he falls.
+      fight.strikes.clear();
+      fight.slamCharge = 0;
+      fight.slamTarget = null;
+      fight.detonateCharge = 0;
+      fight.detonateAt = null;
+      fight.riseTicks = 0;
+      // He may have been caught mid-assembly; the ceremony's last blow must be able to land.
+      boss.setInvulnerable(false);
       boss.setHealth(1.0F);
       boss.setNoAi(true);
       fight.bar.setProgress(0.0F);
+      Vec3 chest = boss.position().add(0.0, 1.6, 0.0);
+      Fx.spiral(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 6.0, DEATH_CEREMONY_TICKS, BRASS);
+      Fx.aura(level, ParticleTypes.LARGE_SMOKE, boss.position(), 3.2, DEATH_CEREMONY_TICKS, EMBER);
+      Fx.runeCircle(level, ParticleTypes.ELECTRIC_SPARK, boss.position().add(0.0, 0.05, 0.0), 5.0, DEATH_CEREMONY_TICKS, BRASS);
+      Fx.clockBurst(level, ParticleTypes.ELECTRIC_SPARK, chest, 2.0, ARC);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 2.0F, 0.5F);
-      announce(level, SAY + "\"\u00a7f...then let us see what I was worth.\"");
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.IRON_GOLEM_HURT, SoundSource.HOSTILE, 1.6F, 0.5F);
+      announce(level, SAY + "\"\u00a7fNo. \u00a76I'm still ticking.\"");
       // FALSE cancels the blow so the death ceremony - which is what actually
       // drops the loot - gets to run. TRUE let the killing hit land and killed
       // him on the spot with no ceremony and no loot.
       return Boolean.FALSE;
    }
 
+   /**
+    * His shutdown, played out over four and a half seconds. The plates come off one by one,
+    * each machine is pulled back into him with a last arc, and a clock face pulses over him
+    * on a slowing tick while he talks himself down. In the last second the arc all folds
+    * into his chest - and then he goes: flare, starburst, a brass shockwave across the
+    * arena, a shatter of parts and a rain of embers over the loot.
+    */
    private static void tickDeath(MinecraftServer server, Mob boss, Fight fight) {
       ServerLevel level = (ServerLevel) boss.level();
       fight.deathTicks--;
+      Vec3 chest = boss.position().add(0.0, 1.6, 0.0);
+      double progress = 1.0 - Math.max(0.0, fight.deathTicks / (double) DEATH_CEREMONY_TICKS);
 
       // His own suit comes apart first, plate by plate, and then the arsenal.
       if (fight.deathTicks % 5 == 0) {
@@ -1381,8 +2053,14 @@ public final class ClockworkKingManager {
             }
             Entity display = findEntity(server, plate.displayId);
             if (display != null) {
-               level.sendParticles(ParticleTypes.ELECTRIC_SPARK, display.getX(), display.getY(), display.getZ(), 20, 0.3, 0.3, 0.3, 0.1);
-               level.sendParticles(ParticleTypes.ITEM_SNOWBALL, display.getX(), display.getY(), display.getZ(), 10, 0.3, 0.3, 0.3, 0.05);
+               Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, display.position(), 0.7, BRASS);
+               com.fortuneandfavors.net.FfVfx.enter();
+               try {
+                  level.sendParticles(ParticleTypes.ELECTRIC_SPARK, display.getX(), display.getY(), display.getZ(), 20, 0.3, 0.3, 0.3, 0.1);
+                  level.sendParticles(ParticleTypes.ITEM_SNOWBALL, display.getX(), display.getY(), display.getZ(), 10, 0.3, 0.3, 0.3, 0.05);
+               } finally {
+                  com.fortuneandfavors.net.FfVfx.exit();
+               }
                level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.COPPER_BREAK, SoundSource.HOSTILE, 1.0F, 0.7F);
                display.discard();
             }
@@ -1398,7 +2076,9 @@ public final class ClockworkKingManager {
             Machine machine = remaining.get(0);
             Entity raw = findEntity(server, machine.id);
             if (raw != null) {
-               level.sendParticles(ParticleTypes.ELECTRIC_SPARK, raw.getX(), raw.getY() + 0.4, raw.getZ(), 24, 0.3, 0.3, 0.3, 0.1);
+               Vec3 at = raw.position().add(0.0, 0.4, 0.0);
+               Fx.lightning(level, ParticleTypes.ELECTRIC_SPARK, at, chest, ARC);
+               Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, at, 0.9, BRASS);
                level.playSound(null, raw.getX(), raw.getY(), raw.getZ(), SoundEvents.ITEM_BREAK, SoundSource.HOSTILE, 0.9F, 0.7F);
                raw.discard();
             }
@@ -1407,17 +2087,55 @@ public final class ClockworkKingManager {
          }
       }
 
-      level.sendParticles(ParticleTypes.CRIT, boss.getX(), boss.getY() + 1.5, boss.getZ(), 10, 1.6, 1.2, 1.6, 0.12);
-      level.sendParticles(ParticleTypes.LARGE_SMOKE, boss.getX(), boss.getY() + 1.0, boss.getZ(), 8, 1.2, 1.0, 1.2, 0.05);
+      // The clock winds down: a pulse of his face on a tick that keeps getting lower.
+      if (fight.deathTicks % 18 == 0 && fight.deathTicks > 20) {
+         Fx.clockBurst(level, ParticleTypes.ELECTRIC_SPARK, chest, 2.0 + progress * 3.0, BRASS);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.NOTE_BLOCK_HAT, SoundSource.HOSTILE, 1.6F, (float) (1.4 - progress));
+      }
+      if (fight.deathTicks == 70) {
+         announce(level, SAY + "\"\u00a7fWho loosened that?\"");
+      } else if (fight.deathTicks == 45) {
+         announce(level, SAY + "\"\u00a7fI can hear the gears stop.\"");
+      } else if (fight.deathTicks == 20) {
+         // The last second: everything folds into his core.
+         Fx.vortex(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 6.0, 20, ARC);
+         Fx.dome(level, ParticleTypes.END_ROD, chest, 2.5, 20, BRASS);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.6F, 0.8F);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 1.6F, 1.4F);
+      } else if (fight.deathTicks == 8) {
+         announce(level, SAY + "\"\u00a7f...tick.\"");
+      }
+
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.CRIT, boss.getX(), boss.getY() + 1.5, boss.getZ(), 10, 1.6, 1.2, 1.6, 0.12);
+         level.sendParticles(ParticleTypes.LARGE_SMOKE, boss.getX(), boss.getY() + 1.0, boss.getZ(), 8, 1.2, 1.0, 1.2, 0.05);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
 
       if (fight.deathTicks > 0) {
          return;
       }
 
+      Fx.flare(level, ParticleTypes.END_ROD, chest, 4.5, BRASS);
+      Fx.starburst(level, ParticleTypes.ELECTRIC_SPARK, chest, 10.0, EMBER);
+      Fx.shockwave(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 14.0, BRASS);
+      Fx.clockBurst(level, ParticleTypes.ELECTRIC_SPARK, chest, 6.0, ARC);
+      Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, chest, 2.0, BRASS);
+      Fx.pillar(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 14.0, ARC);
+      Fx.emberRain(level, ParticleTypes.FLAME, boss.position(), 8.0, 60, EMBER);
+      announce(level, "\u00a76\u00a7lThe Clockwork King \u00a7rbursts into brass and springs. \u00a77The ticking stops.");
       discardPlating(server, fight);
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 6, 1.5, 1.0, 1.5, 0.1);
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 6, 1.5, 1.0, 1.5, 0.1);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 2.0F, 0.6F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 2.0F, 0.7F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, 0.5F);
 
       // Wound him down to nothing, then let vanilla take the body so the normal
       // death path (and its own drop handling) still runs exactly once. Loot goes
@@ -1532,6 +2250,7 @@ public final class ClockworkKingManager {
          MACHINE_OWNER.remove(machine.id);
       }
       fight.machines.clear();
+      fight.strikes.clear();
       FIGHTS.remove(fight.bossId);
    }
 
@@ -1584,7 +2303,12 @@ public final class ClockworkKingManager {
       return null;
    }
 
-   private static void fireArrow(Mob shooter, ServerPlayer target, float damage, double speed) {
+   /**
+    * One bolt from a machine at a player.
+    *
+    * @param spread yaw offset in radians, so a volley can fan rather than stack on one line
+    */
+   private static void fireArrow(Mob shooter, ServerPlayer target, float damage, double speed, double spread) {
       if (!(shooter.level() instanceof ServerLevel level)) {
          return;
       }
@@ -1601,6 +2325,11 @@ public final class ClockworkKingManager {
       double distance = dir.length();
       double lift = Math.min(0.5, distance * 0.008);
       Vec3 aim = flat.add(0.0, lift, 0.0).normalize();
+      if (spread != 0.0) {
+         double cos = Math.cos(spread);
+         double sin = Math.sin(spread);
+         aim = new Vec3(aim.x * cos - aim.z * sin, aim.y, aim.x * sin + aim.z * cos);
+      }
 
       Arrow arrow = new Arrow(level, shooter, new ItemStack(Items.ARROW), new ItemStack(Items.CROSSBOW));
       arrow.setPos(from.x, from.y, from.z);
@@ -1619,7 +2348,7 @@ public final class ClockworkKingManager {
       ServerPlayer best = null;
       double bestDist = range * range;
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level) {
+         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level || BossManager.isFakePlayer(p)) {
             continue;
          }
          double d = p.distanceToSqr(from);
@@ -1631,12 +2360,56 @@ public final class ClockworkKingManager {
       return best;
    }
 
+   /** The nearest player this machine can actually see - so cover always works against the guns. */
+   private static ServerPlayer nearestVisible(Mob from, double range) {
+      if (!(from.level() instanceof ServerLevel level)) {
+         return null;
+      }
+      ServerPlayer best = null;
+      double bestDist = range * range;
+      for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
+         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level || BossManager.isFakePlayer(p)) {
+            continue;
+         }
+         double d = p.distanceToSqr(from);
+         if (d < bestDist && from.hasLineOfSight(p)) {
+            bestDist = d;
+            best = p;
+         }
+      }
+      return best;
+   }
+
+   /** His live machines of one role, as entities. */
+   private static List<Mob> liveMachines(MinecraftServer server, Fight fight, Role role) {
+      List<Mob> out = new ArrayList<>();
+      for (Machine machine : fight.machines.values()) {
+         if (machine.role != role) {
+            continue;
+         }
+         if (findEntity(server, machine.id) instanceof Mob mob && mob.isAlive()) {
+            out.add(mob);
+         }
+      }
+      return out;
+   }
+
+   /** A flat unit vector from {@code from} out to {@code at}; straight up-free and never zero. */
+   private static Vec3 flatAway(Vec3 at, Vec3 from) {
+      Vec3 away = new Vec3(at.x - from.x, 0.0, at.z - from.z);
+      if (away.lengthSqr() < 1.0E-4) {
+         double a = RANDOM.nextDouble() * Math.PI * 2.0;
+         return new Vec3(Math.cos(a), 0.0, Math.sin(a));
+      }
+      return away.normalize();
+   }
+
    /** Everyone in the arena, so machines do not waste shots on bystanders. */
    private static List<ServerPlayer> participantsNear(ServerLevel level, Entity at, double range) {
       List<ServerPlayer> out = new ArrayList<>();
       double r2 = range * range;
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level) {
+         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level || BossManager.isFakePlayer(p)) {
             continue;
          }
          if (p.distanceToSqr(at) <= r2) {
@@ -1650,7 +2423,7 @@ public final class ClockworkKingManager {
       List<ServerPlayer> out = new ArrayList<>();
       double r2 = range * range;
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level) {
+         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level || BossManager.isFakePlayer(p)) {
             continue;
          }
          if (p.distanceToSqr(x, y, z) <= r2) {
@@ -1660,8 +2433,22 @@ public final class ClockworkKingManager {
       return out;
    }
 
+   /**
+    * Only his own dialogue (lines starting with {@link #SAY}) goes through the chat limiter.
+    * Banners and the grey narrator hints are what players act on, and the limiter's
+    * one-line-per-1.2s channel gap used to eat every line of the summon banner after the
+    * first, and every hint sent in the same tick as his line. The boss-dialogue switch in the
+    * config still silences all of it.
+    */
+   private static boolean mayAnnounce(String message) {
+      if (!message.startsWith(SAY)) {
+         return message != null && !message.isEmpty() && ModConfig.bossDialogue();
+      }
+      return BossChat.allowed("clockwork", message);
+   }
+
    private static void announce(ServerLevel level, String message) {
-      if (!BossChat.allowed("clockwork", message)) {
+      if (!mayAnnounce(message)) {
          return;
       }
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
@@ -1670,7 +2457,7 @@ public final class ClockworkKingManager {
    }
 
    private static void announceNear(ServerLevel level, Mob boss, double range, String message) {
-      if (!BossChat.allowed("clockwork", message)) {
+      if (!mayAnnounce(message)) {
          return;
       }
       double r2 = range * range;
