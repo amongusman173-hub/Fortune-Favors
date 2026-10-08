@@ -128,6 +128,37 @@ public final class ScarletDevilManager {
     *  Short enough to be one move, long enough to land after the jump. */
    private static final int TIDE_GAP = 8;
 
+   // --- Scarlet Brand and the Blood Pact ------------------------------------
+
+   /**
+    * The brand: a ring of her sigil burns onto the floor under a fighter and, a beat and a
+    * half later, a lance of blood drops onto it. The answer is to leave the circle, which the
+    * ring makes obvious. Phase two marks two more circles around the first, so stepping out
+    * means stepping out in the right direction.
+    */
+   private static final int BRAND_COOLDOWN = 220;
+   private static final int BRAND_WARN = 30;
+   private static final double BRAND_RADIUS = 2.4;
+   private static final float BRAND_DAMAGE = 12.0F;
+
+   /**
+    * The pact: a chain of her blood ties her to one fighter and drinks from them every half
+    * second. It breaks the moment they put {@link #PACT_BREAK} blocks between themselves and
+    * her, so it is a reason to back off, which her swoop then punishes. Every sip is small and
+    * capped, the same rule as the rest of her healing.
+    */
+   private static final int PACT_COOLDOWN = 380;
+   private static final int PACT_TICKS = 80;
+   private static final int PACT_PULSE = 10;
+   private static final double PACT_BREAK = 16.0;
+   private static final float PACT_DAMAGE = 2.0F;
+   private static final float PACT_HEAL = 1.0F;
+
+   /** Her colours, for the client effects. */
+   private static final int CRIMSON = 0xC0102A;
+   private static final int BLOOD_DARK = 0x5A0010;
+   private static final int MOON = 0xFF3355;
+
    private static final Random RANDOM = new Random();
    private static final Map<UUID, Fight> FIGHTS = new HashMap<>();
    private static final List<Spear> SPEARS = new ArrayList<>();
@@ -168,6 +199,11 @@ public final class ScarletDevilManager {
       final Set<UUID> tideHit = new HashSet<>();
       UUID lungeTarget;
       int lungeTicks;
+      long nextBrand;
+      final List<Brand> brands = new ArrayList<>();
+      long nextPact;
+      UUID pactTarget;
+      int pactTicks;
       boolean dying;
       int deathTicks;
       int questDrops;
@@ -176,6 +212,18 @@ public final class ScarletDevilManager {
          this.bossId = bossId;
          this.summoner = summoner;
          this.bar = bar;
+      }
+   }
+
+   /** A brand burned on the floor: marked now, struck at {@code landAt}. */
+   private static final class Brand {
+      final Vec3 at;
+      final long landAt;
+      boolean falling;
+
+      Brand(Vec3 at, long landAt) {
+         this.at = at;
+         this.landAt = landAt;
       }
    }
 
@@ -360,14 +408,22 @@ public final class ScarletDevilManager {
       fight.nextTaunt = now + 100L;
       fight.nextRain = now + 300L;
       fight.nextAura = now + 30L;
+      fight.nextBrand = now + 180L;
+      fight.nextPact = now + 260L;
       FIGHTS.put(boss.getUUID(), fight);
 
       // Spawn ceremony: the mist rolls in, the moon reddens, she arrives.
       announce(level, "\u00a78\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
       announce(level, "    \u00a74\u00a7l\u2620 THE SCARLET DEVIL DESCENDS \u2620");
-      announce(level, "    \u00a77The scarlet mist swallows the light.");
-      announce(level, "    \u00a78\u201c\u00a7fYou came to my home, so I shall keep your bones.\u00a78\u201d");
+      announce(level, "    \u00a77The blood on the floor starts to move.");
+      announce(level, "    \u00a78\u201c\u00a7fYou spilled me. \u00a74Now I'm thirsty.\u00a78\u201d");
       announce(level, "\u00a78\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
+      // The pool is a sigil before it is a boss: a turning ring of her runes, a heartbeat
+      // under it and a slow red snow over the whole spot while she climbs out.
+      Vec3 pool = new Vec3(x, y, z);
+      Fx.runeCircle(level, ParticleTypes.CRIMSON_SPORE, pool.add(0.0, 0.05, 0.0), 4.0, fight.riseTicks + 10, CRIMSON);
+      Fx.heartbeat(level, ParticleTypes.CRIMSON_SPORE, pool.add(0.0, 0.1, 0.0), 3.0, fight.riseTicks, BLOOD_DARK);
+      Fx.emberRain(level, ParticleTypes.CRIMSON_SPORE, pool, 9.0, fight.riseTicks + 20, MOON);
       level.playSound(null, x, y, z, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.3F, 0.7F);
       level.playSound(null, x, y, z, SoundEvents.PHANTOM_AMBIENT, SoundSource.HOSTILE, 1.6F, 0.5F);
       level.playSound(null, x, y, z, SoundEvents.ENDER_DRAGON_GROWL, SoundSource.HOSTILE, 1.0F, 0.6F);
@@ -450,12 +506,22 @@ public final class ScarletDevilManager {
          if (fight.riseTicks % 8 == 0) {
             level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.PHANTOM_FLAP, SoundSource.HOSTILE, 1.0F, 0.7F);
          }
+         if (fight.riseTicks == 0) {
+            // Out of the pool: the wings open and the room gets the message.
+            Vec3 at = boss.position().add(0.0, 1.0, 0.0);
+            Fx.flare(level, ParticleTypes.CRIMSON_SPORE, at, 2.6, MOON);
+            Fx.starburst(level, ParticleTypes.CRIMSON_SPORE, at, 6.0, CRIMSON);
+            Fx.shockwave(level, ParticleTypes.CRIMSON_SPORE, boss.position(), 10.0, BLOOD_DARK);
+            level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.PHANTOM_AMBIENT, SoundSource.HOSTILE, 1.8F, 0.4F);
+            level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDER_DRAGON_FLAP, SoundSource.HOSTILE, 1.4F, 0.6F);
+            announce(level, SAY + "\"\u00a7fMm. \u00a74More of you than I expected.\"");
+         }
          return;
       }
 
       // 3) Nobody left: she loses interest and leaves.
       if (fight.participants.isEmpty()) {
-         despawn(level, boss, fight, "Nobody is left to play with - the mist thins.");
+         despawn(level, boss, fight, "Nobody left to drink. The mist thins.");
          return;
       }
 
@@ -466,7 +532,9 @@ public final class ScarletDevilManager {
          if (fight.bar != null) {
             fight.bar.setColor(BossBarColor.PURPLE);
          }
-         announce(level, SAY + "\"\u00a7fHalf of me gone? \u00a74Then drown in what I am.\u00a7f\"");
+         announce(level, SAY + "\"\u00a7fThat's half. \u00a74You don't get the other half.\u00a7f\"");
+         Fx.heartbeat(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 0.1, 0.0), 6.0, 40, CRIMSON);
+         Fx.flare(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 1.2, 0.0), 3.0, MOON);
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDER_DRAGON_GROWL, SoundSource.HOSTILE, 1.2F, 0.6F);
          bloodBurst(level, boss.getX(), boss.getY() + 1.0, boss.getZ(), 80);
          startBloodRain(level, boss, fight);
@@ -482,6 +550,10 @@ public final class ScarletDevilManager {
       if (fight.rainUntil > 0L) {
          tickBloodRain(level, boss, fight, now);
       }
+
+      // Brands land and the pact drinks on their own clocks, whatever else she is doing.
+      tickBrands(level, boss, fight, now);
+      tickPact(level, boss, fight);
 
       ServerPlayer target = nearestTarget(level, boss, fight);
       // Unstick her every tick, before any state can return early: the swoop and
@@ -514,6 +586,16 @@ public final class ScarletDevilManager {
       }
       if (now >= fight.nextBite && boss.distanceToSqr(target) < 900.0) {
          startLunge(level, boss, fight, target);
+         return;
+      }
+      if (now >= fight.nextBrand) {
+         fight.nextBrand = now + BRAND_COOLDOWN;
+         brand(level, boss, fight, now);
+         return;
+      }
+      if (fight.pactTicks <= 0 && now >= fight.nextPact) {
+         fight.nextPact = now + PACT_COOLDOWN;
+         startPact(level, boss, fight, target);
          return;
       }
       if (now >= fight.nextSpear) {
@@ -557,8 +639,9 @@ public final class ScarletDevilManager {
       fight.lungeTarget = target.getUUID();
       fight.lungeTicks = 16;
       fight.nextBite = ServerClock.clock(level) + BITE_COOLDOWN;
-      announce(level, SAY + "\"\u00a7fHold still. I want to taste that one.\u00a7f\"");
+      announce(level, SAY + "\"\u00a7fHold still.\u00a7f\"");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.PHANTOM_SWOOP, SoundSource.HOSTILE, 1.5F, 0.7F);
+      Fx.beam(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 0.8, 0.0), target.position().add(0.0, 1.0, 0.0), BLOOD_DARK);
    }
 
    /** Drives a committed swoop; when it connects, she drinks. */
@@ -576,7 +659,7 @@ public final class ScarletDevilManager {
          if (dist <= BITE_REACH + 1.2) {
             bite(level, boss, fight, target);
          } else {
-            announce(level, SAY + "\"\u00a7fMissed. \u00a78How dull.\u00a7f\"");
+            announce(level, SAY + "\"\u00a7fTch.\u00a7f\"");
          }
          fight.lungeTicks = 0;
          return;
@@ -616,10 +699,12 @@ public final class ScarletDevilManager {
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_DRINK, SoundSource.HOSTILE, 1.2F, 0.6F);
       level.sendParticles(ParticleTypes.DAMAGE_INDICATOR, target.getX(), target.getY() + 1.0, target.getZ(), 12, 0.3, 0.3, 0.3, 0.1);
       bloodBurst(level, target.getX(), target.getY() + 1.0, target.getZ(), 30);
+      Vec3 facing = target.position().subtract(boss.position());
+      Fx.crescent(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 0.9, 0.0), facing, 3.2, CRIMSON);
       if (landed) {
          CombatGear.procPopupPublic(level, boss, "\u00a74Bloodsuck +\u00a7f" + Math.round(healed));
       }
-      announce(level, SAY + "\"\u00a7fSweet. \u00a74Next.\u00a7f\"");
+      announce(level, SAY + (RANDOM.nextBoolean() ? "\"\u00a7fMm. \u00a74Next.\u00a7f\"" : "\"\u00a7fYou taste like iron and panic.\u00a7f\""));
    }
 
    /** Blood spears arc in at the target; surviving one leaves her essence behind. */
@@ -650,7 +735,7 @@ public final class ScarletDevilManager {
       arrow.setCritArrow(true);
       arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
       s.level.addFreshEntity(arrow);
-      s.level.sendParticles(ParticleTypes.CRIMSON_SPORE, s.origin.x, s.origin.y, s.origin.z, 8, 0.2, 0.2, 0.2, 0.05);
+      Fx.muzzle(s.level, ParticleTypes.CRIMSON_SPORE, s.origin, dir, CRIMSON);
    }
 
    /**
@@ -660,7 +745,7 @@ public final class ScarletDevilManager {
     */
    private static void nightSwarm(ServerLevel level, Mob boss, Fight fight, ServerPlayer target) {
       fight.swarms++;
-      announce(level, SAY + "\"\u00a7fMy little ones are hungry too.\u00a7f\"");
+      announce(level, SAY + "\"\u00a7fGo on, little ones.\u00a7f\"");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BAT_TAKEOFF, SoundSource.HOSTILE, 1.6F, 0.6F);
       for (int i = 0; i < 6; i++) {
          double a = RANDOM.nextDouble() * Math.PI * 2.0;
@@ -677,7 +762,120 @@ public final class ScarletDevilManager {
             p.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 60, 0, false, false, true));
          }
       }
-      level.sendParticles(ParticleTypes.LARGE_SMOKE, boss.getX(), boss.getY() + 0.6, boss.getZ(), 24, 1.2, 0.8, 1.2, 0.03);
+      Fx.vortex(level, ParticleTypes.LARGE_SMOKE, boss.position(), 4.0, 40, BLOOD_DARK);
+   }
+
+   /** Burns her sigil under every fighter; a lance of blood drops on each a beat and a half later. */
+   private static void brand(ServerLevel level, Mob boss, Fight fight, long now) {
+      int marked = 0;
+      for (UUID id : fight.participants) {
+         ServerPlayer p = level.getServer().getPlayerList().getPlayer(id);
+         if (p == null || !p.isAlive() || p.level() != level || p.distanceToSqr(boss) > ARENA_RADIUS * ARENA_RADIUS) {
+            continue;
+         }
+         markBrand(level, fight, p.position(), now);
+         if (fight.phase == 2) {
+            // Two more either side of the first, so the way out has to be picked.
+            double a = RANDOM.nextDouble() * Math.PI * 2.0;
+            for (int k = 0; k < 2; k++) {
+               double ang = a + k * Math.PI;
+               markBrand(level, fight, p.position().add(Math.cos(ang) * 4.0, 0.0, Math.sin(ang) * 4.0), now);
+            }
+         }
+         marked++;
+      }
+      if (marked == 0) {
+         return;
+      }
+      announce(level, SAY + "\"\u00a7fStay right there.\u00a7f\"");
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.EVOKER_PREPARE_ATTACK, SoundSource.HOSTILE, 1.3F, 0.6F);
+   }
+
+   private static void markBrand(ServerLevel level, Fight fight, Vec3 at, long now) {
+      Vec3 floor = new Vec3(at.x, BossGrounding.groundY(level, at.x, at.z, at.y), at.z);
+      fight.brands.add(new Brand(floor, now + BRAND_WARN));
+      Fx.runeCircle(level, ParticleTypes.CRIMSON_SPORE, floor.add(0.0, 0.05, 0.0), BRAND_RADIUS, BRAND_WARN, CRIMSON);
+   }
+
+   private static void tickBrands(ServerLevel level, Mob boss, Fight fight, long now) {
+      if (fight.brands.isEmpty()) {
+         return;
+      }
+      for (Iterator<Brand> it = fight.brands.iterator(); it.hasNext();) {
+         Brand b = it.next();
+         if (!b.falling && now >= b.landAt - 6L) {
+            // The lance is seen coming down for the last few ticks, so the hit is never a surprise.
+            b.falling = true;
+            Fx.comet(level, ParticleTypes.CRIMSON_SPORE, b.at.add(0.0, 16.0, 0.0), b.at.add(0.0, 0.4, 0.0), 6, MOON);
+         }
+         if (now < b.landAt) {
+            continue;
+         }
+         it.remove();
+         Fx.pillar(level, ParticleTypes.CRIMSON_SPORE, b.at, 7.0, CRIMSON);
+         Fx.gooSplash(level, ParticleTypes.CRIMSON_SPORE, b.at.add(0.0, 0.3, 0.0), 1.6, BLOOD_DARK);
+         level.playSound(null, b.at.x, b.at.y, b.at.z, SoundEvents.TRIDENT_THROW, SoundSource.HOSTILE, 1.4F, 0.6F);
+         double r2 = BRAND_RADIUS * BRAND_RADIUS;
+         for (UUID id : fight.participants) {
+            ServerPlayer p = level.getServer().getPlayerList().getPlayer(id);
+            if (p == null || !p.isAlive() || p.level() != level) {
+               continue;
+            }
+            double dx = p.getX() - b.at.x;
+            double dz = p.getZ() - b.at.z;
+            if (dx * dx + dz * dz > r2 || Math.abs(p.getY() - b.at.y) > 3.0) {
+               continue;
+            }
+            p.hurtServer(level, level.damageSources().mobAttack(boss), BRAND_DAMAGE);
+            p.setDeltaMovement(p.getDeltaMovement().add(0.0, 0.4, 0.0));
+            p.hurtMarked = true;
+         }
+      }
+   }
+
+   /** Ties a chain of blood to the target and starts drinking through it. */
+   private static void startPact(ServerLevel level, Mob boss, Fight fight, ServerPlayer target) {
+      if (target.distanceToSqr(boss) > PACT_BREAK * PACT_BREAK) {
+         return;
+      }
+      fight.pactTarget = target.getUUID();
+      fight.pactTicks = PACT_TICKS;
+      announce(level, SAY + "\"\u00a7fShare a little.\u00a7f\"");
+      Chat.raw(target, "\u00a74A chain of blood ties you to her. \u00a77Get " + (int) PACT_BREAK + " blocks away to snap it.");
+      level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.CHAIN_FALL, SoundSource.HOSTILE, 1.4F, 0.6F);
+      Fx.chains(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 1.0, 0.0), target.position().add(0.0, 1.0, 0.0), CRIMSON);
+   }
+
+   private static void tickPact(ServerLevel level, Mob boss, Fight fight) {
+      if (fight.pactTicks <= 0 || fight.pactTarget == null) {
+         return;
+      }
+      fight.pactTicks--;
+      ServerPlayer p = level.getServer().getPlayerList().getPlayer(fight.pactTarget);
+      if (p == null || !p.isAlive() || p.level() != level) {
+         fight.pactTicks = 0;
+         fight.pactTarget = null;
+         return;
+      }
+      if (p.distanceToSqr(boss) > PACT_BREAK * PACT_BREAK) {
+         fight.pactTicks = 0;
+         fight.pactTarget = null;
+         announce(level, SAY + "\"\u00a7fClever.\u00a7f\"");
+         Fx.shatter(level, ParticleTypes.CRIMSON_SPORE, p.position().add(0.0, 1.0, 0.0), 0.8, CRIMSON);
+         level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.CHAIN_BREAK, SoundSource.HOSTILE, 1.4F, 0.7F);
+         return;
+      }
+      if (fight.pactTicks % PACT_PULSE != 0) {
+         return;
+      }
+      Fx.chains(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 1.0, 0.0), p.position().add(0.0, 1.0, 0.0), CRIMSON);
+      if (p.hurtServer(level, level.damageSources().magic(), PACT_DAMAGE)) {
+         boss.setHealth(Math.min(boss.getMaxHealth(), boss.getHealth() + PACT_HEAL));
+      }
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_DRINK, SoundSource.HOSTILE, 0.7F, 0.6F);
+      if (fight.pactTicks <= 0) {
+         fight.pactTarget = null;
+      }
    }
 
    /**
@@ -694,8 +892,9 @@ public final class ScarletDevilManager {
       fight.tideRadius = 1.2;
       fight.tideTicks = TIDE_TICKS;
       fight.tideHit.clear();
-      announce(level, SAY + "\"\u00a74Then drown standing up.\u00a7f\"");
-      announce(level, SAY + "\u00a78- the floor runs red, and then it starts moving outward");
+      announce(level, SAY + "\"\u00a7fMind your feet.\u00a7f\"");
+      announce(level, "\u00a78The floor runs red, and the red starts moving outward. \u00a77Jump it.");
+      Fx.heartbeat(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 0.1, 0.0), 3.0, 20, CRIMSON);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDER_DRAGON_GROWL, SoundSource.HOSTILE, 1.2F, 0.6F);
       bloodBurst(level, boss.getX(), boss.getY() + 0.2, boss.getZ(), 60);
    }
@@ -759,18 +958,18 @@ public final class ScarletDevilManager {
          } else {
             fight.tideWaves = 0;
             fight.tideGap = 0;
-            announce(level, SAY + "\u00a78- the tide drains away, leaving the floor wet");
+            announce(level, "\u00a78The tide drains away.");
          }
       }
    }
 
    private static void taunt(ServerLevel level, Fight fight) {
       String line = switch (RANDOM.nextInt(5)) {
-         case 0 -> "\"\u00a7fIs that all the courage this world has?\u00a7f\"";
-         case 1 -> "\"\u00a7fAHAHAHA - \u00a7fscream louder, it helps me find you.\u00a7f\"";
-         case 2 -> "\"\u00a7fYour blood is thin. \u00a78Disappointing.\u00a7f\"";
-         case 3 -> "\"\u00a7fNone of you are leaving. \u00a7fNone.\u00a7f\"";
-         default -> "\"\u00a7fI have lived a thousand years. \u00a7fYou have until dawn.\u00a7f\"";
+         case 0 -> "\"\u00a7fKeep running. It warms you up.\u00a7f\"";
+         case 1 -> "\"\u00a7fAHAHA! \u00a7fLouder. I like it louder.\u00a7f\"";
+         case 2 -> "\"\u00a7fThin blood. \u00a78Did you skip dinner?\u00a7f\"";
+         case 3 -> "\"\u00a7fThe door's locked. \u00a7fI'm the door.\u00a7f\"";
+         default -> "\"\u00a7fDawn's hours away. \u00a74I checked.\u00a7f\"";
       };
       announce(level, SAY + line);
    }
@@ -781,7 +980,13 @@ public final class ScarletDevilManager {
       fight.rainUntil = ServerClock.clock(level) + RAIN_TICKS;
       fight.nextRain = ServerClock.clock(level) + RAIN_COOLDOWN + RAIN_TICKS;
       fight.nextRainPulse = ServerClock.clock(level);
-      announce(level, SAY + "\"\u00a74BLOOD RAIN.\u00a7f\" \u00a78- the sky itself begins to bleed");
+      announce(level, SAY + "\"\u00a7fLook up.\u00a7f\"");
+      announce(level, "\u00a78The sky starts to bleed. \u00a77Get under a roof.");
+      for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
+         if (fight.participants.contains(p.getUUID()) && p.level() == level) {
+            Fx.emberRain(level, ParticleTypes.CRIMSON_SPORE, p.position(), 7.0, RAIN_TICKS, CRIMSON);
+         }
+      }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDER_DRAGON_GROWL, SoundSource.HOSTILE, 1.4F, 0.5F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.PHANTOM_AMBIENT, SoundSource.HOSTILE, 1.8F, 0.5F);
       bloodBurst(level, boss.getX(), boss.getY() + 1.5, boss.getZ(), 90);
@@ -791,17 +996,23 @@ public final class ScarletDevilManager {
    private static void tickBloodRain(ServerLevel level, Mob boss, Fight fight, long now) {
       if (now >= fight.rainUntil) {
          fight.rainUntil = 0L;
-         announce(level, SAY + "\"\u00a7fThe rain stops. \u00a74I am still thirsty.\u00a7f\"");
+         announce(level, SAY + "\"\u00a7fDry already? \u00a74Pity.\u00a7f\"");
          return;
       }
 
-      // Visuals every tick, so the sky genuinely reads as raining blood.
-      for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (fight.participants.contains(p.getUUID())) {
-            level.sendParticles(
-               ParticleTypes.CRIMSON_SPORE, p.getX(), p.getY() + 6.0, p.getZ(), 8, 5.0, 0.5, 5.0, 0.35
-            );
+      // Visuals every tick for vanilla clients, so the sky reads as raining blood. Modded
+      // clients already have the ember rain sent when it started.
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
+            if (fight.participants.contains(p.getUUID())) {
+               level.sendParticles(
+                  ParticleTypes.CRIMSON_SPORE, p.getX(), p.getY() + 6.0, p.getZ(), 8, 5.0, 0.5, 5.0, 0.35
+               );
+            }
          }
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
       }
 
       if (now < fight.nextRainPulse) {
@@ -863,9 +1074,17 @@ public final class ScarletDevilManager {
       fight.dying = true;
       fight.deathTicks = 90;
       fight.lungeTicks = 0;
+      fight.pactTicks = 0;
+      fight.pactTarget = null;
+      fight.brands.clear();
+      fight.tideTicks = 0;
+      fight.tideGap = 0;
       ServerLevel level = (ServerLevel) boss.level();
       boss.setInvulnerable(true);
-      announce(level, SAY + "\"\u00a7fN-no... \u00a7fnot like this, not to \u00a74YOU\u00a7f-\"");
+      announce(level, SAY + "\"\u00a7fNo. \u00a7fNo, no, I'm not \u00a74done\u00a7f-\"");
+      Fx.spiral(level, ParticleTypes.CRIMSON_SPORE, boss.position(), 9.0, fight.deathTicks, CRIMSON);
+      Fx.heartbeat(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 0.1, 0.0), 4.0, fight.deathTicks, BLOOD_DARK);
+      Fx.aura(level, ParticleTypes.CRIMSON_SPORE, boss.position(), 3.0, fight.deathTicks, MOON);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.PHANTOM_HURT, SoundSource.HOSTILE, 1.6F, 0.5F);
       return Boolean.FALSE;
    }
@@ -874,13 +1093,20 @@ public final class ScarletDevilManager {
       fight.deathTicks--;
       double progress = 1.0 - Math.min(1.0, fight.deathTicks / 90.0);
 
-      // Her last act is an uncontrolled blood rain, thinning as she comes apart.
+      // Her last act is an uncontrolled blood rain, thinning as she comes apart. She sinks
+      // as it falls, back towards the pool she came out of.
       level.sendParticles(ParticleTypes.CRIMSON_SPORE, boss.getX(), boss.getY() + 4.0, boss.getZ(), 10 + (int) (progress * 20.0), 4.0, 0.8, 4.0, 0.3);
       drawPool(level, boss);
+      if (fight.deathTicks > 20) {
+         boss.setPos(boss.getX(), boss.getY() - 0.012, boss.getZ());
+      }
+      if (fight.deathTicks % 20 == 0 && fight.deathTicks > 0) {
+         Fx.shatter(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 1.0, 0.0), 0.8 + progress, CRIMSON);
+      }
       if (fight.deathTicks % 15 == 0) {
          announce(level, SAY + (fight.deathTicks > 45
-            ? "\"\u00a7fI am the mist. \u00a74I am the dusk. \u00a7fI do not-"
-            : "\"\u00a7f...ah. \u00a7fSo this is what morning feels like.\""));
+            ? "\"\u00a7fGive it back. \u00a74That's mine-\""
+            : "\"\u00a7f...it's so bright out here.\""));
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.PHANTOM_HURT, SoundSource.HOSTILE, 1.2F, 0.5F);
       }
       if (fight.deathTicks > 0) {
@@ -889,9 +1115,14 @@ public final class ScarletDevilManager {
 
       // The collapse: one final crimson implosion, then nothing.
       bloodBurst(level, boss.getX(), boss.getY() + 1.0, boss.getZ(), 160);
+      Vec3 heart = boss.position().add(0.0, 1.0, 0.0);
+      Fx.flare(level, ParticleTypes.CRIMSON_SPORE, heart, 3.4, MOON);
+      Fx.starburst(level, ParticleTypes.CRIMSON_SPORE, heart, 7.0, CRIMSON);
+      Fx.shockwave(level, ParticleTypes.CRIMSON_SPORE, boss.position(), 12.0, BLOOD_DARK);
+      Fx.petals(level, ParticleTypes.CRIMSON_SPORE, heart, 3.0, 60, CRIMSON);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 1.5F, 0.6F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.PHANTOM_DEATH, SoundSource.HOSTILE, 1.5F, 0.5F);
-      announce(level, "\u00a74\u00a7lThe Scarlet Devil \u00a7rburns away in the first light - \u00a77the mist finally clears.");
+      announce(level, "\u00a74\u00a7lThe Scarlet Devil \u00a7rcomes apart into red mist, \u00a77and the mist blows away.");
 
       dropLoot(level, boss, fight);
       if (fight.bar != null) {
@@ -998,7 +1229,7 @@ public final class ScarletDevilManager {
 
       // The laugh. Her single most recognisable line, and the reason players
       // remember which boss killed them.
-      announce(level, SAY + "\"\u00a7fAHAHAHAHAHA! \u00a7fSay hello to your new body.\u00a7f\"");
+      announce(level, SAY + "\"\u00a7fAHAHAHA! \u00a7fGet up. \u00a74You work for me now.\u00a7f\"");
       level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.WITCH_CELEBRATE, SoundSource.HOSTILE, 1.2F, 0.9F);
 
       if (boss != null && boss.isAlive()) {
@@ -1038,7 +1269,7 @@ public final class ScarletDevilManager {
       for (ServerPlayer p : level.getPlayers(pl -> pl != null && pl.isAlive() && !pl.isSpectator())) {
          if (p.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS) {
             if (fight.participants.add(p.getUUID())) {
-               Chat.raw(p, "\u00a74The Scarlet Devil\u00a7r \u00a77has noticed you.");
+               Chat.raw(p, "\u00a74The Scarlet Devil\u00a7r \u00a77has seen you.");
             }
          }
       }
