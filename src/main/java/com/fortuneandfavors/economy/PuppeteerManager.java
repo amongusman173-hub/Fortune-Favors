@@ -400,6 +400,29 @@ public final class PuppeteerManager {
    private static final String KNOT_BAR = "\u00a75\u00a7lTHE FINAL KNOT";
    /** How long the death ceremony plays: one string cut per two ticks. */
    private static final int DEATH_TICKS = 90;
+
+   // ------------------------------------------------------------------ the staged attacks
+   /** Violet thread, his colour. */
+   private static final int THREAD_VIOLET = 0x9A6CFF;
+   /** Stage light. */
+   private static final int LIMELIGHT = 0xFFF4D8;
+   /** The paint on his mask. */
+   private static final int MASK_PAINT = 0xC3283F;
+   /** Spotlight: how long the light holds a spot before the doll comes down on it. */
+   private static final int SPOTLIGHT_WARN = 30;
+   private static final int SPOTLIGHT_COOLDOWN = 220;
+   private static final double SPOTLIGHT_RADIUS = 2.5;
+   private static final float SPOTLIGHT_DAMAGE = 12.0F;
+   /** Marionette Rain: dolls dropped across the stage, one after another. Phase two on. */
+   private static final int RAIN_COOLDOWN = 320;
+   private static final int RAIN_DOLLS = 6;
+   private static final double RAIN_RADIUS = 2.0;
+   private static final float RAIN_DAMAGE = 8.0F;
+   /** Curtain Call: anyone off his stage when the curtain falls is hauled back onto it. Phase three. */
+   private static final int CURTAIN_WARN = 40;
+   private static final int CURTAIN_COOLDOWN = 420;
+   private static final double CURTAIN_STAGE = 6.0;
+   private static final float CURTAIN_DAMAGE = 6.0F;
    /** Identical boss lines inside this window are spoken once, not three times. */
    private static final int LINE_DEDUPE_TICKS = 80;
    /**
@@ -551,11 +574,41 @@ public final class PuppeteerManager {
       int deathTicks;
       /** Strings still to be cut during the ceremony. */
       int stringsLeft;
+      /** The staged attacks' clocks, and the blows they have already marked on the floor. */
+      long nextSpotlight;
+      long nextRain;
+      long nextCurtain;
+      final List<Strike> strikes = new ArrayList<>();
 
       Fight(UUID bossId, UUID summoner, ServerBossEvent bar) {
          this.bossId = bossId;
          this.summoner = summoner;
          this.bar = bar;
+      }
+   }
+
+   /**
+    * A blow marked on the floor that has not landed yet: a spotlit spot, a doll on its way down,
+    * a curtain about to fall. Marked first and landed later, so every one of them is a warning
+    * before it is a hit.
+    */
+   private static final class Strike {
+      static final int SPOTLIGHT = 0;
+      static final int DOLL = 1;
+      static final int CURTAIN = 2;
+      final int kind;
+      final Vec3 at;
+      final long landAt;
+      final double radius;
+      final float damage;
+      boolean falling;
+
+      Strike(int kind, Vec3 at, long landAt, double radius, float damage) {
+         this.kind = kind;
+         this.at = at;
+         this.landAt = landAt;
+         this.radius = radius;
+         this.damage = damage;
       }
    }
 
@@ -1012,9 +1065,18 @@ public final class PuppeteerManager {
       fight.nextReel = now + 360L;
       fight.nextSnare = now + 480L;
       fight.nextRewind = now + 700L;
+      fight.nextSpotlight = now + 140L;
+      fight.nextRain = now + 300L;
+      fight.nextCurtain = now + 400L;
       FIGHTS.put(boss.getUUID(), fight);
 
-      announce(level, "\u00a75\u00a7l\u2726 \u00a75The strings draw tight overhead \u00a78- \u00a7fThe Puppeteer \u00a75is let down into the arena.");
+      announce(level, "\u00a75\u00a7l\u2726 \u00a75Strings drop out of nowhere. \u00a7fThe Puppeteer \u00a75comes down on them.");
+      // The stage is set before he reaches it: a ring of sigils where he will land, a shaft of
+      // limelight from above, and motes drifting round the spot like dust in a footlight.
+      Vec3 mark = new Vec3(x, y, z);
+      Fx.runeCircle(level, ParticleTypes.END_ROD, mark.add(0.0, 0.05, 0.0), 3.5, RISE_TICKS + 10, THREAD_VIOLET);
+      Fx.pillar(level, ParticleTypes.END_ROD, mark, 14.0, LIMELIGHT);
+      Fx.petals(level, ParticleTypes.END_ROD, mark.add(0.0, 0.5, 0.0), 2.5, RISE_TICKS, LIMELIGHT);
       level.playSound(null, x, y, z, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.2F, 1.5F);
       level.playSound(null, x, y, z, SoundEvents.VEX_CHARGE, SoundSource.HOSTILE, 1.0F, 0.6F);
       Advancements.grant(summoner, "summon_puppeteer");
@@ -1123,7 +1185,11 @@ public final class PuppeteerManager {
             // He is standing in the arena now, so he can be hit.
             boss.setInvulnerable(false);
             level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.VEX_AMBIENT, SoundSource.HOSTILE, 1.2F, 0.5F);
-            level.sendParticles(ParticleTypes.SOUL, boss.getX(), boss.getY() + 1.0, boss.getZ(), 40, 1.0, 1.2, 1.0, 0.05);
+            // He lands, the light flares, and the floor rings out from his feet.
+            Fx.flare(level, ParticleTypes.END_ROD, boss.position().add(0.0, 1.6, 0.0), 2.2, LIMELIGHT);
+            Fx.shockwave(level, ParticleTypes.SOUL, boss.position(), 6.0, THREAD_VIOLET);
+            Fx.starburst(level, ParticleTypes.END_ROD, boss.position().add(0.0, 1.4, 0.0), 4.0, THREAD_VIOLET);
+            announce(level, SAY + "\"\u00a7fPlaces, everyone.\"");
          }
          return;
       }
@@ -1150,7 +1216,7 @@ public final class PuppeteerManager {
          if (fight.bar != null) {
             fight.bar.setColor(BossBarColor.RED);
          }
-         announce(level, SAY + "\"\u00a7fMore strings than hands. \u00a7dGood. \u00a7fHold all of them.\"");
+         announce(level, SAY + "\"\u00a7fAct two. \u00a7dMore strings.\"");
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.EVOKER_PREPARE_SUMMON, SoundSource.HOSTILE, 1.2F, 0.6F);
          stringBurst(level, boss, 60);
          // He threads everyone at once the moment the phase turns: the rule of the fight
@@ -1165,7 +1231,7 @@ public final class PuppeteerManager {
          if (fight.bar != null) {
             fight.bar.setColor(BossBarColor.BLUE);
          }
-         announce(level, SAY + "\"\u00a7fEnough. \u00a7dThe whole cast comes back out.\"");
+         announce(level, SAY + "\"\u00a7fFinal act. \u00a7dEveryone back on stage.\"");
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.HOSTILE, 1.4F, 0.5F);
          stringBurst(level, boss, 90);
          summonAllPuppets(level, boss, fight);
@@ -1174,6 +1240,9 @@ public final class PuppeteerManager {
          // change, and a fight should never open a phase with its most expensive move.
          fight.nextKnot = now + 200L;
       }
+
+      // 4b) Blows already marked on the floor land on their own clock, target or no target.
+      tickStrikes(level, boss, fight, now);
 
       // 5) Ambient: he is always trailing strings, so he reads as a thing on wires.
       if (now >= fight.nextAura) {
@@ -1201,6 +1270,24 @@ public final class PuppeteerManager {
             return;
          }
          fight.nextThread = now + 40L;
+      }
+
+      // 6a) The staged attacks: every one is marked on the floor before it lands.
+      if (now >= fight.nextSpotlight) {
+         fight.nextSpotlight = now + SPOTLIGHT_COOLDOWN;
+         if (spotlight(level, boss, fight, target, now)) {
+            return;
+         }
+      }
+      if (fight.phase >= 2 && now >= fight.nextRain) {
+         fight.nextRain = now + RAIN_COOLDOWN;
+         marionetteRain(level, boss, fight, now);
+         return;
+      }
+      if (fight.phase >= 3 && now >= fight.nextCurtain) {
+         fight.nextCurtain = now + CURTAIN_COOLDOWN;
+         curtainCall(level, boss, fight, now);
+         return;
       }
 
       // 6b) The phase-rotation moves, gated on how far the fight has come. Each is
@@ -1275,6 +1362,155 @@ public final class PuppeteerManager {
       }
    }
 
+   // ------------------------------------------------------------------ the staged attacks
+
+   /**
+    * Spotlight: a circle of light settles on the player and holds there, and a doll comes down on
+    * it. One spot in phase one, two in phase two, three in phase three - on different players
+    * where there are enough of them.
+    */
+   private static boolean spotlight(ServerLevel level, Mob boss, Fight fight, ServerPlayer target, long now) {
+      int spots = Math.min(fight.phase, 3);
+      List<ServerPlayer> marks = new ArrayList<>();
+      marks.add(target);
+      for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isSpectator() && fight.participants.contains(pl.getUUID()))) {
+         if (marks.size() >= spots) {
+            break;
+         }
+         if (!marks.contains(p) && !isPossessed(p)) {
+            marks.add(p);
+         }
+      }
+      for (ServerPlayer p : marks) {
+         Vec3 at = p.position();
+         fight.strikes.add(new Strike(Strike.SPOTLIGHT, at, now + SPOTLIGHT_WARN, SPOTLIGHT_RADIUS, SPOTLIGHT_DAMAGE));
+         Fx.runeCircle(level, ParticleTypes.END_ROD, at.add(0.0, 0.05, 0.0), SPOTLIGHT_RADIUS, SPOTLIGHT_WARN, LIMELIGHT);
+         Fx.pillar(level, ParticleTypes.END_ROD, at, 12.0, LIMELIGHT);
+         p.sendOverlayMessage(Component.literal("\u00a7e\u2726 \u00a7fYou're in the spotlight \u00a78- \u00a7fmove."));
+      }
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_POWER_SELECT, SoundSource.HOSTILE, 1.2F, 1.6F);
+      announce(level, SAY + "\"\u00a7fLights.\"");
+      return true;
+   }
+
+   /** Marionette Rain: dolls dropped one after another on marked spots across the stage. */
+   private static void marionetteRain(ServerLevel level, Mob boss, Fight fight, long now) {
+      int dolls = RAIN_DOLLS + (fight.phase >= 3 ? 2 : 0);
+      for (int i = 0; i < dolls; i++) {
+         // Half the dolls are aimed at players, half are scattered; nobody is safe standing still.
+         Vec3 at;
+         List<ServerPlayer> room = level.getPlayers(pl -> pl.isAlive() && !pl.isSpectator() && fight.participants.contains(pl.getUUID()) && !isPossessed(pl));
+         if (i % 2 == 0 && !room.isEmpty()) {
+            ServerPlayer p = room.get(RANDOM.nextInt(room.size()));
+            at = p.position().add((RANDOM.nextDouble() - 0.5) * 2.0, 0.0, (RANDOM.nextDouble() - 0.5) * 2.0);
+         } else {
+            double a = RANDOM.nextDouble() * Math.PI * 2.0;
+            double r = 3.0 + RANDOM.nextDouble() * 8.0;
+            at = boss.position().add(Math.cos(a) * r, 0.0, Math.sin(a) * r);
+         }
+         at = new Vec3(at.x, groundAt(level, at), at.z);
+         long land = now + 25L + i * 5L;
+         fight.strikes.add(new Strike(Strike.DOLL, at, land, RAIN_RADIUS, RAIN_DAMAGE));
+         Fx.runeCircle(level, ParticleTypes.END_ROD, at.add(0.0, 0.05, 0.0), RAIN_RADIUS, (int)(land - now), MASK_PAINT);
+      }
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.EVOKER_PREPARE_SUMMON, SoundSource.HOSTILE, 1.2F, 1.3F);
+      announce(level, SAY + "\"\u00a7fHeads up.\"");
+   }
+
+   /**
+    * Curtain Call: the stage is marked round him, and when the curtain falls everybody standing
+    * off it is hauled back on by the strings and hurt for the trouble. The answer is to come in.
+    */
+   private static void curtainCall(ServerLevel level, Mob boss, Fight fight, long now) {
+      Vec3 stage = boss.position();
+      fight.strikes.add(new Strike(Strike.CURTAIN, stage, now + CURTAIN_WARN, CURTAIN_STAGE, CURTAIN_DAMAGE));
+      Fx.dome(level, ParticleTypes.END_ROD, stage, CURTAIN_STAGE, CURTAIN_WARN, THREAD_VIOLET);
+      Fx.runeCircle(level, ParticleTypes.END_ROD, stage.add(0.0, 0.05, 0.0), CURTAIN_STAGE, CURTAIN_WARN, LIMELIGHT);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 1.4F, 0.6F);
+      announce(level, SAY + "\"\u00a7fCurtain call. \u00a7dOn stage, all of you.\"");
+   }
+
+   private static void tickStrikes(ServerLevel level, Mob boss, Fight fight, long now) {
+      if (fight.strikes.isEmpty()) {
+         return;
+      }
+      for (Iterator<Strike> it = fight.strikes.iterator(); it.hasNext();) {
+         Strike strike = it.next();
+         if (strike.kind != Strike.CURTAIN && !strike.falling && now >= strike.landAt - 6L) {
+            // The doll is seen falling for the last few ticks, so the landing is never a surprise.
+            strike.falling = true;
+            Fx.comet(level, ParticleTypes.END_ROD, strike.at.add(0.0, 14.0, 0.0), strike.at.add(0.0, 0.6, 0.0), 6,
+               strike.kind == Strike.SPOTLIGHT ? LIMELIGHT : MASK_PAINT);
+         }
+         if (now < strike.landAt) {
+            continue;
+         }
+         it.remove();
+         if (strike.kind == Strike.CURTAIN) {
+            fallCurtain(level, boss, fight, strike);
+         } else {
+            landDoll(level, boss, fight, strike);
+         }
+      }
+   }
+
+   private static void landDoll(ServerLevel level, Mob boss, Fight fight, Strike strike) {
+      Fx.shockwave(level, ParticleTypes.CLOUD, strike.at, strike.radius + 1.0, strike.kind == Strike.SPOTLIGHT ? LIMELIGHT : MASK_PAINT);
+      Fx.shatter(level, new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.BLOCK, net.minecraft.world.level.block.Blocks.OAK_PLANKS.defaultBlockState()),
+         strike.at.add(0.0, 0.6, 0.0), 1.4, 0x9A6A3C);
+      level.playSound(null, strike.at.x, strike.at.y, strike.at.z, SoundEvents.ARMOR_STAND_BREAK, SoundSource.HOSTILE, 1.4F, 0.7F);
+      level.playSound(null, strike.at.x, strike.at.y, strike.at.z, SoundEvents.WOOD_BREAK, SoundSource.HOSTILE, 1.2F, 0.6F);
+      double r2 = strike.radius * strike.radius;
+      for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isSpectator() && !BossManager.isFakePlayer(pl) && !isPossessed(pl))) {
+         if (p.distanceToSqr(strike.at) > r2) {
+            continue;
+         }
+         p.hurtServer(level, level.damageSources().mobAttack(boss), strike.damage);
+         p.setDeltaMovement(p.getDeltaMovement().add(0.0, 0.45, 0.0));
+         p.hurtMarked = true;
+      }
+   }
+
+   private static void fallCurtain(ServerLevel level, Mob boss, Fight fight, Strike strike) {
+      Vec3 stage = boss.position();
+      Fx.shockwave(level, ParticleTypes.END_ROD, stage, strike.radius, THREAD_VIOLET);
+      level.playSound(null, stage.x, stage.y, stage.z, SoundEvents.TRIPWIRE_CLICK_ON, SoundSource.HOSTILE, 1.6F, 0.5F);
+      int hauled = 0;
+      for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isSpectator() && !BossManager.isFakePlayer(pl) && !isPossessed(pl)
+            && fight.participants.contains(pl.getUUID()))) {
+         double d = Math.sqrt(p.distanceToSqr(stage));
+         if (d <= strike.radius || d > ARENA_RADIUS) {
+            continue;
+         }
+         Vec3 pull = stage.subtract(p.position());
+         Vec3 flat = new Vec3(pull.x, 0.0, pull.z);
+         if (flat.lengthSqr() > 1.0E-4) {
+            flat = flat.normalize().scale(Math.min(2.4, 0.8 + d * 0.08));
+            p.setDeltaMovement(flat.x, 0.5, flat.z);
+            p.hurtMarked = true;
+         }
+         p.hurtServer(level, level.damageSources().mobAttack(boss), strike.damage);
+         Fx.chains(level, ParticleTypes.END_ROD, boss.position().add(0.0, 1.6, 0.0), p.position().add(0.0, 1.0, 0.0), THREAD_VIOLET);
+         hauled++;
+      }
+      if (hauled == 0) {
+         announce(level, SAY + "\"\u00a7fGood. \u00a7dEveryone's where I want them.\"");
+      }
+   }
+
+   /** The floor under a point: the first block with a solid top, searched a few blocks either way. */
+   private static double groundAt(ServerLevel level, Vec3 at) {
+      net.minecraft.core.BlockPos pos = net.minecraft.core.BlockPos.containing(at.x, at.y + 3.0, at.z);
+      for (int i = 0; i < 9; i++) {
+         net.minecraft.core.BlockPos below = pos.below();
+         if (level.getBlockState(below).isFaceSturdy(level, below, net.minecraft.core.Direction.UP) && level.getBlockState(pos).isAir()) {
+            return pos.getY();
+         }
+         pos = below;
+      }
+      return at.y;
+   }
+
    /**
     * Steps a hand-moved puppet horizontally without putting it inside terrain.
     *
@@ -1329,7 +1565,7 @@ public final class PuppeteerManager {
          new Tether(fight.bossId, level, target.getUUID(), threadLevel, 1, now + length, now + every)
       );
       fight.threaded.add(target.getUUID());
-      announce(level, SAY + "\"\u00a7fHold still. \u00a7dThis part is easier on you.\"");
+      announce(level, SAY + "\"\u00a7fHold still.\"");
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 1.1F, 0.7F);
       level.sendParticles(ParticleTypes.END_ROD, target.getX(), target.getY() + 1.2, target.getZ(), 20, 0.4, 0.6, 0.4, 0.05);
       target.sendOverlayMessage(Component.literal(threadLine(1)));
@@ -1452,7 +1688,7 @@ public final class PuppeteerManager {
       thread.windupTotal = ticks;
       thread.nextWindupCue = now;
       showWindupBar(player, ticks, ticks);
-      announce(level, SAY + "\"\u00a7fTwo is not enough. \u00a7dHold still for the third.\"");
+      announce(level, SAY + "\"\u00a7fOne more. \u00a7dHold still.\"");
       player.sendOverlayMessage(Component.literal("\u00a75\u00a7lSTRINGS CLOSING \u00a78| \u00a7frun, or hit him"));
       player.sendSystemMessage(
          Component.literal(
@@ -1527,7 +1763,7 @@ public final class PuppeteerManager {
       // Counted here, at the landing, because this is the moment the player has learned
       // the tell. Next time it will be shorter.
       MARIONETTE_LANDED.merge(player.getUUID(), 1, Integer::sum);
-      announce(level, SAY + "\"\u00a7fThere. \u00a7dNow hold it like that.\"");
+      announce(level, SAY + "\"\u00a7fThere. \u00a7dDance.\"");
       player.sendOverlayMessage(Component.literal(threadLine(MARIONETTE_STACKS)));
       player.sendSystemMessage(
          Component.literal(
@@ -2006,7 +2242,7 @@ public final class PuppeteerManager {
          level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 0.8F, 1.2F);
       }
       if (held > 0) {
-         announce(level, SAY + "\"\u00a7fEverything in this room is already on a string. \u00a7dI am simply pulling." + "\"");
+         announce(level, SAY + "\"\u00a7fEverything here is on a string." + "\"");
       }
    }
 
@@ -2085,7 +2321,7 @@ public final class PuppeteerManager {
                // whether it is silenced would answer yes and silence it forever.
                tether.hadNoAi = mob.isNoAi();
                tether.world.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 1.1F, 1.3F);
-               announce(tether.world, SAY + "\"\u00a7fYou are all so worried about the strings on \u00a7dyou\u00a7f.\"");
+               announce(tether.world, SAY + "\"\u00a7fLook up.\"");
                continue;
             }
          }
@@ -2437,7 +2673,7 @@ public final class PuppeteerManager {
          stringPullTo(level, body, boss);
       }
       if (raised > 0) {
-         announce(level, SAY + "\"\u00a7fAll of you, again. \u00a7dYou may not have noticed, but you never left my stage.\"");
+         announce(level, SAY + "\"\u00a7fFrom the top. \u00a7dAll of you.\"");
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.EVOKER_PREPARE_SUMMON, SoundSource.HOSTILE, 1.3F, 0.5F);
       }
    }
@@ -2483,7 +2719,7 @@ public final class PuppeteerManager {
       level.playSound(null, mine.x, mine.y, mine.z, SoundEvents.ILLUSIONER_MIRROR_MOVE, SoundSource.HOSTILE, 1.2F, 1.0F);
       level.playSound(null, theirs.x, theirs.y, theirs.z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.0F, 1.4F);
       level.sendParticles(ParticleTypes.SOUL, mine.x, mine.y + 1.0, mine.z, 24, 0.6, 0.8, 0.6, 0.05);
-      announce(level, SAY + "\"\u00a7fWas that me? \u00a7dOr was that the one you were already winning against?\"");
+      announce(level, SAY + "\"\u00a7fWrong one.\"");
       // Once per fight at phase three, then it becomes an ordinary cooldown move.
       fight.swapped = true;
       return true;
@@ -2828,7 +3064,7 @@ public final class PuppeteerManager {
          level.addFreshEntity(arrow);
          drawString(level, from.x, from.y, from.z, p.getX(), p.getY() + 1.0, p.getZ(), 14);
       }
-      announce(level, SAY + "\"\u00a7fA handful of strings. \u00a7dCatch.\"");
+      announce(level, SAY + "\"\u00a7fStrings. \u00a7dEverywhere.\"");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ARROW_SHOOT, SoundSource.HOSTILE, 1.2F, 0.7F);
    }
 
@@ -2901,7 +3137,7 @@ public final class PuppeteerManager {
       if (caught == 0) {
          return false;
       }
-      announce(level, SAY + "\"\u00a7fCome here. \u00a7dAll of you at once.\"");
+      announce(level, SAY + "\"\u00a7fCloser.\"");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.VEX_CHARGE, SoundSource.HOSTILE, 1.1F, 0.7F);
       return true;
    }
@@ -2922,7 +3158,7 @@ public final class PuppeteerManager {
       double z = target.getZ() + Math.sin(angle) * 2.5;
       double y = target.getY();
       SNARES.add(new Snare(boss.getUUID(), level, x, y, z, ServerClock.clock(level) + SNARE_TICKS));
-      announce(level, SAY + "\"\u00a7fMind where you stand.\"");
+      announce(level, SAY + "\"\u00a7fCareful where you step.\"");
       level.playSound(null, x, y, z, SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 0.9F, 1.4F);
       level.sendParticles(ParticleTypes.END_ROD, x, y + 0.2, z, 18, 1.2, 0.2, 1.2, 0.02);
       return true;
@@ -3011,7 +3247,7 @@ public final class PuppeteerManager {
          return false;
       }
       boss.setHealth(Math.min(boss.getMaxHealth(), boss.getHealth() + recalled * REWIND_HEAL));
-      announce(level, SAY + "\"\u00a7fYou cut the ones you could reach. \u00a7dI take the rest back.\"");
+      announce(level, SAY + "\"\u00a7fCut them? \u00a7dI have more.\"");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.HOSTILE, 1.2F, 0.6F);
       stringBurst(level, boss, 40);
       return true;
@@ -3133,7 +3369,7 @@ public final class PuppeteerManager {
       // driver. Anything else would be two full mechanics at once.
       thread.windupUntil = 0L;
       showKnotBar(target, ticks, ticks, KNOT_BREAKS);
-      announce(level, SAY + "\"\u00a7fI am done borrowing your arms. \u00a7dGive me the rest of you.\"");
+      announce(level, SAY + "\"\u00a7fI'm done with your arms. \u00a7dI want the rest.\"");
       target.sendOverlayMessage(Component.literal(knotLine(KNOT_BREAKS)));
       target.sendSystemMessage(
          Component.literal(
@@ -3303,7 +3539,7 @@ public final class PuppeteerManager {
       // The one line that has to be unmistakable, because it is the one that changes who is
       // playing: it names the body he is in, and it tells everyone still standing that the
       // person next to them is now the fight.
-      announce(level, SAY + "\"\u00a7fThere. \u00a7dSit still - I will drive. \u00a7fEveryone meet " + player.getName().getString() + " again.\"");
+      announce(level, SAY + "\"\u00a7fSit still. \u00a7dI'll drive. \u00a7fSay hello to " + player.getName().getString() + ".\"");
       announce(level, "\u00a75\u00a7lTHE FINAL KNOT CLOSES \u00a78- \u00a7fhe is wearing " + player.getName().getString() + "\u00a7f.");
       player.sendOverlayMessage(Component.literal(possessionLine()));
       player.sendSystemMessage(
@@ -3576,8 +3812,12 @@ public final class PuppeteerManager {
          }
       }
       fight.stringsLeft = 1 + threads + strings;
-      announce(level, SAY + "\"\u00a7fNo. No, no, I am still \u00a7dholding\u2014\"");
+      announce(level, SAY + "\"\u00a7fNo- \u00a7dI'm still holding-\"");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.VEX_DEATH, SoundSource.HOSTILE, 1.4F, 0.7F);
+      // The blow lands and the mask cracks: a flare, and every string he holds goes taut at once.
+      Fx.flare(level, ParticleTypes.END_ROD, boss.position().add(0.0, 1.8, 0.0), 2.0, MASK_PAINT);
+      Fx.starburst(level, ParticleTypes.END_ROD, boss.position().add(0.0, 1.6, 0.0), 5.0, THREAD_VIOLET);
+      fight.strikes.clear();
       return Boolean.FALSE;
    }
 
@@ -3608,7 +3848,8 @@ public final class PuppeteerManager {
          double x = boss.getX() + Math.cos(angle) * 1.2;
          double z = boss.getZ() + Math.sin(angle) * 1.2;
          drawString(level, x, boss.getY() + 3.0, z, boss.getX(), boss.getY() + 1.2, boss.getZ(), 12);
-         level.sendParticles(ParticleTypes.END_ROD, x, boss.getY() + 1.6, z, 8, 0.2, 0.5, 0.2, 0.05);
+         // Each cut is a snap of light where the thread parts.
+         Fx.clash(level, ParticleTypes.CRIT, new Vec3(x, boss.getY() + 2.2, z), new Vec3(Math.cos(angle), 0.0, Math.sin(angle)), THREAD_VIOLET);
          for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && pl.distanceToSqr(boss) < 2500.0)) {
             p.sendOverlayMessage(
                Component.literal("\u00a75a string is cut \u00a78| \u00a7f" + fight.stringsLeft + " left")
@@ -3624,11 +3865,12 @@ public final class PuppeteerManager {
          puppet.frozen = true;
       }
       if (fight.deathTicks == 45) {
-         announce(level, "\u00a77Every puppet stops where it is standing.");
+         announce(level, "\u00a77Every puppet stops dead.");
          for (UUID id : new ArrayList<>(fight.puppets)) {
             Entity entity = findEntity(level.getServer(), id);
             if (entity != null) {
                level.sendParticles(ParticleTypes.SMOKE, entity.getX(), entity.getY() + 1.0, entity.getZ(), 12, 0.4, 0.7, 0.4, 0.02);
+               Fx.ring(level, ParticleTypes.END_ROD, entity.position().add(0.0, 0.1, 0.0), 1.0, THREAD_VIOLET);
             }
          }
       }
@@ -3637,10 +3879,17 @@ public final class PuppeteerManager {
          return;
       }
 
-      announce(level, "\u00a75\u00a7lTHE LAST STRING HAS BEEN CUT.");
+      announce(level, "\u00a75\u00a7lTHE LAST STRING IS CUT.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 1.4F, 0.6F);
-      level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, boss.getX(), boss.getY() + 1.0, boss.getZ(), 60, 1.6, 1.2, 1.6, 0.12);
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+      // The mask comes apart in a flare, the body breaks into splinters, the soul goes up the
+      // string it came down on, and the stage light goes out in a ring across the floor.
+      Vec3 heart = boss.position().add(0.0, 1.4, 0.0);
+      Fx.flare(level, ParticleTypes.END_ROD, heart.add(0.0, 0.4, 0.0), 2.8, LIMELIGHT);
+      Fx.shatter(level, new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.BLOCK, net.minecraft.world.level.block.Blocks.OAK_PLANKS.defaultBlockState()),
+         heart, 2.0, 0x9A6A3C);
+      Fx.spiral(level, ParticleTypes.SOUL, boss.position(), 12.0, 50, THREAD_VIOLET);
+      Fx.shockwave(level, ParticleTypes.SOUL, boss.position(), 9.0, THREAD_VIOLET);
+      level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, boss.getX(), boss.getY() + 1.0, boss.getZ(), 40, 1.6, 1.2, 1.6, 0.12);
 
       // Paid, and marked as paid before the drops exist: the ordinary death hook fires off
       // the same removed body, and the safety net has to see this as already done.
@@ -3688,8 +3937,8 @@ public final class PuppeteerManager {
          // The ceremony never ran, so the two things it owes the room are said here in one
          // tick: what was holding them lets go, and the fight is over.
          cutAllThreads(level, fight);
-         announce(level, SAY + "\"\u00a7f...the strings go slack.\"");
-         announce(level, "\u00a75\u00a7lTHE LAST STRING HAS BEEN CUT.");
+         announce(level, SAY + "\"\u00a7f...slack.\"");
+         announce(level, "\u00a75\u00a7lTHE LAST STRING IS CUT.");
          for (UUID id : new ArrayList<>(fight.puppets)) {
             Entity puppet = findEntity(level.getServer(), id);
             if (puppet != null) {
@@ -4133,7 +4382,7 @@ public final class PuppeteerManager {
       existing.windupUntil = 0L;
       clearWindupBar(player.getUUID());
       player.sendOverlayMessage(Component.literal(threadLine(wanted)));
-      announce(level, SAY + "\"\u00a7fHold still. \u00a7dThis part is easier on you.\"");
+      announce(level, SAY + "\"\u00a7fHold still.\"");
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 1.1F, 0.7F);
       return null;
    }
