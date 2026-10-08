@@ -100,7 +100,7 @@ public final class MagisterGear {
          return null;
       }
       String spell = currentSpell(player);
-      long now = player.level().getGameTime();
+      long now = ServerClock.clock(player.level());
       Long until = COOLDOWN_UNTIL.get(player.getUUID());
       if (until != null && now < until) {
          bar(player, "&7" + spell + " recovers in &f" + ((until - now + 19) / 20) + "s");
@@ -242,7 +242,7 @@ public final class MagisterGear {
       if (server == null) {
          return;
       }
-      long now = server.overworld().getGameTime();
+      long now = ServerClock.clock(server.overworld());
       tickMeteors(server);
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
          Safe.run("magister gear tick", () -> tickPlayer(p, now));

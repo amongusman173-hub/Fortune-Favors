@@ -165,7 +165,7 @@ public final class PuppeteerGear {
          if (puppet == null) {
             return;
          }
-         long now = level.getGameTime();
+         long now = ServerClock.clock(level);
          ALLIES.put(puppet.getUUID(), new Ally(puppet.getUUID(), killer.getUUID(), name, false, now + ALLY_TICKS));
          level.sendParticles(ParticleTypes.SOUL, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 30, 0.6, 0.8, 0.6, 0.06);
          level.sendParticles(ParticleTypes.END_ROD, puppet.getX(), puppet.getY() + 1.4, puppet.getZ(), 20, 0.5, 0.7, 0.5, 0.04);
@@ -190,7 +190,7 @@ public final class PuppeteerGear {
       if (!(player.level() instanceof ServerLevel level)) {
          return null;
       }
-      long now = level.getGameTime();
+      long now = ServerClock.clock(level);
       LivingEntity mark = markUnderCrosshair(level, player);
       Tie tie = TIES.get(player.getUUID());
 
@@ -322,7 +322,7 @@ public final class PuppeteerGear {
       if (!ModItems.isEmptyMask(helm)) {
          return false;
       }
-      long now = player.level().getGameTime();
+      long now = ServerClock.clock(player.level());
       return ModItems.cooldownSecondsLeft(helm, now) <= 0L;
    }
 
@@ -339,7 +339,7 @@ public final class PuppeteerGear {
          return false;
       }
       ItemStack helm = player.getItemBySlot(EquipmentSlot.HEAD);
-      long now = level.getGameTime();
+      long now = ServerClock.clock(level);
       ModItems.setCooldownUntil(helm, now + EMPTY_MASK_COOLDOWN);
 
       ServerPlayer decoy = BossManager.spawnPuppetCopy(
@@ -379,7 +379,7 @@ public final class PuppeteerGear {
       if (until == null) {
          return false;
       }
-      if (player.level().getGameTime() >= until) {
+      if (ServerClock.clock(player.level()) >= until) {
          ESCAPED.remove(player.getUUID());
          return false;
       }
@@ -411,7 +411,7 @@ public final class PuppeteerGear {
             if (ModItems.isEmptyMask(p.getItemBySlot(EquipmentSlot.HEAD)) && p.isAlive()) {
                shrugOffMobs(p);
             }
-            if (ESCAPED.containsKey(p.getUUID()) && p.level().getGameTime() >= ESCAPED.get(p.getUUID())) {
+            if (ESCAPED.containsKey(p.getUUID()) && ServerClock.clock(p.level()) >= ESCAPED.get(p.getUUID())) {
                ESCAPED.remove(p.getUUID());
                p.sendOverlayMessage(Component.literal("\u00a77The mask is quiet again."));
             }
@@ -449,7 +449,7 @@ public final class PuppeteerGear {
       if (ALLIES.isEmpty()) {
          return;
       }
-      long now = server.overworld().getGameTime();
+      long now = ServerClock.clock(server.overworld());
       for (Iterator<Map.Entry<UUID, Ally>> it = ALLIES.entrySet().iterator(); it.hasNext();) {
          Map.Entry<UUID, Ally> entry = it.next();
          Ally ally = entry.getValue();
@@ -462,7 +462,7 @@ public final class PuppeteerGear {
             it.remove();
             continue;
          }
-         now = level.getGameTime();
+         now = ServerClock.clock(level);
          if (now >= ally.until) {
             it.remove();
             level.sendParticles(ParticleTypes.POOF, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 16, 0.4, 0.6, 0.4, 0.05);
@@ -552,7 +552,7 @@ public final class PuppeteerGear {
             it.remove();
             continue;
          }
-         long now = holder.level().getGameTime();
+         long now = ServerClock.clock(holder.level());
          if (now >= tie.until) {
             it.remove();
             // Said out loud, like the snap: a string that simply stops being drawn

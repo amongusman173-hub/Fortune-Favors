@@ -98,7 +98,7 @@ public final class VoidShaperGear {
       if (hits < HITS_PER_THROW) {
          return;
       }
-      long now = level.getGameTime();
+      long now = ServerClock.clock(level);
       Long next = NEXT_THROW.get(attacker.getUUID());
       if (next != null && now < next) {
          return;
@@ -155,7 +155,7 @@ public final class VoidShaperGear {
       if (!(player.level() instanceof ServerLevel level)) {
          return null;
       }
-      long now = level.getGameTime();
+      long now = ServerClock.clock(level);
       UUID gripping = VoidShaperManager.heldBy(player);
 
       if (player.isShiftKeyDown()) {
@@ -282,7 +282,7 @@ public final class VoidShaperGear {
       if (!(player.level() instanceof ServerLevel level)) {
          return false;
       }
-      long now = level.getGameTime();
+      long now = ServerClock.clock(level);
       Long next = NEXT_THROW.get(player.getUUID());
       if (next != null && now < next) {
          return false;

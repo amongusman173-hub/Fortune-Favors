@@ -164,7 +164,7 @@ public final class ClockworkGear {
       if (server == null) {
          return;
       }
-      long now = server.overworld().getGameTime();
+      long now = ServerClock.clock(server.overworld());
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
          Safe.run("clockwork gear tick", () -> tickPlayer(p, now));
       }
@@ -218,7 +218,7 @@ public final class ClockworkGear {
    /** Called from the damage hook so the Heart knows when you were last hit. */
    public static void onPlayerDamaged(ServerPlayer player) {
       if (player != null) {
-         LAST_HURT.put(player.getUUID(), player.level().getGameTime());
+         LAST_HURT.put(player.getUUID(), ServerClock.clock(player.level()));
       }
    }
 

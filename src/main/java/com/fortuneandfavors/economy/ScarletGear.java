@@ -267,7 +267,7 @@ public final class ScarletGear {
          return null;
       }
 
-      long now = player.level().getGameTime();
+      long now = ServerClock.clock(player.level());
       long left = ModItems.cooldownSecondsLeft(held, now);
       if (left > 0L) {
          bar(player, "§4Grimoire §8| §7still bleeding dry §8- §f" + left + "s");
@@ -335,7 +335,7 @@ public final class ScarletGear {
       if (target == null || !(player.level() instanceof ServerLevel level)) {
          return false;
       }
-      SPEARS.add(new Spear(target.getUUID(), level, player, player.getEyePosition(), 3, level.getGameTime() + 5L));
+      SPEARS.add(new Spear(target.getUUID(), level, player, player.getEyePosition(), 3, ServerClock.clock(level) + 5L));
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ARROW_SHOOT, SoundSource.PLAYERS, 1.2F, 0.7F);
       return true;
    }
@@ -458,7 +458,7 @@ public final class ScarletGear {
          return null;
       }
 
-      long now = level.getGameTime();
+      long now = ServerClock.clock(level);
       long left = ModItems.cooldownSecondsLeft(held, now);
       if (left > 0L) {
          bar(player, "§4Prism §8| §7still clouded §8- §f" + left + "s");
@@ -513,7 +513,7 @@ public final class ScarletGear {
             it.remove();
             continue;
          }
-         if (s.level.getGameTime() < s.next) {
+         if (ServerClock.clock(s.level) < s.next) {
             continue;
          }
          // Resolve the target generically. The volley used to look the target up
@@ -540,7 +540,7 @@ public final class ScarletGear {
          s.level.addFreshEntity(arrow);
          s.level.sendParticles(ParticleTypes.CRIMSON_SPORE, s.origin.x, s.origin.y, s.origin.z, 8, 0.2, 0.2, 0.2, 0.05);
          s.remaining--;
-         s.next = s.level.getGameTime() + 3L;
+         s.next = ServerClock.clock(s.level) + 3L;
          if (s.remaining <= 0) {
             it.remove();
          }
@@ -564,7 +564,7 @@ public final class ScarletGear {
             continue;
          }
          ServerLevel level = (ServerLevel) mob.level();
-         long now = level.getGameTime();
+         long now = ServerClock.clock(level);
          if (now % 10L == 0L) {
             level.sendParticles(new DustParticleOptions(-65536, 0.7F), mob.getX(), mob.getY() + 0.3, mob.getZ(), 1, 0.15, 0.15, 0.15, 0.0);
          }
@@ -616,7 +616,7 @@ public final class ScarletGear {
          }
          ServerLevel level = (ServerLevel) mob.level();
          ServerPlayer owner = server.getPlayerList().getPlayer(servant.owner);
-         if (level.getGameTime() % 6L == 0L) {
+         if (ServerClock.clock(level) % 6L == 0L) {
             level.sendParticles(ParticleTypes.CRIMSON_SPORE, mob.getX(), mob.getY() + 0.6, mob.getZ(), 3, 0.3, 0.5, 0.3, 0.02);
          }
 
@@ -643,8 +643,8 @@ public final class ScarletGear {
                Vec3 toward = foe.position().subtract(mob.position()).normalize().scale(dist > 100.0 ? 0.42 : 0.3);
                mob.setPos(mob.getX() + toward.x, mob.getY(), mob.getZ() + toward.z);
                mob.setYRot(faceYaw(mob, foe));
-            } else if (level.getGameTime() >= servant.nextAttack) {
-               servant.nextAttack = level.getGameTime() + 20L;
+            } else if (ServerClock.clock(level) >= servant.nextAttack) {
+               servant.nextAttack = ServerClock.clock(level) + 20L;
                foe.hurtServer(level, level.damageSources().mobAttack(mob), SERVANT_DAMAGE);
                blood(level, foe.getX(), foe.getY() + 1.0, foe.getZ(), 8);
             }
@@ -716,7 +716,7 @@ public final class ScarletGear {
             bar((ServerPlayer) target, "§4BEING DRAINED §8| §f" + Math.max(0, (int) Math.ceil(target.getHealth() / 2.0)) + " ❤ §7- hurt them or run");
          }
 
-         long now = ritual.level.getGameTime();
+         long now = ServerClock.clock(ritual.level);
          if (now < ritual.nextPulse) {
             continue;
          }

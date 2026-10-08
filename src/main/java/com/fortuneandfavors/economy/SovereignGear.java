@@ -130,7 +130,7 @@ public final class SovereignGear {
       if (!(player.level() instanceof ServerLevel level)) {
          return null;
       }
-      long now = level.getGameTime();
+      long now = ServerClock.clock(level);
       Long until = BELL_UNTIL.get(player.getUUID());
       if (until != null && now < until) {
          bar(player, "&7The Bell is still ringing &8(" + ((until - now + 19) / 20) + "s)");
@@ -261,7 +261,7 @@ public final class SovereignGear {
       if (!(player.level() instanceof ServerLevel level)) {
          return null;
       }
-      long now = level.getGameTime();
+      long now = ServerClock.clock(level);
       Long until = SEAL_UNTIL.get(player.getUUID());
       if (until != null && now < until) {
          bar(player, "&7Royal Tribute already sworn &8(" + ((until - now + 19) / 20) + "s)");
@@ -313,7 +313,7 @@ public final class SovereignGear {
          Safe.run("sovereign gear tick", () -> tickSeal(p));
       }
       tickGuards(server);
-      long now = server.overworld().getGameTime();
+      long now = ServerClock.clock(server.overworld());
       Safe.run("sovereign royal subjects", () -> tickSubjects(server, now));
    }
 

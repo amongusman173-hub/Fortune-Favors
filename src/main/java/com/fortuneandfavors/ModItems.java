@@ -2244,10 +2244,24 @@ public final class ModItems {
       }
    }
 
-   /** Whole seconds still to wait before this stack may be used again (0 = ready). */
-   public static long cooldownSecondsLeft(ItemStack stack, long gameTime) {
-      long left = cooldownUntil(stack) - gameTime;
-      return left <= 0L ? 0L : (left + 19L) / 20L;
+   /**
+    * Longest wait any item in the mod puts on itself, with room to spare. A stamp further away
+    * than this was written on a different clock, not by a real cooldown.
+    */
+   private static final long MAX_ITEM_COOLDOWN_TICKS = 20L * 60L * 60L;
+
+   /**
+    * Whole seconds still to wait before this stack may be used again (0 = ready).
+    *
+    * <p>The stamp lives on the item, so it outlives the clock that wrote it: boss gear used to
+    * stamp {@code level.getGameTime()}, which stands still outside the overworld, and now stamps
+    * {@link com.fortuneandfavors.economy.ServerClock}. A stamp from the old clock can read as
+    * days away on the new one, so anything past {@link #MAX_ITEM_COOLDOWN_TICKS} is treated as
+    * ready rather than locking the item until the clocks happen to meet.
+    */
+   public static long cooldownSecondsLeft(ItemStack stack, long now) {
+      long left = cooldownUntil(stack) - now;
+      return left <= 0L || left > MAX_ITEM_COOLDOWN_TICKS ? 0L : (left + 19L) / 20L;
    }
 
    /** The Space-Time Rift: the clock that tears a hole in time and calls him through. */

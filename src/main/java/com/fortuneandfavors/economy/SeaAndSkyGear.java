@@ -476,7 +476,7 @@ public final class SeaAndSkyGear {
       player.setDeltaMovement(flat.x * speed, Math.max(0.34, pull.y / distance * speed * 0.6), flat.z * speed);
       player.hurtMarked = true;
       player.fallDistance = 0.0F;
-      DEEP_STRIKE.put(player.getUUID(), player.level().getGameTime() + DEEP_STRIKE_WINDOW_TICKS);
+      DEEP_STRIKE.put(player.getUUID(), ServerClock.clock(player.level()) + DEEP_STRIKE_WINDOW_TICKS);
       BossVfx.beam(level, player.getEyePosition(), to, 0.1, ParticleTypes.SCULK_SOUL);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.CHAIN_FALL, SoundSource.PLAYERS, 1.0F, 1.3F);
       bar(player, "&3Abyssal Hook &8- &7the chain brought you instead.");
@@ -488,7 +488,7 @@ public final class SeaAndSkyGear {
       if (level == null) {
          return;
       }
-      long now = hitter.level().getGameTime();
+      long now = ServerClock.clock(hitter.level());
       Long until = DEEP_STRIKE.get(hitter.getUUID());
       if (until != null && now <= until) {
          DEEP_STRIKE.remove(hitter.getUUID());
@@ -507,7 +507,7 @@ public final class SeaAndSkyGear {
 
    /** Marks {@code victim} for this bearer. Returns whether it was already marked. */
    private static boolean markTarget(ServerPlayer bearer, LivingEntity victim) {
-      long until = bearer.level().getGameTime() + MARK_TICKS;
+      long until = ServerClock.clock(bearer.level()) + MARK_TICKS;
       Map<UUID, Long> marks = MARKS.computeIfAbsent(bearer.getUUID(), k -> new HashMap<>());
       Long previous = marks.put(victim.getUUID(), until);
       BossVfx.at(
@@ -521,7 +521,7 @@ public final class SeaAndSkyGear {
          0.2,
          0.02
       );
-      return previous != null && previous > bearer.level().getGameTime();
+      return previous != null && previous > ServerClock.clock(bearer.level());
    }
 
    /** How much knockback a marked body takes from the bearer's blows. */
@@ -535,7 +535,7 @@ public final class SeaAndSkyGear {
          return false;
       }
       Long until = marks.get(victim.getUUID());
-      return until != null && until >= bearer.level().getGameTime();
+      return until != null && until >= ServerClock.clock(bearer.level());
    }
 
    // ---------------------------------------------------------------- the sky: Skybreaker
@@ -685,7 +685,7 @@ public final class SeaAndSkyGear {
       if (!wearingMantle(player) || player.getHealth() - amount > 0.0F) {
          return null;
       }
-      long now = player.level().getGameTime();
+      long now = ServerClock.clock(player.level());
       Long until = SECOND_WIND_UNTIL.get(player.getUUID());
       if (until != null && now < until) {
          return null;
@@ -746,7 +746,7 @@ public final class SeaAndSkyGear {
          TAILWIND_UNTIL.remove(id);
          return;
       }
-      long now = player.level().getGameTime();
+      long now = ServerClock.clock(player.level());
 
       // Light as Air: falling slowly, so the Mantle's own lethality stays a fall's job.
       if (!player.onGround() && player.getDeltaMovement().y < -0.4) {
@@ -756,7 +756,7 @@ public final class SeaAndSkyGear {
       boolean sneaking = player.isShiftKeyDown();
       boolean wasSneaking = Boolean.TRUE.equals(WAS_SNEAKING.get(id));
       if (sneaking && !wasSneaking) {
-         long now2 = player.level().getGameTime();
+         long now2 = ServerClock.clock(player.level());
          Long last = LAST_SNEAK.get(id);
          if (last != null && now2 - last <= DOUBLE_TAP_TICKS) {
             windstep(player, now2);
@@ -1187,7 +1187,7 @@ public final class SeaAndSkyGear {
 
    /** True (and says so) while {@code key} is still recovering for this player. */
    private static boolean cooldown(ServerPlayer player, String key, long ticks) {
-      long now = player.level().getGameTime();
+      long now = ServerClock.clock(player.level());
       Long until = COOLDOWN_UNTIL(COOLDOWNS.get(player.getUUID()), key);
       if (until != null && now < until) {
          bar(player, "&7Recovering &8- &f" + ((until - now + 19L) / 20L) + "s");
@@ -1253,7 +1253,7 @@ public final class SeaAndSkyGear {
    /** Whether this bearer is holding a Deep Strike, for the self-test. */
    public static boolean deepStrikeForTest(ServerPlayer bearer) {
       Long until = DEEP_STRIKE.get(bearer.getUUID());
-      return until != null && until >= bearer.level().getGameTime();
+      return until != null && until >= ServerClock.clock(bearer.level());
    }
 
    /**
