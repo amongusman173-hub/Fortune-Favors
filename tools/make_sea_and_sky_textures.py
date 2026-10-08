@@ -371,16 +371,19 @@ def gale_core():
 
 
 if __name__ == "__main__":
-    leviathans_grasp()
-    tidecaller()
-    abyssal_chain()
-    sovereigns_heart()
-    drowned_loot_box()
-    abyssal_pearl()
+    # Every icon this script drew has been redrawn by tools/make_reworked_textures_b.py; the
+    # functions above stay for reference, and running this writes nothing.
+    # leviathans_grasp() - drawn by tools/make_reworked_textures_b.py now
+    # tidecaller() - drawn by tools/make_reworked_textures_b.py now
+    # abyssal_chain() - drawn by tools/make_reworked_textures_b.py now
+    # sovereigns_heart() - drawn by tools/make_reworked_textures_b.py now
+    # drowned_loot_box() - drawn by tools/make_reworked_textures_b.py now
+    # abyssal_pearl() - drawn by tools/make_reworked_textures_b.py now
 
-    skybreaker()
-    gale_chakram()
-    wardens_mantle()
-    gale_sigil()
-    gale_loot_box()
-    gale_core()
+    # skybreaker() - drawn by tools/make_reworked_textures_b.py now
+    # gale_chakram() - drawn by tools/make_reworked_textures_b.py now
+    # wardens_mantle() - drawn by tools/make_reworked_textures_b.py now
+    # gale_sigil() - drawn by tools/make_reworked_textures_b.py now
+    # gale_loot_box() - drawn by tools/make_reworked_textures_b.py now
+    # gale_core() - drawn by tools/make_reworked_textures_b.py now
+    pass

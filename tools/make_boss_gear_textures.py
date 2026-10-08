@@ -11,6 +11,10 @@ The three weapons are held items, so they keep vanilla's diagonal (grip bottom-l
 top-right). These replace the versions drawn by tools/make_new_boss_textures.py, which no longer
 writes them.
 
+The Clockwork King and Starbound Magister pieces have since been redrawn again by
+tools/make_reworked_textures_a.py, and the Voidshaper three by tools/make_reworked_textures_b.py
+(which is where their functions now live); this script no longer writes anything.
+
 Run:  python3 tools/make_boss_gear_textures.py [--out DIR]
 """
 import argparse
@@ -195,106 +199,11 @@ def astral_mantle(out):
     save(c, "astral_mantle", out)
 
 
-# ------------------------------------------------------------------ Voidshaper
-
-def void_reaver(out):
-    """A broad cleaver of void-stone with a burning violet edge."""
-    c = Canvas()
-
-    def piece(x, y):
-        s, t = diag(x, y)
-        if -11 <= t <= -3 and s in (15, 16):
-            return True
-        if t in (-3, -2) and 12 <= s <= 19:
-            return True
-        lo = 12 if t < 7 else 12 + (t - 6)
-        return -1 <= t <= 10 and lo <= s <= 17
-
-    def colour(x, y):
-        s, t = diag(x, y)
-        if t in (-3, -2) and 12 <= s <= 19:
-            return VOID_L if s <= 14 else (VOID if s <= 17 else VOID_S)
-        if t <= -10:
-            return VGLOW if s == 15 else VOID
-        if t <= -4:
-            return OBSID_L if (t % 2 == 0) == (s == 15) else OBSID_S
-        lo = 12 if t < 7 else 12 + (t - 6)
-        if s == lo:
-            return VGLOW
-        if s == lo + 1:
-            return VOID_L
-        if s >= 17:
-            return OBSID_D
-        if s == 16:
-            return OBSID_S
-        if (s + t) % 5 == 0:
-            return VOID
-        return OBSID
-
-    c.fill_where(piece, colour)
-    c.outline(skip=[VGLOW])
-    save(c, "void_reaver", out)
-
-
-def colossus_plate(out):
-    """A breastplate cut from obsidian, cracked through with void-light."""
-    c = Canvas()
-    c.grid([
-        "................",
-        "..LLLb....LLLb..",
-        ".LOOOOb..LOOOOd.",
-        ".LOOOOOLLOOOOOd.",
-        ".LOOOVOOOOOOOOd.",
-        "..dOOOVOOOVOOd..",
-        "...OOOOVVVOOd...",
-        "...OOOOOWOOOd...",
-        "...OOOOVOVOOd...",
-        "...OOOVOOOVOd...",
-        "...OOVOOOOOOd...",
-        "...OOOOOOOOOd...",
-        "...LOOOOOOOOd...",
-        "...dddddddddd...",
-        "................",
-        "................",
-    ], {"L": OBSID_L, "O": OBSID, "d": OBSID_S, "b": OBSID,
-        "V": VOID_L, "W": VGLOW})
-    c.outline(skip=[VGLOW])
-    save(c, "colossus_plate", out)
-
-
-def shaping_sigil(out):
-    """A ring of void-runes with a block held weightless at its centre."""
-    c = Canvas()
-    c.grid([
-        "................",
-        ".....VVLVV......",
-        "...VV.....VV....",
-        "..V..........V..",
-        "..V...SSSb...V..",
-        ".L...SLSSb....V.",
-        ".V...SSSSb....V.",
-        ".V...SSSSb....L.",
-        ".V...bbbbd....V.",
-        "..V..........V..",
-        "..L..........V..",
-        "...VV.....VV....",
-        ".....VVLVV......",
-        "................",
-        "................",
-        "................",
-    ], {"V": VOID_L, "L": VGLOW, "S": STEEL, "b": STEEL_S, "d": STEEL_D})
-    # the hovering block's top face catches the light
-    c.set(6, 4, STEEL_L)
-    c.set(7, 4, STEEL_L)
-    # a shadow under the block, so it reads as lifted
-    for x in (6, 7, 8):
-        c.set(x, 10, VOID_S)
-    c.outline(skip=[VGLOW, VOID_L, VOID_S])
-    save(c, "shaping_sigil", out)
-
-
-ALL = [clockwork_gauntlet, mechanical_heart, automaton_armor, starpiercer, astral_mantle,
-       void_reaver, colossus_plate, shaping_sigil]
+# The Clockwork King and Starbound Magister pieces above are drawn by
+# tools/make_reworked_textures_a.py now; they stay here for reference but no longer run.
+# The Voidshaper three (void_reaver, colossus_plate, shaping_sigil) moved to
+# tools/make_reworked_textures_b.py, so nothing here runs any more.
+ALL = []
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

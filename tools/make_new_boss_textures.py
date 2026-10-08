@@ -494,18 +494,19 @@ if __name__ == "__main__":
     # astral_mantle() - drawn by tools/make_reworked_textures_a.py now
     # magisters_codex(), starbound_loot_box() - drawn by tools/make_reworked_textures_a.py now
 
-    void_anchor()
-    colossus_trophy()
-    voidsteel_scrap()
-    # void_reaver() - drawn by tools/make_boss_gear_textures.py now
-    # colossus_plate() - drawn by tools/make_boss_gear_textures.py now
-    # shaping_sigil() - drawn by tools/make_boss_gear_textures.py now
-    voidshaper_loot_box()
+    # void_anchor() - drawn by tools/make_reworked_textures_b.py now
+    # colossus_trophy() - drawn by tools/make_reworked_textures_b.py now
+    # voidsteel_scrap() - drawn by tools/make_reworked_textures_b.py now
+    # void_reaver() - drawn by tools/make_reworked_textures_b.py now
+    # colossus_plate() - drawn by tools/make_reworked_textures_b.py now
+    # shaping_sigil() - drawn by tools/make_reworked_textures_b.py now
+    # voidshaper_loot_box() - drawn by tools/make_reworked_textures_b.py now
 
-    sovereigns_crown()
-    sovereign_trophy()
-    royal_tribute()
-    royal_contract()
-    sovereigns_bell()
-    emerald_seal()
-    sovereign_loot_box()
+    # sovereigns_crown() - drawn by tools/make_reworked_textures_b.py now
+    # sovereign_trophy() - drawn by tools/make_reworked_textures_b.py now
+    # royal_tribute() - drawn by tools/make_reworked_textures_b.py now
+    # royal_contract() - drawn by tools/make_reworked_textures_b.py now
+    # sovereigns_bell() - drawn by tools/make_reworked_textures_b.py now
+    # emerald_seal() - drawn by tools/make_reworked_textures_b.py now
+    # sovereign_loot_box() - drawn by tools/make_reworked_textures_b.py now
+    pass
