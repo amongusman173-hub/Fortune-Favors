@@ -486,25 +486,25 @@ if __name__ == "__main__":
     clockwork_core()
     clockwork_trophy()
     mech_scrap()
-    clockwork_gauntlet()
-    mechanical_heart()
+    # clockwork_gauntlet() - drawn by tools/make_boss_gear_textures.py now
+    # mechanical_heart() - drawn by tools/make_boss_gear_textures.py now
     clockwork_loot_box()
-    automaton_armor()
+    # automaton_armor() - drawn by tools/make_boss_gear_textures.py now
 
     astral_compass()
     starbound_trophy()
     magical_essence()
-    starpiercer()
-    astral_mantle()
+    # starpiercer() - drawn by tools/make_boss_gear_textures.py now
+    # astral_mantle() - drawn by tools/make_boss_gear_textures.py now
     magisters_codex()
     starbound_loot_box()
 
     void_anchor()
     colossus_trophy()
     voidsteel_scrap()
-    void_reaver()
-    colossus_plate()
-    shaping_sigil()
+    # void_reaver() - drawn by tools/make_boss_gear_textures.py now
+    # colossus_plate() - drawn by tools/make_boss_gear_textures.py now
+    # shaping_sigil() - drawn by tools/make_boss_gear_textures.py now
     voidshaper_loot_box()
 
     sovereigns_crown()

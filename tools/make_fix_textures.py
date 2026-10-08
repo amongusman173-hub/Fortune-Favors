@@ -349,4 +349,4 @@ if __name__ == "__main__":
     excalibur()
     mystery_box()
     clockwork_trophy()
-    clockwork_gauntlet()
+    # clockwork_gauntlet() - drawn by tools/make_boss_gear_textures.py now
