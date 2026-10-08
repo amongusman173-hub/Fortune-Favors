@@ -45,6 +45,13 @@ public abstract class VanishStepMixin {
       if (VanishManager.isHiddenBody(living)) {
          return true;
       }
+      // The Illusioner's Spellbook hides its caster for real, with an actual invisibility
+      // effect, so the old shape below misses it: ask the spell itself (server side, where
+      // the sound and dust packets to everyone else are cut).
+      if (living instanceof net.minecraft.server.level.ServerPlayer sp
+            && com.fortuneandfavors.economy.RaidGearManager.isTrulyHidden(sp)) {
+         return true;
+      }
       return living.isInvisible() && !living.hasEffect(MobEffects.INVISIBILITY);
    }
 
