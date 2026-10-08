@@ -3,6 +3,7 @@ package com.fortuneandfavors.economy;
 import com.fortuneandfavors.ModItems;
 import com.fortuneandfavors.ModSounds;
 import com.fortuneandfavors.util.Chat;
+import com.fortuneandfavors.util.FxKinds;
 import com.fortuneandfavors.util.Safe;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -407,12 +408,19 @@ public final class VoidShaperManager {
       }
       LIFTED.clear();
       LOOSE.clear();
+      // Last, with nothing tracked: whatever is still loaded and tagged is not saved with its chunk.
+      Safe.run("void shaper orphan blocks", () -> sweepOrphanedBlocks(server));
    }
 
-   /** A player's throw or grip: a tear in the world where the block came loose. */
+   /**
+    * A player's throw: a tear in the world where the block came loose, the void flaring out
+    * behind it along the throw, and a brief tear standing across the line it leaves on.
+    */
    private static void playerTearFx(ServerLevel level, Vec3 at, Vec3 dir) {
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, at, Vec3.ZERO, 0.8, 0.0, 0x7A2BD9);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.REVERSE_PORTAL, at, dir.normalize(), 0.0, 0.0, 0xB06BFF);
+      Vec3 d = dir.lengthSqr() < 1.0E-6 ? new Vec3(0.0, 0.0, 1.0) : dir.normalize();
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, at, Vec3.ZERO, 0.8, 0.0, VOID);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.REVERSE_PORTAL, at, d, 0.0, 0.0, VOID_LIGHT);
+      Fx.tear(level, ParticleTypes.REVERSE_PORTAL, at, new Vec3(-d.z, 0.0, d.x), 1.0, 8, VOID_LIGHT);
    }
 
    /** Void Anchor right-click: throw the hook and he follows it up. */
@@ -504,8 +512,11 @@ public final class VoidShaperManager {
          UUID.randomUUID(), Component.literal(BOSS_NAME), BossBarColor.PURPLE, BossBarOverlay.PROGRESS
       );
       bar.setVisible(true);
+      // His own world only; the fight tick hands it to anyone who walks into reach later.
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         bar.addPlayer(p);
+         if (p.level() == level) {
+            bar.addPlayer(p);
+         }
       }
 
       Fight fight = new Fight(boss.getUUID(), summoner.getUUID(), bar);
@@ -536,7 +547,9 @@ public final class VoidShaperManager {
       Vec3 hole = new Vec3(sx, sy, sz);
       Fx.rift(level, ParticleTypes.REVERSE_PORTAL, hole.add(0.0, 0.1, 0.0), 3.0, VOID);
       Fx.runeCircle(level, ParticleTypes.PORTAL, hole.add(0.0, 0.05, 0.0), 6.0, RISE_TICKS + 10, VOID);
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, hole.add(0.0, 0.15, 0.0), false, VOID_DARK);
+      wormhole(level, hole.add(0.0, 0.15, 0.0), true, VOID_DARK);
+      // The void showing through: dark motes drawn down into the hole for the whole climb.
+      Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, hole, 6.0, RISE_TICKS, VOID_DARK);
       Fx.spiral(level, ParticleTypes.REVERSE_PORTAL, hole, 9.0, RISE_TICKS, VOID_LIGHT);
       Fx.vortex(level, ParticleTypes.PORTAL, hole.add(0.0, 0.2, 0.0), 4.5, RISE_TICKS, VOID_DARK);
       level.playSound(null, sx, sy, sz, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.5F, 0.7F);
@@ -551,6 +564,10 @@ public final class VoidShaperManager {
    public static void tick(MinecraftServer server) {
       if (!LOOT_PAID.isEmpty()) {
          LOOT_PAID.removeIf(id -> findEntity(server, id) == null);
+      }
+      // Server ticks, not a level's game time: this only spaces the sweep out.
+      if (server.getTickCount() % ORPHAN_SWEEP_TICKS == ORPHAN_SWEEP_OFFSET) {
+         Safe.run("void shaper orphan blocks", () -> sweepOrphanedBlocks(server));
       }
       if (FIGHTS.isEmpty()) {
          return;
@@ -572,8 +589,14 @@ public final class VoidShaperManager {
       long now = ServerClock.clock(level);
 
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+         if (p.level() != level) {
+            // Through a portal: the bar does not follow them into another world.
+            fight.bar.removePlayer(p);
+            continue;
+         }
          if (isTarget(p, level) && p.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS) {
             fight.participants.add(p.getUUID());
+            fight.bar.addPlayer(p);
          }
       }
 
@@ -600,8 +623,9 @@ public final class VoidShaperManager {
       if (nearestPlayer(boss, ARENA_RADIUS) != null) {
          fight.lastSeen = now;
       } else if (now - fight.lastSeen > LONELY_TICKS) {
-         Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 0.2, 0.0), true, VOID_DARK);
+         wormhole(level, boss.position().add(0.0, 0.2, 0.0), false, VOID_DARK);
          Fx.rift(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 0.1, 0.0), 2.4, VOID);
+         Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, boss.position(), 4.0, 16, VOID_DARK);
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_DIG, SoundSource.HOSTILE, 1.4F, 0.8F);
          announce(level, "\u00a78The ground settles. \u00a77The Void Shaper is gone.");
          shutDown(server, fight);
@@ -751,6 +775,11 @@ public final class VoidShaperManager {
       if (got > 0) {
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.DEEPSLATE_BREAK, SoundSource.HOSTILE, 1.4F, 0.7F);
       }
+      if (got >= 3) {
+         // A big grab is seen as one: the void folds in on him and throws a ring back out as
+         // the blocks come up.
+         Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 1.0, 0.0), GRAB_RANGE * 0.6, 14, VOID);
+      }
    }
 
    /**
@@ -793,11 +822,11 @@ public final class VoidShaperManager {
       );
       level.addFreshEntity(display);
       fight.held.add(new Held(display.getUUID(), kindOf(state), angle, radius, height, fuse));
-      // The block is torn out of its socket and drawn up into his orbit along a thread of void,
-      // so every block he holds is seen leaving the ground it came from.
+      // The block is torn out of its socket and drawn up into his orbit along a weaving stream
+      // of void, so every block he holds is seen leaving the ground it came from.
       Vec3 hole = Vec3.atCenterOf(socket);
       Fx.rift(level, ParticleTypes.REVERSE_PORTAL, hole, 0.7, VOID);
-      Fx.beam(level, ParticleTypes.REVERSE_PORTAL, hole, display.position(), VOID_LIGHT);
+      Fx.soulStream(level, ParticleTypes.REVERSE_PORTAL, hole, display.position(), 0.5, 12, VOID_LIGHT);
       return true;
    }
 
@@ -819,7 +848,14 @@ public final class VoidShaperManager {
          double z = boss.getZ() + Math.sin(spin) * held.radius;
          display.setPos(x, y, z);
          display.hurtMarked = true;
-         level.sendParticles(ParticleTypes.PORTAL, x, y, z, 1, 0.1, 0.1, 0.1, 0.0);
+         // The void keeps hold of it: modded clients see dark motes drawn into the block every
+         // half second (one cue that animates itself), everyone else a portal mote now and then.
+         if (Math.floorMod(now + held.displayId.hashCode(), 10L) == 0L) {
+            com.fortuneandfavors.net.FfVfx.shape(level, FxKinds.VOID_COLLAPSE, ParticleTypes.REVERSE_PORTAL, new Vec3(x, y - 1.0, z), Vec3.ZERO, 0.9, 10.0, VOID);
+         }
+         if ((now & 1L) == 0L) {
+            Fx.vanilla(level, ParticleTypes.PORTAL, x, y, z, 1, 0.1, 0.1, 0.1, 0.0);
+         }
          if (fight.dying) {
             // The ceremony takes them down one at a time: nothing leaves his hands as a throw.
             continue;
@@ -857,12 +893,7 @@ public final class VoidShaperManager {
       Vec3 vel = dir.scale(held.kind.speed);
       fight.shots.add(new Shot(held.displayId, from, vel, held.kind, 120));
       Fx.muzzle(level, ParticleTypes.REVERSE_PORTAL, from, dir, kindColor(held.kind));
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.PORTAL, from.x, from.y, from.z, 18, 0.3, 0.3, 0.3, 0.08);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      Fx.vanilla(level, ParticleTypes.PORTAL, from.x, from.y, from.z, 12, 0.3, 0.3, 0.3, 0.08);
       level.playSound(null, from.x, from.y, from.z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 0.8F, 1.6F);
    }
 
@@ -878,13 +909,21 @@ public final class VoidShaperManager {
             it.remove();
             continue;
          }
+         // The trail: a beam segment in the block's own colour over this tick's flight for modded
+         // clients, every other tick, and one portal mote a tick for the rest. Fragments fly
+         // without one. It used to be a vanilla mote on every sub-step, to everyone.
+         if (!shot.fragment) {
+            if ((shot.life & 1) == 0) {
+               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.REVERSE_PORTAL, shot.pos, shot.pos.add(shot.vel.scale(2.0)), 0.0, 0.0, kindColor(shot.kind));
+            }
+            Fx.vanilla(level, ParticleTypes.PORTAL, shot.pos.x, shot.pos.y, shot.pos.z, 1, 0.05, 0.05, 0.05, 0.0);
+         }
          int steps = shot.kind.speed >= 1.5 ? 5 : 3;
          boolean done = false;
          for (int s = 0; s < steps && !done; s++) {
             shot.pos = shot.pos.add(shot.vel.scale(1.0 / steps));
             display.setPos(shot.pos.x, shot.pos.y, shot.pos.z);
             display.hurtMarked = true;
-            level.sendParticles(ParticleTypes.PORTAL, shot.pos.x, shot.pos.y, shot.pos.z, 1, 0.05, 0.05, 0.05, 0.0);
 
             if (!level.getBlockState(BlockPos.containing(shot.pos)).isAir()) {
                impact(level, boss, fight, shot, true);
@@ -917,17 +956,14 @@ public final class VoidShaperManager {
       Vec3 at = new Vec3(x, y + 0.2, z);
       if (shot.fragment) {
          // A leaf fragment: a puff and a scratch, not a second explosion.
-         level.sendParticles(ParticleTypes.CHERRY_LEAVES, x, y + 0.2, z, 4, 0.2, 0.2, 0.2, 0.03);
+         Fx.shatter(level, ParticleTypes.CHERRY_LEAVES, at, 0.3, kindColor(kind));
       } else {
          impactFx(level, kind, at, shot.vel);
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            level.sendParticles(ParticleTypes.EXPLOSION, x, y + 0.2, z, 1, 0.0, 0.0, 0.0, 0.0);
-            level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + 0.3, z, 12, 0.4, 0.3, 0.4, 0.05);
-            level.sendParticles(ParticleTypes.CRIT, x, y + 0.2, z, 10, 0.3, 0.3, 0.3, 0.06);
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+         Fx.vanillaOnly(() -> {
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION, x, y + 0.2, z, 1, 0.0, 0.0, 0.0, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, x, y + 0.3, z, 8, 0.4, 0.3, 0.4, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, x, y + 0.2, z, 6, 0.3, 0.3, 0.3, 0.06);
+         });
       }
       level.playSound(null, x, y, z, onTerrain ? SoundEvents.STONE_BREAK : SoundEvents.STONE_HIT, SoundSource.HOSTILE, shot.fragment ? 0.6F : 1.2F, 1.0F);
 
@@ -972,7 +1008,7 @@ public final class VoidShaperManager {
                fight.shots.add(new Shot(id, frag, dir.scale(0.7), kind, 30, true));
             }
          }
-         level.sendParticles(ParticleTypes.CHERRY_LEAVES, x, y + 0.3, z, 20, 0.6, 0.4, 0.6, 0.06);
+         Fx.vanilla(level, ParticleTypes.CHERRY_LEAVES, x, y + 0.3, z, 12, 0.6, 0.4, 0.6, 0.06);
       }
    }
 
@@ -1065,7 +1101,14 @@ public final class VoidShaperManager {
       }
       boss.setPos(x, y, z);
       boss.hurtMarked = true;
-      level.sendParticles(ParticleTypes.SCULK_SOUL, boss.getX(), boss.getY() + 0.2, boss.getZ(), 1, 0.2, 0.1, 0.2, 0.0);
+      // Each stride drags the void with it: motes sucked into his footprints for modded
+      // clients, a sculk soul for the rest - both a few times a second, not every tick.
+      if (boss.tickCount % 12 == 0) {
+         com.fortuneandfavors.net.FfVfx.shape(level, FxKinds.VOID_COLLAPSE, ParticleTypes.REVERSE_PORTAL, new Vec3(x, y - 1.3, z), Vec3.ZERO, 1.4, 10.0, VOID_DARK);
+      }
+      if (boss.tickCount % 3 == 0) {
+         Fx.vanilla(level, ParticleTypes.SCULK_SOUL, boss.getX(), boss.getY() + 0.2, boss.getZ(), 1, 0.2, 0.1, 0.2, 0.0);
+      }
    }
 
    // --------------------------------------------------------------------- wall
@@ -1097,8 +1140,12 @@ public final class VoidShaperManager {
       }
       fight.wallTicks = 120;
       fight.wallCentre = centre.add(0.0, 1.0, 0.0);
-      // The wall comes up out of a tear along its own base, rubble first.
+      // The wall comes up out of a tear along its own base, rubble first, and void smoulders up
+      // its face for as long as it stands - one self-timed cue per column, for modded clients.
       Fx.tear(level, ParticleTypes.REVERSE_PORTAL, centre.add(0.0, 0.2, 0.0), side, 5.0, 20, VOID);
+      for (int col = -2; col <= 2; col++) {
+         com.fortuneandfavors.net.FfVfx.shape(level, FxKinds.AURA, ParticleTypes.REVERSE_PORTAL, centre.add(side.scale(col)), Vec3.ZERO, 3.0, fight.wallTicks, VOID);
+      }
       Fx.rockburst(level, groundDust(level, centre.x, centre.y, centre.z), centre.add(0.0, 0.5, 0.0), 2.6, VOID_DARK);
       level.playSound(null, centre.x, centre.y, centre.z, SoundEvents.DEEPSLATE_PLACE, SoundSource.HOSTILE, 1.8F, 0.6F);
       if (blocks > 0) {
@@ -1120,8 +1167,8 @@ public final class VoidShaperManager {
             fight.wallBlocks.remove(id);
             continue;
          }
-         if (fight.wallTicks % 4 == 0) {
-            level.sendParticles(ParticleTypes.SCULK_SOUL, display.getX(), display.getY() + 0.5, display.getZ(), 1, 0.1, 0.1, 0.1, 0.0);
+         if (fight.wallTicks % 8 == 0) {
+            Fx.vanilla(level, ParticleTypes.SCULK_SOUL, display.getX(), display.getY() + 0.5, display.getZ(), 1, 0.1, 0.1, 0.1, 0.0);
          }
          for (ServerPlayer p : playersNear(level, display.getX(), display.getY(), display.getZ(), 1.4)) {
             Vec3 away = p.position().subtract(display.position());
@@ -1134,12 +1181,8 @@ public final class VoidShaperManager {
             p.hurtMarked = true;
          }
          if (fight.wallTicks <= 0) {
-            com.fortuneandfavors.net.FfVfx.enter();
-            try {
-               level.sendParticles(ParticleTypes.LARGE_SMOKE, display.getX(), display.getY() + 0.4, display.getZ(), 14, 0.3, 0.3, 0.3, 0.05);
-            } finally {
-               com.fortuneandfavors.net.FfVfx.exit();
-            }
+            // The shatter below draws the collapse for modded clients.
+            Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, display.getX(), display.getY() + 0.4, display.getZ(), 4, 0.3, 0.3, 0.3, 0.05);
             display.discard();
          }
       }
@@ -1286,7 +1329,12 @@ public final class VoidShaperManager {
       Vec3 eye = anchor.add(0.0, HORIZON_EYE, 0.0);
       fight.channelTicks = HORIZON_WARN;
       fight.strikes.add(new Strike(Strike.HORIZON, anchor, Vec3.ZERO, now + HORIZON_WARN, HORIZON_SAFE, HORIZON_DAMAGE, new HashSet<>()));
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, eye, false, VOID_DARK);
+      // The hole itself: a wormhole opening (it was drawn sealing - the old helper's flag runs
+      // backwards), a tear ripped across the sky through it for the whole charge, and the
+      // rift at its heart.
+      wormhole(level, eye, true, VOID_DARK);
+      Fx.tear(level, ParticleTypes.REVERSE_PORTAL, eye, new Vec3(1.0, 0.0, 0.0), 3.5, HORIZON_WARN, VOID_LIGHT);
+      Fx.rift(level, ParticleTypes.REVERSE_PORTAL, eye, 2.6, VOID);
       Fx.vortex(level, ParticleTypes.PORTAL, eye, 3.0, HORIZON_WARN, VOID);
       Fx.dome(level, ParticleTypes.END_ROD, anchor, HORIZON_SAFE, HORIZON_WARN, VOID_LIGHT);
       Fx.runeCircle(level, ParticleTypes.PORTAL, anchor.add(0.0, 0.05, 0.0), HORIZON_SAFE, HORIZON_WARN, VOID_LIGHT);
@@ -1301,13 +1349,9 @@ public final class VoidShaperManager {
    private static void tickChannel(ServerLevel level, Mob boss, Fight fight) {
       fight.channelTicks--;
       BossGrounding.clampToGround(level, boss, 1.5);
+      // The vortex, tear and rift sent at the cast draw the hole for modded clients.
       if (fight.channelTicks % 6 == 0) {
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + HORIZON_EYE, boss.getZ(), 20, 1.2, 0.6, 1.2, 0.05);
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+         Fx.vanilla(level, ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + HORIZON_EYE, boss.getZ(), 12, 1.2, 0.6, 1.2, 0.05);
       }
    }
 
@@ -1325,6 +1369,8 @@ public final class VoidShaperManager {
                // The last-second flash: the hole goes white before it goes off.
                Vec3 eye = s.at.add(0.0, HORIZON_EYE, 0.0);
                Fx.flare(level, ParticleTypes.END_ROD, eye, 2.0, VOID_LIGHT);
+               // ...and draws everything round it in for the last half second.
+               Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, eye, 9.0, (int) lead, VOID_DARK);
                level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.8F, 0.8F);
             } else {
                // The crack opens under the rune a moment before it bursts.
@@ -1368,7 +1414,7 @@ public final class VoidShaperManager {
       Fx.starburst(level, ParticleTypes.END_ROD, eye, 10.0, VOID_LIGHT);
       Fx.nova(level, ParticleTypes.REVERSE_PORTAL, eye, 8.0, VOID);
       Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, s.at.add(0.0, 0.1, 0.0), 18.0, VOID_DARK);
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, eye, true, VOID_DARK);
+      wormhole(level, eye, false, VOID_DARK);
       level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 2.0F, 0.6F);
       level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.4F, 0.5F);
       double safe2 = s.radius * s.radius;
@@ -1449,16 +1495,17 @@ public final class VoidShaperManager {
          double gz = z + Math.sin(a) * r;
          Fx.geyser(level, ParticleTypes.REVERSE_PORTAL, new Vec3(gx, BossGrounding.groundY(level, gx, gz, y), gz), 9.0, VOID_LIGHT);
       }
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         for (int i = 0; i < 26; i++) {
-            double ox = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
-            double oz = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
-            level.sendParticles(ParticleTypes.END_ROD, x + ox, y + RANDOM.nextDouble() * 2.0, z + oz, 1, 0.0, 0.9, 0.0, 0.25);
-            level.sendParticles(ParticleTypes.REVERSE_PORTAL, x + ox, y, z + oz, 1, 0.0, 1.2, 0.0, 0.3);
-         }
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
+      // Every other tick and ten points: fifty-two packets every tick was 2,600 per cast for a
+      // Bedrock player through Geyser.
+      if ((fight.invertTicks & 1) == 0) {
+         Fx.vanillaOnly(() -> {
+            for (int i = 0; i < 10; i++) {
+               double ox = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
+               double oz = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x + ox, y + RANDOM.nextDouble() * 2.0, z + oz, 1, 0.0, 0.9, 0.0, 0.25);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, x + ox, y, z + oz, 1, 0.0, 1.2, 0.0, 0.3);
+            }
+         });
       }
       if (RANDOM.nextInt(6) == 0) {
          level.playSound(null, x, y, z, SoundEvents.ENDERMAN_AMBIENT, SoundSource.HOSTILE, 1.2F, 0.5F);
@@ -1487,16 +1534,11 @@ public final class VoidShaperManager {
          Vec3 unit = pull.scale(1.0 / len);
          p.push(unit.x * 1.8, 0.4, unit.z * 1.8);
          p.hurtMarked = true;
+         // The chain, and the void streaming back along it into him. The chain's own vanilla
+         // version is the line clients without the mod see; the extra dotted line that used to
+         // follow it reached modded clients as well.
          Fx.chains(level, ParticleTypes.REVERSE_PORTAL, heart, p.position().add(0.0, 1.0, 0.0), VOID_LIGHT);
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            for (double d = 1.0; d < len; d += 1.4) {
-               Vec3 point = p.position().add(unit.scale(d));
-               level.sendParticles(ParticleTypes.PORTAL, point.x, point.y + 1.0, point.z, 1, 0.05, 0.05, 0.05, 0.0);
-            }
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+         Fx.soulStream(level, ParticleTypes.REVERSE_PORTAL, p.position().add(0.0, 1.0, 0.0), heart, 0.6, 16, VOID);
       }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 1.4F, 1.4F);
       announceNear(level, boss, ARENA_RADIUS, SAY + "\"Come here.\"");
@@ -1529,18 +1571,20 @@ public final class VoidShaperManager {
          return;
       }
       Vec3 from = boss.position();
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, from.add(0.0, 1.5, 0.0), true, VOID_DARK);
+      // He goes into the dark where he stood and steps out of a portal torn open behind them,
+      // facing their back. (Both wormholes used to be drawn the wrong way round.)
+      wormhole(level, from.add(0.0, 1.5, 0.0), false, VOID_DARK);
+      Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, from, 2.5, 10, VOID_DARK);
       boss.setPos(dest.x, dest.y, dest.z);
       boss.hurtMarked = true;
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, dest.add(0.0, 1.5, 0.0), false, VOID);
+      Vec3 facing = new Vec3(target.getX() - dest.x, 0.0, target.getZ() - dest.z);
+      Fx.riftPortal(level, ParticleTypes.REVERSE_PORTAL, dest.subtract(facing.lengthSqr() < 1.0E-4 ? Vec3.ZERO : facing.normalize().scale(0.6)), facing, 4.2, 8, VOID);
       Fx.tear(level, ParticleTypes.REVERSE_PORTAL, dest.add(0.0, 1.8, 0.0), new Vec3(0.0, 1.0, 0.0), 3.0, 10, VOID_LIGHT);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.REVERSE_PORTAL, from.x, from.y + 1.5, from.z, 60, 0.6, 1.0, 0.6, 0.15);
-         level.sendParticles(ParticleTypes.REVERSE_PORTAL, dest.x, dest.y + 1.5, dest.z, 60, 0.6, 1.0, 0.6, 0.15);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      Vec3 out = dest;
+      Fx.vanillaOnly(() -> {
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, from.x, from.y + 1.5, from.z, 24, 0.6, 1.0, 0.6, 0.15);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, out.x, out.y + 1.5, out.z, 24, 0.6, 1.0, 0.6, 0.15);
+      });
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.5F, 0.8F);
       // He arrives holding something, always.
       grab(level, boss, fight, 2, 18);
@@ -1559,12 +1603,12 @@ public final class VoidShaperManager {
       }
       fight.slamTarget = target.position();
       fight.slamCharge = 26;
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 1.5, 0.0), true, VOID_DARK);
+      wormhole(level, boss.position().add(0.0, 1.5, 0.0), false, VOID_DARK);
       boss.setPos(target.getX(), target.getY() + 12.0, target.getZ());
       boss.setDeltaMovement(Vec3.ZERO);
       boss.hurtMarked = true;
       Fx.runeCircle(level, ParticleTypes.PORTAL, fight.slamTarget.add(0.0, 0.05, 0.0), 5.5, 26, VOID);
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 1.5, 0.0), false, VOID);
+      wormhole(level, boss.position().add(0.0, 1.5, 0.0), true, VOID);
       announceNear(level, boss, ARENA_RADIUS, "§5§lVOID SLAM §8- §7he's above you. Get out of the ring.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 1.6F, 0.7F);
    }
@@ -1576,16 +1620,14 @@ public final class VoidShaperManager {
       }
       Vec3 target = fight.slamTarget;
       double r = 5.5;
+      // The rune circle sent at the cast is the modded ring; this one is for everyone else.
       if (fight.slamCharge % 4 == 0) {
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            for (int i = 0; i < 32; i++) {
-               double a = i * (Math.PI * 2.0 / 32.0);
-               level.sendParticles(ParticleTypes.PORTAL, target.x + Math.cos(a) * r, target.y + 0.2, target.z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
+         Fx.vanillaOnly(() -> {
+            for (int i = 0; i < 20; i++) {
+               double a = i * (Math.PI * 2.0 / 20.0);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, target.x + Math.cos(a) * r, target.y + 0.2, target.z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
             }
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+         });
       }
       fight.slamCharge--;
       if (fight.slamCharge == 6) {
@@ -1598,14 +1640,11 @@ public final class VoidShaperManager {
       Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, target.add(0.0, 0.1, 0.0), 8.0, VOID);
       Fx.rockburst(level, groundDust(level, target.x, target.y, target.z), target.add(0.0, 0.3, 0.0), 3.2, VOID_DARK);
       Fx.starburst(level, ParticleTypes.END_ROD, target.add(0.0, 0.6, 0.0), 5.0, VOID_LIGHT);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, target.x, target.y + 0.3, target.z, 4, 1.5, 0.5, 1.5, 0.0);
-         level.sendParticles(ParticleTypes.GUST, target.x, target.y + 0.3, target.z, 40, 4.0, 0.4, 4.0, 0.2);
-         level.sendParticles(ParticleTypes.REVERSE_PORTAL, target.x, target.y + 0.5, target.z, 80, 4.0, 0.8, 4.0, 0.2);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      Fx.vanillaOnly(() -> {
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, target.x, target.y + 0.3, target.z, 2, 1.5, 0.5, 1.5, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.GUST, target.x, target.y + 0.3, target.z, 16, 4.0, 0.4, 4.0, 0.2);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, target.x, target.y + 0.5, target.z, 24, 4.0, 0.8, 4.0, 0.2);
+      });
       level.playSound(null, target.x, target.y, target.z, ModSounds.BOSS_SLAM, SoundSource.HOSTILE, 2.2F, 0.6F);
       for (ServerPlayer p : playersNear(level, target.x, target.y, target.z, 5.5)) {
          Vec3 away = p.position().subtract(target);
@@ -1655,12 +1694,7 @@ public final class VoidShaperManager {
          held.fuse = Math.min(held.fuse, 1);
       }
       Fx.nova(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 2.0, 0.0), 6.0, VOID_LIGHT);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 2.0, boss.getZ(), 60, 1.5, 1.5, 1.5, 0.25);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      Fx.vanilla(level, ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 2.0, boss.getZ(), 24, 1.5, 1.5, 1.5, 0.25);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.SHULKER_SHOOT, SoundSource.HOSTILE, 1.4F, 0.8F);
    }
 
@@ -1727,6 +1761,9 @@ public final class VoidShaperManager {
       Fx.spiral(level, ParticleTypes.REVERSE_PORTAL, boss.position(), 10.0, DEATH_CEREMONY_TICKS, VOID_LIGHT);
       Fx.vortex(level, ParticleTypes.PORTAL, boss.position().add(0.0, 0.2, 0.0), 6.0, DEATH_CEREMONY_TICKS, VOID_DARK);
       Fx.aura(level, ParticleTypes.REVERSE_PORTAL, boss.position(), 5.5, DEATH_CEREMONY_TICKS, VOID);
+      // The void he borrowed is called back: dark motes drawn in from the whole arena for the
+      // length of the ceremony, timed so the ring they throw out is the moment he folds.
+      Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, boss.position(), 14.0, DEATH_CEREMONY_TICKS, VOID_DARK);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 2.0F, 0.6F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_HURT, SoundSource.HOSTILE, 1.8F, 0.5F);
       announceNear(level, boss, ARENA_RADIUS, SAY + "\"No. §5Not yet-\"");
@@ -1795,11 +1832,9 @@ public final class VoidShaperManager {
          Fx.flare(level, ParticleTypes.END_ROD, heart, 2.0, VOID_LIGHT);
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.8F, 0.6F);
       }
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 12, 1.2, 1.2, 1.2, 0.1);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
+      // The spiral, vortex, aura and collapse sent at the blow carry it for modded clients.
+      if ((fight.deathTicks & 1) == 0) {
+         Fx.vanilla(level, ParticleTypes.PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 6, 1.2, 1.2, 1.2, 0.1);
       }
 
       if (fight.deathTicks > 0) {
@@ -1834,7 +1869,8 @@ public final class VoidShaperManager {
       Fx.starburst(level, ParticleTypes.REVERSE_PORTAL, heart, 12.0, VOID);
       Fx.nova(level, ParticleTypes.REVERSE_PORTAL, heart, 9.0, VOID_LIGHT);
       Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, new Vec3(feet.x, BossGrounding.groundY(level, feet.x, feet.z, feet.y) + 0.1, feet.z), 18.0, VOID_DARK);
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, heart, true, VOID_DARK);
+      wormhole(level, heart, false, VOID_DARK);
+      Fx.rift(level, ParticleTypes.REVERSE_PORTAL, heart, 3.0, VOID);
       Fx.shatter(level, ParticleTypes.REVERSE_PORTAL, heart, 2.6, VOID);
       // ...and the ground he borrowed rains back down round the spot he stood.
       for (int i = 0; i < 8; i++) {
@@ -1845,13 +1881,10 @@ public final class VoidShaperManager {
          double y = BossGrounding.groundY(level, x, z, feet.y);
          Fx.meteor(level, groundDust(level, x, y, z), new Vec3(x - Math.cos(a) * 3.0, y + 18.0, z - Math.sin(a) * 3.0), new Vec3(x, y + 0.2, z), 14 + RANDOM.nextInt(10), VOID_LIGHT);
       }
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 8, 2.0, 2.0, 2.0, 0.15);
-         level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 200, 5.0, 3.0, 5.0, 0.3);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      Fx.vanillaOnly(() -> {
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 3, 2.0, 2.0, 2.0, 0.15);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 40, 5.0, 3.0, 5.0, 0.3);
+      });
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 2.2F, 0.7F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 2.0F, 0.4F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.8F, 0.5F);
@@ -1909,7 +1942,8 @@ public final class VoidShaperManager {
             }
          }
       }
-      return removed;
+      // The blocks a stray body left behind go with it.
+      return removed + sweepOrphanedBlocks(server);
    }
 
    /** Pays this boss's loot exactly once, however he dies, and releases the fight. */
@@ -1969,7 +2003,18 @@ public final class VoidShaperManager {
 
    // ------------------------------------------------------------------ teardown
 
+   /**
+    * Ends a fight's bookkeeping - and takes every block he made with it.
+    *
+    * <p>The blocks used to be cleared only by {@link #shutDown} and by the end of the death
+    * ceremony. A death by any other route - one the entity-death hook reports straight to
+    * {@link #onBossDeath} - released the fight here and left whatever he was holding, throwing
+    * or walling with hanging in the air: displays nothing tracked any more, saved with their
+    * chunk for good. Anything this pass cannot reach (an unloaded chunk) is caught by
+    * {@link #sweepOrphanedBlocks} when it loads again.
+    */
    private static void release(MinecraftServer server, Fight fight) {
+      discardBlocks(server, fight);
       fight.bar.setVisible(false);
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
          fight.bar.removePlayer(p);
@@ -1982,6 +2027,11 @@ public final class VoidShaperManager {
       if (boss != null) {
          boss.discard();
       }
+      release(server, fight);
+   }
+
+   /** Discards every display this fight made - held, in flight, or standing in a wall. */
+   private static void discardBlocks(MinecraftServer server, Fight fight) {
       for (Held held : new ArrayList<>(fight.held)) {
          Entity display = findEntity(server, held.displayId);
          if (display != null) {
@@ -2014,7 +2064,69 @@ public final class VoidShaperManager {
             }
          }
       }
-      release(server, fight);
+   }
+
+   // ------------------------------------------------------------- orphaned blocks
+
+   /** How often the orphan sweep runs (server ticks), and where in that cycle. */
+   private static final int ORPHAN_SWEEP_TICKS = 200;
+   private static final int ORPHAN_SWEEP_OFFSET = 37;
+
+   /**
+    * Discards every block display of his - and of the Sigil and the Reaver - that nothing is
+    * tracking any more.
+    *
+    * <p>Each one carries {@link #HOLD_TAG} (a block he holds, or one of a wall) or
+    * {@link #SHARD_TAG} (a block in flight, a leaf fragment, or a player's gripped or thrown
+    * block). They are tracked in memory and discarded by uuid, but a display is saved with its
+    * chunk, so a uuid lookup misses every one that is not loaded at the time: a fight torn down
+    * while its arena was unloaded, a player's throw that flew into an unloaded chunk, or any of
+    * them after a crash. Those come back the next time the chunk loads as a block hanging in the
+    * air that no tick would ever move or remove. This finds them by tag instead, every ten
+    * seconds, in every loaded world - so it also catches them the first time their chunk loads.
+    *
+    * @return how many displays were removed
+    */
+   public static int sweepOrphanedBlocks(MinecraftServer server) {
+      if (server == null) {
+         return 0;
+      }
+      Set<UUID> tracked = new HashSet<>(LIFTED.keySet());
+      for (Loose l : LOOSE) {
+         tracked.add(l.displayId);
+      }
+      for (Fight fight : FIGHTS.values()) {
+         for (Held h : fight.held) {
+            tracked.add(h.displayId);
+         }
+         for (Shot shot : fight.shots) {
+            tracked.add(shot.displayId);
+         }
+         tracked.addAll(fight.wallBlocks);
+      }
+      int removed = 0;
+      for (ServerLevel level : server.getAllLevels()) {
+         List<Entity> orphans = new ArrayList<>();
+         for (Entity e : level.getAllEntities()) {
+            if (e instanceof Display && !e.isRemoved() && isVoidBlock(e) && !tracked.contains(e.getUUID())) {
+               orphans.add(e);
+            }
+         }
+         for (Entity e : orphans) {
+            e.discard();
+            removed++;
+         }
+      }
+      if (removed > 0) {
+         com.fortuneandfavors.FortuneFavorsMod.LOGGER.info("[FF] Discarded {} orphaned Void Shaper block display(s)", removed);
+      }
+      return removed;
+   }
+
+   /** One of the displays this class makes: held, walled, thrown, fragmented or gripped. */
+   private static boolean isVoidBlock(Entity e) {
+      Set<String> tags = e.entityTags();
+      return tags.contains(HOLD_TAG) || tags.contains(SHARD_TAG);
    }
 
    // ---------------------------------------------------------- throwable support
@@ -2074,8 +2186,8 @@ public final class VoidShaperManager {
       LIFTED.put(display.getUUID(), new Lift(owner.getUUID(), kindOf(state), ServerClock.clock(level) + LIFT_LIFETIME));
       // The block is pulled out of its socket and up into the hand along a thread of void.
       Vec3 socket = Vec3.atCenterOf(pos);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, socket, Vec3.ZERO, 0.6, 0.0, 0x7A2BD9);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.REVERSE_PORTAL, socket, display.position(), 0.0, 0.0, 0xB06BFF);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, socket, Vec3.ZERO, 0.6, 0.0, VOID);
+      Fx.soulStream(level, ParticleTypes.REVERSE_PORTAL, socket, display.position(), 0.35, 10, VOID_LIGHT);
       level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.DEEPSLATE_BREAK, SoundSource.PLAYERS, 0.8F, 0.7F);
       return display.getUUID();
    }
@@ -2118,7 +2230,9 @@ public final class VoidShaperManager {
       Entity display = findEntity(server, displayId);
       if (display != null) {
          if (poof && display.level() instanceof ServerLevel level) {
-            level.sendParticles(ParticleTypes.POOF, display.getX(), display.getY(), display.getZ(), 10, 0.3, 0.3, 0.3, 0.04);
+            // Let go, the block folds back into the void it was borrowed from.
+            Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, display.position().add(0.0, -1.0, 0.0), 1.2, 8, VOID);
+            Fx.vanilla(level, ParticleTypes.POOF, display.getX(), display.getY(), display.getZ(), 6, 0.3, 0.3, 0.3, 0.04);
          }
          display.discard();
       }
@@ -2155,8 +2269,15 @@ public final class VoidShaperManager {
          display.setPos(at.x, at.y, at.z);
          display.setYRot(owner.getYRot());
          display.hurtMarked = true;
-         if (now % 4L == 0L && display.level() instanceof ServerLevel level) {
-            level.sendParticles(ParticleTypes.PORTAL, at.x, at.y, at.z, 1, 0.1, 0.1, 0.1, 0.0);
+         if (display.level() instanceof ServerLevel level) {
+            // Held by the void: dark motes drawn into the gripped block every half second for
+            // modded clients, a portal mote now and then for everyone else.
+            if (now % 10L == 0L) {
+               com.fortuneandfavors.net.FfVfx.shape(level, FxKinds.VOID_COLLAPSE, ParticleTypes.REVERSE_PORTAL, at.add(0.0, -1.0, 0.0), Vec3.ZERO, 0.8, 10.0, VOID_LIGHT);
+            }
+            if (now % 4L == 0L) {
+               Fx.vanilla(level, ParticleTypes.PORTAL, at.x, at.y, at.z, 1, 0.1, 0.1, 0.1, 0.0);
+            }
          }
       }
    }
@@ -2221,14 +2342,18 @@ public final class VoidShaperManager {
             continue;
          }
          boolean done = false;
+         // The trail: a violet beam segment over the flight for modded clients, every other tick,
+         // and a couple of portal motes for the rest. The motes were a bare FfVfx.particles,
+         // which reached modded clients as well.
+         if ((loose.life & 1) == 0) {
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.REVERSE_PORTAL, loose.pos, loose.pos.add(loose.vel.scale(2.0)), 0.0, 0.0, VOID_LIGHT);
+         }
+         Fx.vanilla(level, ParticleTypes.REVERSE_PORTAL, loose.pos.x, loose.pos.y, loose.pos.z, 2, 0.08, 0.08, 0.08, 0.0);
          int steps = loose.kind.speed >= 1.5 ? 5 : 3;
          for (int s = 0; s < steps && !done; s++) {
             loose.pos = loose.pos.add(loose.vel.scale(1.0 / steps));
             display.setPos(loose.pos.x, loose.pos.y, loose.pos.z);
             display.hurtMarked = true;
-            if (s == 0) {
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, loose.pos.x, loose.pos.y, loose.pos.z, 2, 0.08, 0.08, 0.08, 0.0);
-            }
             if (!level.getBlockState(BlockPos.containing(loose.pos)).isAir()) {
                done = true;
                break;
@@ -2243,9 +2368,11 @@ public final class VoidShaperManager {
          loose.life--;
          if (done || loose.life <= 0) {
             // The block shatters back into the void it was borrowed from.
-            Fx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, loose.pos.add(0.0, 0.2, 0.0), Vec3.ZERO, 1.8, 0.0, 0x9C8AB8);
-            Fx.shatter(level, ParticleTypes.REVERSE_PORTAL, loose.pos.add(0.0, 0.3, 0.0), 1.2, 0x7A2BD9);
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, loose.pos.x, loose.pos.y + 0.3, loose.pos.z, 10, 0.4, 0.3, 0.4, 0.05);
+            // ...through the block's own landing (fire for magma, frost for ice: the same table
+            // the boss's throws use) and a small implosion of the void taking it back.
+            impactFx(level, loose.kind, loose.pos.add(0.0, 0.2, 0.0), loose.vel);
+            Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, loose.pos.add(0.0, -1.0, 0.0), 1.6, 8, VOID);
+            Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, loose.pos.x, loose.pos.y + 0.3, loose.pos.z, 6, 0.4, 0.3, 0.4, 0.05);
             level.playSound(null, loose.pos.x, loose.pos.y, loose.pos.z, SoundEvents.STONE_HIT, SoundSource.PLAYERS, 1.0F, 1.0F);
             if (display != null) {
                display.discard();
@@ -2300,6 +2427,15 @@ public final class VoidShaperManager {
    }
 
    // ------------------------------------------------------------------ helpers
+
+   /**
+    * A wormhole that opens ({@code open}) or seals. Sent as the raw cue: {@code Fx.wormhole}'s
+    * flag runs the wrong way round, so the rise, the Event Horizon and every step and slam were
+    * drawn sealing where they opened and opening where they closed.
+    */
+   private static void wormhole(ServerLevel level, Vec3 at, boolean open, int color) {
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, ParticleTypes.REVERSE_PORTAL, at, Vec3.ZERO, 0.0, open ? 1.0 : 0.0, color);
+   }
 
    private static Mob bossOf(MinecraftServer server, Fight fight) {
       Entity raw = findEntity(server, fight.bossId);

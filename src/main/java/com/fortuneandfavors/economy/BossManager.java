@@ -2555,17 +2555,26 @@ public final class BossManager {
       // the rise his heartbeat is the loudest thing in the arena while the souls around him are
       // drawn down into the ground and a helix climbs out of it with him. These are timed effects
       // drawn by the client; the old calling was some six hundred particle calls in a single tick.
+      // The sculk bloom is the infection itself creeping out over those fourteen blocks for the
+      // whole of the rise, and the call's shriek goes out from the pit as sonic crescents.
       Vec3 pit = new Vec3(cx, cy, cz);
-      Fx.shockwave(level, ParticleTypes.SCULK_SOUL, pit, 14.0, SCULK_TEAL);
+      Fx.sculkBloom(level, ParticleTypes.SCULK_CHARGE_POP, pit, 14.0, 90, SCULK_TEAL);
       Fx.runeCircle(level, ParticleTypes.SCULK_SOUL, pit.add(0.0, 0.1, 0.0), 6.0, 90, SCULK_TEAL);
-      Fx.heartbeat(level, ParticleTypes.SCULK_SOUL, pit, 7.0, 90, 0x3FE0FF);
+      Fx.heartbeat(level, ParticleTypes.SCULK_SOUL, pit, 7.0, 90, SCULK_GLOW);
       Fx.vortex(level, ParticleTypes.SCULK_SOUL, pit, 5.0, 70, SCULK_TEAL);
-      Fx.spiral(level, ParticleTypes.SCULK_SOUL, pit, 7.0, 70, 0x3FE0FF);
-      for (int boom = 0; boom < 3; boom++) {
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, cx, cy + 1.2 + boom * 0.5, cz, 1, 0.0, 0.0, 0.0, 0.0);
+      Fx.spiral(level, ParticleTypes.SCULK_SOUL, pit, 7.0, 70, SCULK_GLOW);
+      for (int i = 0; i < 6; i++) {
+         double a = i * Math.PI / 3.0;
+         Fx.sonicRing(level, ParticleTypes.SCULK_SOUL, pit.add(0.0, 1.2, 0.0), new Vec3(Math.cos(a), 0.0, Math.sin(a)), 14.0, 20, SCULK_TEAL);
       }
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, cx, cy + 1.0, cz, 60, 3.0, 2.0, 3.0, 0.12);
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, cx, cy + 0.8, cz, 30, 2.5, 1.2, 2.5, 0.08);
+      // The old calling's vanilla booms and spores, for clients without the mod only.
+      Fx.vanillaOnly(() -> {
+         for (int boom = 0; boom < 3; boom++) {
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, cx, cy + 1.2 + boom * 0.5, cz, 1, 0.0, 0.0, 0.0, 0.0);
+         }
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, cx, cy + 1.0, cz, 30, 3.0, 2.0, 3.0, 0.12);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, cx, cy + 0.8, cz, 16, 2.5, 1.2, 2.5, 0.08);
+      });
       level.playSound(null, cx, cy, cz, SoundEvents.SCULK_SHRIEKER_SHRIEK, SoundSource.HOSTILE, 1.8F, 0.5F);
       level.playSound(null, cx, cy, cz, SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.5F, 0.4F);
       level.playSound(null, cx, cy, cz, SoundEvents.SCULK_CATALYST_BLOOM, SoundSource.HOSTILE, 1.2F, 0.6F);
@@ -2583,7 +2592,13 @@ public final class BossManager {
       )) {
          if (en instanceof Mob mob) {
             mob.setNoAi(true);
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, mob.getX(), mob.getY() + 1.0, mob.getZ(), 12, 0.5, 0.6, 0.5, 0.04);
+            // Each silenced creature's soul is drawn down into the pit (a few streams; the rest
+            // just go with a puff - a crowded call would otherwise be a cue per mob).
+            if (kills < 8) {
+               Fx.soulStream(level, ParticleTypes.SCULK_SOUL, mob.position().add(0.0, 1.0, 0.0), pit.add(0.0, 0.3, 0.0), 0.6, 24, SCULK_GLOW);
+            } else {
+               Fx.vanilla(level, ParticleTypes.SCULK_SOUL, mob.getX(), mob.getY() + 1.0, mob.getZ(), 6, 0.5, 0.6, 0.5, 0.04);
+            }
             mob.hurtServer(level, level.damageSources().sonicBoom(summoner), 9999.0F);
             kills++;
          }
@@ -2794,18 +2809,15 @@ public final class BossManager {
                b.riseTicks--;
                wardenMob.setPos(wardenMob.getX(), wardenMob.getY() + 0.05142857142857143, wardenMob.getZ());
                wardenMob.setYRot(wardenMob.getYRot() + 6.0F);
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, wardenMob.getX(), wardenMob.getY() + 0.5, wardenMob.getZ(), 8, 1.5, 0.7, 1.5, 0.05);
-               com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SCULK.defaultBlockState()),
-                  wardenMob.getX(),
-                  wardenMob.getY() + 0.3,
-                  wardenMob.getZ(),
-                  8,
-                  1.4,
-                  0.5,
-                  1.4,
-                  0.0
-               );
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, wardenMob.getX(), wardenMob.getY() + 0.8, wardenMob.getZ(), 4, 1.2, 0.5, 1.2, 0.01);
+               // The rise's dust and souls, every other tick and for clients without the mod only:
+               // modded clients have the calling's bloom, vortex and helix, which run for the rise.
+               if ((b.riseTicks & 1) == 0) {
+                  Fx.vanillaOnly(() -> {
+                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, wardenMob.getX(), wardenMob.getY() + 0.5, wardenMob.getZ(), 6, 1.5, 0.7, 1.5, 0.05);
+                     com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SCULK.defaultBlockState()),
+                        wardenMob.getX(), wardenMob.getY() + 0.3, wardenMob.getZ(), 6, 1.4, 0.5, 1.4, 0.0);
+                  });
+               }
                if (b.riseTicks % 8 == 0) {
                   // A widening ring every few beats, the ground cracking open further as he climbs.
                   double ring = (70 - b.riseTicks) * 0.22 + 1.0;
@@ -2822,14 +2834,22 @@ public final class BossManager {
 
                   // He is out. One roar, and the arena is thrown back by it: a flare at the chest, a
                   // starburst of soul-light, a shockwave across the floor, and three sonic rings.
+                  // The roar itself goes out as eight sculk crescents racing over the arena floor.
                   Vec3 chest = wardenMob.position().add(0.0, 1.8, 0.0);
-                  Fx.flare(level, ParticleTypes.SCULK_SOUL, chest, 2.4, 0x3FE0FF);
+                  Fx.flare(level, ParticleTypes.SCULK_SOUL, chest, 2.4, SCULK_GLOW);
                   Fx.starburst(level, ParticleTypes.SCULK_SOUL, chest, 6.0, SCULK_TEAL);
                   Fx.shockwave(level, ParticleTypes.SCULK_SOUL, wardenMob.position(), 12.0, SCULK_TEAL);
-                  for (int boom = 0; boom < 3; boom++) {
-                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, wardenMob.getX(), wardenMob.getY() + 1.2 + boom * 0.4, wardenMob.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+                  for (int i = 0; i < 8; i++) {
+                     double a = i * Math.PI / 4.0 + Math.PI / 8.0;
+                     com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SONIC_RING, ParticleTypes.SCULK_SOUL, chest.add(0.0, -0.6, 0.0),
+                        new Vec3(Math.cos(a), 0.0, Math.sin(a)), 16.0, 18, SCULK_TEAL);
                   }
-                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, wardenMob.getX(), wardenMob.getY() + 1.0, wardenMob.getZ(), 30, 2.5, 1.5, 2.5, 0.08);
+                  Fx.vanillaOnly(() -> {
+                     for (int boom = 0; boom < 3; boom++) {
+                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, wardenMob.getX(), wardenMob.getY() + 1.2 + boom * 0.4, wardenMob.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+                     }
+                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, wardenMob.getX(), wardenMob.getY() + 1.0, wardenMob.getZ(), 20, 2.5, 1.5, 2.5, 0.08);
+                  });
 
                   for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && pl.distanceToSqr(wardenMob) < 256.0)) {
                      double dx = p.getX() - wardenMob.getX();
@@ -2849,14 +2869,17 @@ public final class BossManager {
                b.bar.setColor(BossBarColor.RED);
 
                level.playSound(null, wardenMob.getX(), wardenMob.getY(), wardenMob.getZ(), SoundEvents.WARDEN_AGITATED, SoundSource.HOSTILE, 1.2F, 0.5F);
+               // Phase two is seen as well as heard: the deep sculk floods out under him and his
+               // chest flares.
+               Fx.sculkBloom(level, ParticleTypes.SCULK_CHARGE_POP, wardenMob.position(), 16.0, 80, SCULK_DEEP);
+               Fx.flare(level, ParticleTypes.SCULK_SOUL, wardenMob.position().add(0.0, 1.8, 0.0), 2.0, SCULK_GLOW);
                w.nextUltimate = now;   // phase two opens with RESONANCE
             }
 
             if (now >= w.nextAura) {
                w.nextAura = now + 30L;
-               com.fortuneandfavors.net.FfVfx.enter();
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, wardenMob.getX(), wardenMob.getY() + 2.0, wardenMob.getZ(), 4, 1.5, 1.5, 1.5, 0.02);
-               com.fortuneandfavors.net.FfVfx.exit();
+               // Vanilla-only: modded clients have the SCULK_AURA cue renewed below.
+               Fx.vanilla(level, ParticleTypes.SCULK_SOUL, wardenMob.getX(), wardenMob.getY() + 2.0, wardenMob.getZ(), 4, 1.5, 1.5, 1.5, 0.02);
             }
 
             tickWardenInfection(server, level, wardenMob, b, now);
@@ -2909,11 +2932,18 @@ public final class BossManager {
                }
             }
 
-            if (ServerClock.clock(level) % 10L == 0L) {
+            if (now % 10L == 0L) {
+               boolean renew = now % 40L == 0L;
                for (CaveSpider crawler : level.getEntitiesOfClass(
                   CaveSpider.class, wardenMob.getBoundingBox().inflate(48.0), c -> c.isAlive() && isSculkCrawler(c)
                )) {
-                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, crawler.getX(), crawler.getY() + 0.2, crawler.getZ(), 1, 0.2, 0.1, 0.2, 0.01);
+                  // Each crawler wears a small sculk aura (renewed with the Warden's own, and
+                  // lasting past the next renewal so it never blinks); the drifting soul is the
+                  // vanilla version of it.
+                  if (renew) {
+                     com.fortuneandfavors.net.FfVfx.follow(level, com.fortuneandfavors.net.FfVfx.SCULK_AURA, ParticleTypes.SCULK_SOUL, crawler, 0.5, 50.0, SCULK_TEAL);
+                  }
+                  Fx.vanilla(level, ParticleTypes.SCULK_SOUL, crawler.getX(), crawler.getY() + 0.2, crawler.getZ(), 1, 0.2, 0.1, 0.2, 0.01);
                }
             }
          } catch (Exception var15) {
@@ -2922,6 +2952,10 @@ public final class BossManager {
    }
 
    private static final int SCULK_TEAL = 0x1FD8C8;
+   /** The pale soul-light at the heart of the sculk effects: flares, souls, the bloom's spores. */
+   private static final int SCULK_GLOW = 0x3FE0FF;
+   /** The deep, nearly black teal of the sculk itself, for the infection and the void slam. */
+   private static final int SCULK_DEEP = 0x0E6A70;
    private static final String[] WARDEN_ROTATION_1 = {"sonic", "spires", "pull", "infection", "slam", "summon"};
    private static final String[] WARDEN_ROTATION_2 = {"echo", "eruption", "pull", "heartbeat", "spires", "infection", "slam", "summon"};
 
@@ -2932,30 +2966,43 @@ public final class BossManager {
    private static void wardenBeat(ServerLevel level, Mob warden, ActiveBoss b, ServerPlayer target, String move) {
       Vec3 at = warden.position();
       Vec3 chest = at.add(0.0, 1.6, 0.0);
+      // The modded picture of each move. These cues go to modded clients only (FfVfx.shape): the
+      // move bodies below keep their own vanilla particles, sent to clients without the mod only,
+      // so nobody sees both. Every one is drawn with the sculk and soul sprites - these moves used
+      // to borrow the frost nova, the ice eruption and the ice burst, so the Warden snowed.
       switch (move) {
          case "sonic" -> {
             Vec3 aim = target.position().add(0.0, 1.0, 0.0).subtract(chest).normalize();
             com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SONIC, ParticleTypes.SONIC_BOOM, chest, chest.add(aim.scale(26.0)), 0.0, 0.0, SCULK_TEAL);
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SONIC_RING, ParticleTypes.SCULK_SOUL, chest, aim, 26.0, 18, SCULK_TEAL);
          }
          case "eruption" -> {
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.FROST_NOVA, ParticleTypes.SCULK_SOUL, at, Vec3.ZERO, 10.0, 0.0, SCULK_TEAL);
+            // The floor blooms out to the ring, and souls boil up out of it in twelve columns.
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SCULK_BLOOM, ParticleTypes.SCULK_CHARGE_POP, at, Vec3.ZERO, 10.0, 60, SCULK_TEAL);
             for (int i = 0; i < 12; i++) {
                double a = i * Math.PI / 6.0, r = 4.0 + i % 3 * 1.5;
-               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_ERUPT, ParticleTypes.SCULK_SOUL, at.add(Math.cos(a) * r, 0.0, Math.sin(a) * r), Vec3.ZERO, 2.5, 0.0, SCULK_TEAL);
+               Vec3 foot = at.add(Math.cos(a) * r, 0.2, Math.sin(a) * r);
+               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SOUL_STREAM, ParticleTypes.SCULK_SOUL, foot, foot.add(0.0, 3.2, 0.0), 0.35, 20, SCULK_GLOW);
             }
          }
          case "pull" -> {
-            for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isCreative() && pl.distanceToSqr(warden) < 256.0)) {
-               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.SCULK_SOUL, chest, p.position().add(0.0, 1.0, 0.0), 0.0, 0.0, SCULK_TEAL);
+            // Each of you is reeled in along a stream of souls, out of a bloom at his feet.
+            for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isCreative() && !pl.isSpectator() && pl.distanceToSqr(warden) < 256.0)) {
+               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SOUL_STREAM, ParticleTypes.SCULK_SOUL, p.position().add(0.0, 1.0, 0.0), chest, 0.8, 20, SCULK_TEAL);
             }
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.SCULK_SOUL, at, Vec3.ZERO, 3.0, 0.0, SCULK_TEAL);
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SCULK_BLOOM, ParticleTypes.SCULK_CHARGE_POP, at, Vec3.ZERO, 3.5, 30, SCULK_TEAL);
          }
-         case "infection" -> com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.FROST_NOVA, ParticleTypes.SCULK_SOUL, at, Vec3.ZERO, b.warden.phase2 ? 34.0 : 26.0, 0.0, 0x0E6A70);
+         // The infection's bloom carries its own vanilla version: its move body is per-player.
+         case "infection" -> Fx.sculkBloom(level, ParticleTypes.SCULK_CHARGE_POP, at, b.warden.phase2 ? 34.0 : 26.0, 60, SCULK_DEEP);
          case "slam" -> {
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.SCULK_SOUL, at, Vec3.ZERO, b.warden.phase2 ? 14.0 : 10.0, 0.0, SCULK_TEAL);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.SCULK_SOUL, chest, Vec3.ZERO, 2.0, 0.0, SCULK_TEAL);
+            // The void slam: the dark folds into him, then the floor blooms where it landed.
+            double reach = b.warden.phase2 ? 14.0 : 10.0;
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.VOID_COLLAPSE, ParticleTypes.SCULK_SOUL, chest, Vec3.ZERO, reach * 0.6, 10, SCULK_DEEP);
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SCULK_BLOOM, ParticleTypes.SCULK_CHARGE_POP, at, Vec3.ZERO, reach, 40, SCULK_TEAL);
          }
-         default -> com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.SCULK_SOUL, at, Vec3.ZERO, 3.5, 30, SCULK_TEAL);
+         default -> {
+            // The summon is drawn per crawler by wardenSculkSummon.
+         }
       }
       if (move.equals("infection")) {
          wardenInfectionWave(level, warden, b);   // sends its own per-player cues, so not inside the vanilla-only block
@@ -2966,35 +3013,37 @@ public final class BossManager {
       switch (move) {
          case "echo" -> {
             // ECHO LANCES: he sights each of you three times, a fan of lances lands a moment later.
-            for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isCreative() && pl.distanceToSqr(warden) < 28.0 * 28.0)) {
+            for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isCreative() && !pl.isSpectator() && pl.distanceToSqr(warden) < 28.0 * 28.0)) {
                Vec3 aim = p.position().add(0.0, 1.0, 0.0).subtract(chest).normalize();
                for (int k = -1; k <= 1; k++) {
                   Vec3 dir = aim.yRot((float)(k * 0.28)).normalize();
                   snowHits.add(new SnowHit(warden, now + 16 + (k + 1) * 6L, 2, chest, chest.add(dir.scale(28.0)), 1.2, 9.0F, 0, com.fortuneandfavors.net.FfVfx.SONIC, 0.0));
                }
             }
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.SCULK_SOUL, chest.add(0.0, 1.4, 0.0), new Vec3(1.0, 0.0, 0.0), 1.0, 22, SCULK_TEAL);
+            Fx.tear(level, ParticleTypes.SCULK_SOUL, chest.add(0.0, 1.4, 0.0), new Vec3(1.0, 0.0, 0.0), 1.0, 22, SCULK_TEAL);
             level.playSound(null, at.x, at.y, at.z, SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.6F, 0.7F);
             return;
          }
          case "spires" -> {
-            // SCULK SPIRES: a line of sculk tears across the ground toward each of you. Step off the line.
-            for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isCreative() && pl.distanceToSqr(warden) < 30.0 * 30.0)) {
+            // SCULK SPIRES: a line of sculk tears across the ground toward each of you. Step off the
+            // line. Each spike lands as a burst of sculk (the cue tickSnowHits sends for a Warden hit).
+            for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isCreative() && !pl.isSpectator() && pl.distanceToSqr(warden) < 30.0 * 30.0)) {
                double a = Math.atan2(p.getZ() - at.z, p.getX() - at.x);
                for (int k = 1; k <= 14; k++) {
                   double x = at.x + Math.cos(a) * k * 1.4, z = at.z + Math.sin(a) * k * 1.4;
                   Vec3 foot = new Vec3(x, groundBelow(level, x, z, (int)at.y + 2), z);
-                  snowHits.add(new SnowHit(warden, now + 6 + k * 2L, 0, foot.add(0.0, 0.6, 0.0), Vec3.ZERO, 1.3, phase2 ? 9.0F : 7.0F, 0, com.fortuneandfavors.net.FfVfx.ICE_ERUPT, 1.8 + k * 0.1));
+                  snowHits.add(new SnowHit(warden, now + 6 + k * 2L, 0, foot.add(0.0, 0.6, 0.0), Vec3.ZERO, 1.3, phase2 ? 9.0F : 7.0F, 0, com.fortuneandfavors.util.FxKinds.SCULK_BLOOM, 1.2 + k * 0.06));
                }
             }
             level.playSound(null, at.x, at.y, at.z, SoundEvents.SCULK_SHRIEKER_SHRIEK, SoundSource.HOSTILE, 1.4F, 0.5F);
             return;
          }
          case "heartbeat" -> {
-            // HEARTBEAT: three beats of his heart. Anyone within 20 blocks not crouching - not keeping quiet - is heard.
+            // HEARTBEAT: three beats of his heart. Anyone within 20 blocks not crouching - not keeping
+            // quiet - is heard. Each beat is a sculk shock racing out over the floor.
             for (int beat = 0; beat < 3; beat++) {
                long t = now + 20 + beat * 18L;
-               snowHits.add(new SnowHit(warden, t, 4, at.add(0.0, 1.0, 0.0), Vec3.ZERO, 20.0, 7.0F, 0, com.fortuneandfavors.net.FfVfx.FROST_NOVA, 20.0));
+               snowHits.add(new SnowHit(warden, t, 4, at.add(0.0, 1.0, 0.0), Vec3.ZERO, 20.0, 7.0F, 0, com.fortuneandfavors.util.FxKinds.SCULK_BLOOM, 20.0));
             }
             for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && pl.distanceToSqr(warden) < 30.0 * 30.0)) {
                actionBar(p, "§3§lHEARTBEAT §7- §fcrouch§7. Stay quiet or he hears you.");
@@ -3002,21 +3051,22 @@ public final class BossManager {
             level.playSound(null, at.x, at.y, at.z, SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 2.0F, 0.6F);
             return;
          }
+         case "sonic", "eruption", "pull", "slam" -> {
+         }
          default -> {
+            // The summon sends its own cues per crawler, so it runs outside the vanilla-only block.
+            wardenSculkSummon(level, warden);
+            return;
          }
       }
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
+      Fx.vanillaOnly(() -> {
          switch (move) {
             case "sonic" -> wardenSonicBoom(level, warden, target);
             case "eruption" -> wardenEruptionRing(level, warden, b);
             case "pull" -> wardenTendrilPull(level, warden, b);
-            case "slam" -> wardenVoidSlam(level, warden, b);
-            default -> wardenSculkSummon(level, warden);
+            default -> wardenVoidSlam(level, warden, b);
          }
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      });
    }
 
    /**
@@ -3027,7 +3077,10 @@ public final class BossManager {
       long now = ServerClock.clock(level);
       Vec3 at = warden.position();
       int life = 70, charge = (int)(life * 0.42);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RESONANCE, ParticleTypes.SCULK_SOUL, at, Vec3.ZERO, life, 0.0, SCULK_TEAL);
+      // Sent through Fx so clients without the mod see the charge too (it had no vanilla picture).
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RESONANCE, ParticleTypes.SCULK_SOUL, at, Vec3.ZERO, life, 0.0, SCULK_TEAL);
+      // The ground under him goes black with sculk for the whole of the charge.
+      Fx.sculkBloom(level, ParticleTypes.SCULK_CHARGE_POP, at, 18.0, life, SCULK_DEEP);
       for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && pl.distanceToSqr(warden) < 40.0 * 40.0)) {
          p.addEffect(new MobEffectInstance(MobEffects.DARKNESS, 120, 0, false, false));
          actionBar(p, "§3§lRESONANCE §7- the deep dark answers him. §fGet distance - it reaches 18 blocks.");
@@ -3079,53 +3132,64 @@ public final class BossManager {
          0.9F,
          0.8F
       );
-      double mx = wardenMob.getX();
-      double my = wardenMob.getY();
-      double mz = wardenMob.getZ();
-
-      for (int ring = 0; ring < 3; ring++) {
-         double r = 1.2 + ring * 1.0;
-
-         for (int i = 0; i < 16; i++) {
-            double a = i / 16.0 * Math.PI * 2.0;
-            com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-13726853, 1.8F), mx + Math.cos(a) * r, my + 0.8 + ring * 0.15, mz + Math.sin(a) * r, 1, 0.04, 0.2, 0.04, 0.01
-            );
-         }
-      }
-
-      for (int t = 0; t < 6; t++) {
-         double ta = t / 6.0 * Math.PI * 2.0 + (Math.PI / 6);
-
-         for (int j = 1; j <= 5; j++) {
-            double dist = j * 0.6;
-            double curl = Math.sin(j * 0.8) * 0.3;
-            com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SCULK.defaultBlockState()),
-               mx + Math.cos(ta) * dist + curl,
-               my + 0.3 + j * 0.15,
-               mz + Math.sin(ta) * dist + curl,
-               2,
-               0.0,
-               0.0,
-               0.0,
-               0.02
-            );
-         }
-      }
-
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, mx, my + 1.5, mz, 22, 1.5, 0.8, 1.5, 0.03);
+      // The swing as modded clients see it: the sculk lashing out over the floor around him,
+      // and a flare at his chest when it connects. The old dust rings and sculk chips below are
+      // the vanilla picture, for clients without the mod only.
+      Vec3 feet = wardenMob.position();
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SCULK_BLOOM, ParticleTypes.SCULK_CHARGE_POP, feet, Vec3.ZERO, 4.5, 16, SCULK_TEAL);
       if (hit) {
-         for (int i = 0; i < 32; i++) {
-            double a = i / 32.0 * Math.PI * 2.0;
-            double r = 1.6 + i % 4 * 0.7;
-            com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-5185306, 2.2F), mx + Math.cos(a) * r, my + 1.2, mz + Math.sin(a) * r, 1, 0.05, 0.3, 0.05, 0.01);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.FLARE, ParticleTypes.SCULK_SOUL, feet.add(0.0, 1.4, 0.0), Vec3.ZERO, 1.6, 0.0, SCULK_GLOW);
+      }
+      final boolean landed = hit;
+      Fx.vanillaOnly(() -> {
+         double mx = wardenMob.getX();
+         double my = wardenMob.getY();
+         double mz = wardenMob.getZ();
+
+         for (int ring = 0; ring < 2; ring++) {
+            double r = 1.2 + ring * 1.5;
+
+            for (int i = 0; i < 12; i++) {
+               double a = i / 12.0 * Math.PI * 2.0;
+               com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-13726853, 1.8F), mx + Math.cos(a) * r, my + 0.8 + ring * 0.15, mz + Math.sin(a) * r, 1, 0.04, 0.2, 0.04, 0.01
+               );
+            }
          }
 
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, mx, my + 1.4, mz, 24, 1.5, 0.8, 1.5, 0.05);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, mx, my + 1.2, mz, 3, 0.8, 0.5, 0.8, 0.0);
-         com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SCULK.defaultBlockState()), mx, my + 0.5, mz, 18, 1.2, 0.6, 1.2, 0.0);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, mx, my + 1.0, mz, 12, 1.0, 0.5, 1.0, 0.02);
-         com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-16111062, 1.5F), mx, my + 0.8, mz, 20, 1.5, 0.4, 1.5, 0.02);
-      }
+         for (int t = 0; t < 6; t++) {
+            double ta = t / 6.0 * Math.PI * 2.0 + (Math.PI / 6);
+
+            for (int j = 1; j <= 5; j++) {
+               double dist = j * 0.6;
+               double curl = Math.sin(j * 0.8) * 0.3;
+               com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SCULK.defaultBlockState()),
+                  mx + Math.cos(ta) * dist + curl,
+                  my + 0.3 + j * 0.15,
+                  mz + Math.sin(ta) * dist + curl,
+                  1,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.02
+               );
+            }
+         }
+
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, mx, my + 1.5, mz, 22, 1.5, 0.8, 1.5, 0.03);
+         if (landed) {
+            for (int i = 0; i < 16; i++) {
+               double a = i / 16.0 * Math.PI * 2.0;
+               double r = 1.6 + i % 2 * 1.4;
+               com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-5185306, 2.2F), mx + Math.cos(a) * r, my + 1.2, mz + Math.sin(a) * r, 1, 0.05, 0.3, 0.05, 0.01);
+            }
+
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, mx, my + 1.4, mz, 24, 1.5, 0.8, 1.5, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, mx, my + 1.2, mz, 3, 0.8, 0.5, 0.8, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SCULK.defaultBlockState()), mx, my + 0.5, mz, 18, 1.2, 0.6, 1.2, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, mx, my + 1.0, mz, 12, 1.0, 0.5, 1.0, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-16111062, 1.5F), mx, my + 0.8, mz, 20, 1.5, 0.4, 1.5, 0.02);
+         }
+      });
    }
 
    private static void wardenSonicBoom(ServerLevel level, Mob wardenMob, ServerPlayer target) {
@@ -3168,14 +3232,15 @@ public final class BossManager {
       double uz = tz / len;
       float dmg = 6.0F;
 
-      for (double d = 2.0; d <= 26.0; d += 1.5) {
+      // Vanilla clients only (wardenBeat runs this inside Fx.vanillaOnly); spaced to stay cheap.
+      for (double d = 2.0; d <= 26.0; d += 2.5) {
          double px = wardenMob.getX() + ux * d;
          double py = wardenMob.getY() + 1.6 + uy * d;
          double pz = wardenMob.getZ() + uz * d;
          com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, px, py, pz, 2, 0.3, 0.3, 0.3, 0.0);
          com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-5185306, 1.2F), px, py, pz, 4, 0.3, 0.3, 0.3, 0.01);
          com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-16115174, 1.5F), px, py, pz, 2, 0.2, 0.2, 0.2, 0.01);
-         if (d % 6.0 < 1.5) {
+         if (d % 6.0 < 2.5) {
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, px, py, pz, 4, 0.8, 0.4, 0.8, 0.02);
          }
       }
@@ -3207,14 +3272,17 @@ public final class BossManager {
       boolean phase2 = b.warden != null && b.warden.phase2;
       int count = 0;
 
-      for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && pl.distanceToSqr(wardenMob) < (phase2 ? 34.0 : 26.0) * (phase2 ? 34.0 : 26.0))) {
+      for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isCreative() && !pl.isSpectator() && pl.distanceToSqr(wardenMob) < (phase2 ? 34.0 : 26.0) * (phase2 ? 34.0 : 26.0))) {
          int cur = b.warden.infection.getOrDefault(p.getUUID(), 0);
          if (cur < 3) {
             b.warden.infection.put(p.getUUID(), cur + 1);
             b.warden.infectionNext.put(p.getUUID(), ServerClock.clock(level) + 40L);
             b.warden.infectionShowUntil.put(p.getUUID(), ServerClock.clock(level) + 700L);
             showInfectionBar(p, cur + 1, b);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.SCULK_SOUL, p.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 0.5 + 0.3 * cur, 0.0, SCULK_TEAL);
+            // The infection is seen taking root: a stream of souls out of him into each of you,
+            // and a bloom at your feet that grows with the stage. (It was the ice burst.)
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SOUL_STREAM, ParticleTypes.SCULK_SOUL, wardenMob.position().add(0.0, 1.8, 0.0), p.position().add(0.0, 1.0, 0.0), 0.7, 22, SCULK_DEEP);
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SCULK_BLOOM, ParticleTypes.SCULK_CHARGE_POP, p.position(), Vec3.ZERO, 1.2 + 0.6 * cur, 40, SCULK_TEAL);
             if (cur == 0) {
                actionBar(p, "§3§lSCULK INFECTION§r§7 has taken root...");
             } else if (cur == 1) {
@@ -3223,7 +3291,7 @@ public final class BossManager {
                actionBar(p, "§3§lSCULK INFECTION III§r§7 - it is feeding on your very life.");
             }
 
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, p.getX(), p.getY() + 1.0, p.getZ(), 14, 0.4, 0.6, 0.4, 0.04);
+            Fx.vanilla(level, ParticleTypes.SCULK_SOUL, p.getX(), p.getY() + 1.0, p.getZ(), 14, 0.4, 0.6, 0.4, 0.04);
             count++;
          }
       }
@@ -3253,7 +3321,10 @@ public final class BossManager {
          for (UUID id : new HashSet<>(b.warden.infection.keySet())) {
             ServerPlayer p = server.getPlayerList().getPlayer(id);
             int lvl = b.warden.infection.getOrDefault(id, 0);
-            if (p != null && p.isAlive() && !p.isCreative()) {
+            // Only while they share his world: the drain heals him, and a player who left through
+            // a portal was being hurt with this level's damage sources and feeding a boss they
+            // could no longer reach. The stage holds (and fades) again when they come back.
+            if (p != null && p.isAlive() && !p.isCreative() && !p.isSpectator() && p.level() == level) {
                // One pulse every 40 ticks carries every stage at once. Stages I and II used to share
                // one clock and reset it for each other, so the pulse - and its particles, sounds and
                // sculk veins - fired on whichever stage won the race, over and over.
@@ -3272,7 +3343,9 @@ public final class BossManager {
                         addTempSculk(level, below, Blocks.SCULK_VEIN.defaultBlockState(), now + 160L);
                      }
                   }
-                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, p.getX(), p.getY() + 1.0, p.getZ(), 2 + lvl, 0.3, 0.5, 0.3, 0.02);
+                  // The infected wear the sculk: an aura renewed with each pulse, heavier per stage.
+                  com.fortuneandfavors.net.FfVfx.follow(level, com.fortuneandfavors.net.FfVfx.SCULK_AURA, ParticleTypes.SCULK_SOUL, p, 0.3 + 0.25 * lvl, 45.0, SCULK_DEEP);
+                  Fx.vanilla(level, ParticleTypes.SCULK_SOUL, p.getX(), p.getY() + 1.0, p.getZ(), 2 + lvl, 0.3, 0.5, 0.3, 0.02);
                }
 
                if (lvl >= 3) {
@@ -3283,20 +3356,9 @@ public final class BossManager {
                      wardenMob.heal(3.0F);
                      p.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 100, 1, false, false));
                      p.addEffect(new MobEffectInstance(MobEffects.DARKNESS, 60, 0, false, false));
-                     double dx = wardenMob.getX() - p.getX();
-                     double dz = wardenMob.getZ() - p.getZ();
-                     double len = Math.max(0.1, Math.sqrt(dx * dx + dz * dz));
-
-                     for (int i = 1; i <= 8; i++) {
-                        double t = i / 8.0;
-                        double lx = p.getX() + dx * t;
-                        double lz = p.getZ() + dz * t;
-                        com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-13726853, 1.5F), lx, p.getY() + 1.0 + Math.sin(t * Math.PI) * 0.5, lz, 2, 0.05, 0.05, 0.05, 0.0
-                        );
-                     }
-
-                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, p.getX(), p.getY() + 1.0, p.getZ(), 14, 0.5, 0.6, 0.5, 0.06);
-                     com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-16115174, 1.4F), p.getX(), p.getY() + 0.5, p.getZ(), 8, 0.3, 0.4, 0.3, 0.04);
+                     // The life going: a stream of souls out of the victim into his chest.
+                     Fx.soulStream(level, ParticleTypes.SCULK_SOUL, p.position().add(0.0, 1.0, 0.0), wardenMob.position().add(0.0, 1.8, 0.0), 0.9, 30, SCULK_GLOW);
+                     Fx.vanilla(level, ParticleTypes.SCULK_SOUL, p.getX(), p.getY() + 1.0, p.getZ(), 10, 0.5, 0.6, 0.5, 0.06);
                      level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 0.8F, 0.5F);
                      actionBar(p, "§3§lThe sculk drinks your life and feeds the Elder Warden!");
                   }
@@ -3622,8 +3684,8 @@ public final class BossManager {
          double px = emx + Math.cos(a) * r;
          double pz = emz + Math.sin(a) * r;
 
-         for (int h = 0; h < 5; h++) {
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, px, emy + 0.5 + h * 0.5, pz, 2, 0.15, 0.2, 0.15, 0.02);
+         for (int h = 0; h < 3; h++) {
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, px, emy + 0.5 + h * 0.8, pz, 2, 0.15, 0.2, 0.15, 0.02);
             com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-16115174, 1.0F), px, emy + 0.5 + h * 0.5, pz, 1, 0.1, 0.15, 0.1, 0.01);
          }
       }
@@ -3748,9 +3810,9 @@ public final class BossManager {
          com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-16448251, 2.2F), mx + Math.cos(a) * r, my + 1.5 + i * 0.05, mz + Math.sin(a) * r, 2, 0.05, 0.1, 0.05, 0.0);
       }
 
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, mx, my + 0.5, mz, 60, 5.0, 2.0, 5.0, 0.12);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, mx, my + 0.5, mz, 30, 5.0, 2.0, 5.0, 0.12);
       com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION, mx, my + 1.0, mz, 8, 3.0, 1.0, 3.0, 0.0);
-      com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-12973510, 2.5F), mx, my + 0.5, mz, 40, 4.0, 2.0, 4.0, 0.08);
+      com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-12973510, 2.5F), mx, my + 0.5, mz, 20, 4.0, 2.0, 4.0, 0.08);
       level.playSound(null, mx, my, mz, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 2.5F, 0.4F);
 
       for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isCreative() && pl.distanceToSqr(wardenMob) < radius * radius)) {
@@ -3764,8 +3826,8 @@ public final class BossManager {
          p.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 120, 1, false, false));
       }
 
-      for (int i = 0; i < 40; i++) {
-         double a = i / 40.0 * Math.PI * 2.0;
+      for (int i = 0; i < 24; i++) {
+         double a = i / 24.0 * Math.PI * 2.0;
          double r = 1.0 + RANDOM.nextDouble() * (radius - 1.0);
          double px = mx + Math.cos(a + i * 0.3) * r;
          double pz = mz + Math.sin(a + i * 0.3) * r;
@@ -4259,32 +4321,36 @@ public final class BossManager {
       Vec3 eye = p.getEyePosition(1.0F);
       Vec3 look = p.getLookAngle();
       level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.PLAYERS, 0.9F, 0.8F);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SONIC, ParticleTypes.SONIC_BOOM, eye.add(0.0, -0.2, 0.0), eye.add(look.scale(24.0)), 0.0, 0.0, SCULK_TEAL);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.SONIC_BOOM, eye.add(look.scale(1.2)).add(0.0, -0.2, 0.0), Vec3.ZERO, 0.9, 0.0, SCULK_TEAL);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.SONIC_BOOM, eye.add(look.scale(2.0)), Vec3.ZERO, 1.5, 0.0, SCULK_TEAL);
-      com.fortuneandfavors.net.FfVfx.enter();   // the vanilla line below is for vanilla clients
-
-      for (double d = 2.0; d <= 24.0; d += 2.0) {
-         double px = eye.x + look.x * d;
-         double py = eye.y - 0.2 + look.y * d;
-         double pz = eye.z + look.z * d;
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, px, py, pz, 1, 0.0, 0.0, 0.0, 0.0);
-         com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-5185306, 1.0F), px, py, pz, 3, 0.2, 0.2, 0.2, 0.01);
-      }
-      com.fortuneandfavors.net.FfVfx.exit();
+      // Sonic Charge, drawn as the Warden's own scream: the sonic beam down the line of sight,
+      // sculk shockwave crescents racing along it, and a soul-teal flare at the muzzle. It used to
+      // borrow the ice burst for the muzzle, which is why the staff threw snowflakes.
+      Vec3 muzzle = eye.add(0.0, -0.2, 0.0).add(look.scale(1.2));
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.SONIC, ParticleTypes.SONIC_BOOM, eye.add(0.0, -0.2, 0.0), eye.add(look.scale(24.0)), 0.0, 0.0, SCULK_TEAL);
+      Fx.sonicRing(level, ParticleTypes.SCULK_SOUL, muzzle, look, 24.0, 18, SCULK_TEAL);
+      Fx.flare(level, ParticleTypes.SCULK_CHARGE_POP, muzzle, 0.9, SCULK_GLOW);
+      // The old line of vanilla booms, now for clients without the mod only (the templates above
+      // already send their own vanilla versions, so this is kept short).
+      Fx.vanillaOnly(() -> {
+         for (double d = 4.0; d <= 24.0; d += 4.0) {
+            double px = eye.x + look.x * d;
+            double py = eye.y - 0.2 + look.y * d;
+            double pz = eye.z + look.z * d;
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, px, py, pz, 1, 0.0, 0.0, 0.0, 0.0);
+         }
+      });
 
       level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.WARDEN_SONIC_BOOM, SoundSource.PLAYERS, 1.0F, 0.9F);
       float dmg = 8.0F;
 
       for (LivingEntity e : level.getEntitiesOfClass(
-         LivingEntity.class, p.getBoundingBox().inflate(26.0), ex -> ex.isAlive() && ex != p && !isFriendlySkeleton(ex)
+         LivingEntity.class, p.getBoundingBox().inflate(26.0), ex -> ex.isAlive() && ex != p && !ex.isSpectator() && !isFriendlySkeleton(ex)
       )) {
          Vec3 rel = e.getEyePosition().subtract(eye);
          double proj = rel.dot(look);
          if (!(proj < 1.0) && !(proj > 24.0)) {
             Vec3 perp = rel.subtract(look.scale(proj));
             if (!(perp.lengthSqr() > 3.0)) {
-               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.SCULK_SOUL, e.position().add(0.0, e.getBbHeight() * 0.5, 0.0), Vec3.ZERO, 0.6, 0.0, SCULK_TEAL);
+               Fx.flare(level, ParticleTypes.SCULK_CHARGE_POP, e.position().add(0.0, e.getBbHeight() * 0.5, 0.0), 0.8, SCULK_TEAL);
                if (e instanceof ServerPlayer other) {
                   other.hurtServer(level, level.damageSources().sonicBoom(p), dmg);
                   other.setDeltaMovement(other.getDeltaMovement().add(look.x * 1.2, 0.4, look.z * 1.2));
@@ -4308,7 +4374,7 @@ public final class BossManager {
       level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.SCULK_BLOCK_SPREAD, SoundSource.PLAYERS, 1.0F, 0.7F);
       int wrapped = 0;
 
-      for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, p.getBoundingBox().inflate(22.0), ex -> ex.isAlive() && ex != p)) {
+      for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, p.getBoundingBox().inflate(22.0), ex -> ex.isAlive() && ex != p && !ex.isSpectator())) {
          Vec3 rel = e.getEyePosition().subtract(eye);
          double proj = rel.dot(look);
          if (!(proj < 1.0) && !(proj > 20.0)) {
@@ -4316,9 +4382,13 @@ public final class BossManager {
             if (!(perp.lengthSqr() > 2.5)) {
                wrapInSculk(level, e, p.getUUID(), until);
                bloombBlocksUnderneath(level, e, until);
-               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.SCULK_SOUL, eye.add(0.0, -0.3, 0.0), e.position().add(0.0, 1.0, 0.0), 0.0, 0.0, SCULK_TEAL);
-               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.SCULK_SOUL, e.position(), Vec3.ZERO, 1.6, 40, SCULK_TEAL);
-               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_ERUPT, ParticleTypes.SCULK_SOUL, e.position(), Vec3.ZERO, 2.2, 0.0, SCULK_TEAL);
+               // Sculk Bloom: a weaving stream of souls carries the bloom from the staff to the
+               // target, and the sculk creeps out over the ground under them as the tendrils close.
+               // (It used to erupt in ice spikes - the snowflakes players saw on a sculk staff.)
+               if (wrapped < 6) {
+                  Fx.soulStream(level, ParticleTypes.SCULK_SOUL, eye.add(0.0, -0.3, 0.0), e.position().add(0.0, 1.0, 0.0), 0.6, 16, SCULK_TEAL);
+                  Fx.sculkBloom(level, ParticleTypes.SCULK_CHARGE_POP, e.position(), 2.4, 60, SCULK_TEAL);
+               }
                wrapped++;
             }
          }
@@ -4326,6 +4396,11 @@ public final class BossManager {
 
       if (wrapped > 0) {
          Chat.msg(p, "&3The sculk blooms - " + wrapped + " caught in the tendrils.");
+      } else {
+         // A miss still blooms, so the cast reads: a short creep of sculk where the staff pointed.
+         Vec3 end = eye.add(look.scale(8.0));
+         Fx.soulStream(level, ParticleTypes.SCULK_SOUL, eye.add(0.0, -0.3, 0.0), end, 0.5, 14, SCULK_TEAL);
+         Fx.sculkBloom(level, ParticleTypes.SCULK_CHARGE_POP, new Vec3(end.x, groundBelow(level, end.x, end.z, (int)end.y + 2), end.z), 2.0, 40, SCULK_TEAL);
       }
 
       return null;
@@ -4370,7 +4445,9 @@ public final class BossManager {
          w.nextDrain = ServerClock.clock(level) + 20L;
       }
 
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, e.getX(), e.getY() + 1.0, e.getZ(), 14, 0.5, 0.6, 0.5, 0.03);
+      // The tendrils closing. Modded clients already have the bloom the staff sent under this
+      // body; the spore pop is the vanilla picture of it.
+      Fx.vanilla(level, ParticleTypes.SCULK_CHARGE_POP, e.getX(), e.getY() + 1.0, e.getZ(), 10, 0.5, 0.6, 0.5, 0.03);
       if (e instanceof ServerPlayer sp) {
          actionBar(sp, "§3The sculk wraps around you - §fSPAM JUMP§3 to tear free!");
       }
@@ -4395,7 +4472,8 @@ public final class BossManager {
                ServerLevel level = (ServerLevel)ent.level();
                if (now >= w.until) {
                   sculkWrapped.remove(e.getKey());
-                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, ent.getX(), ent.getY() + 1.0, ent.getZ(), 10, 0.5, 0.6, 0.5, 0.03);
+                  // The sculk withers off them in flakes.
+                  Fx.flare(level, ParticleTypes.SCULK_CHARGE_POP, ent.position().add(0.0, 1.0, 0.0), 0.7, SCULK_TEAL);
                   if (ent instanceof ServerPlayer sp) {
                      actionBar(sp, "§aThe sculk lets go.");
                   }
@@ -4405,17 +4483,18 @@ public final class BossManager {
                      sp.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 3, false, false));
                      if (sp.onGround() && sp.getDeltaMovement().y > 0.02) {
                         w.jumps++;
-                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_CHARGE_POP, sp.getX(), sp.getY() + 0.3, sp.getZ(), 6, 0.3, 0.2, 0.3, 0.02);
+                        // Each jump tears a few tendrils: a small spore flash at the feet.
+                        Fx.flare(level, ParticleTypes.SCULK_CHARGE_POP, sp.position().add(0.0, 0.3, 0.0), 0.5, SCULK_TEAL);
                         if (w.jumps >= 6) {
                            sculkWrapped.remove(e.getKey());
-                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, sp.getX(), sp.getY() + 1.0, sp.getZ(), 20, 0.6, 0.7, 0.6, 0.04);
+                           Fx.flare(level, ParticleTypes.SCULK_SOUL, sp.position().add(0.0, 1.0, 0.0), 1.1, SCULK_GLOW);
                            actionBar(sp, "§aYou tear free of the sculk!");
                            continue;
                         }
                      }
                   } else if (w.mob && now >= w.mobBreakAt) {
                      sculkWrapped.remove(e.getKey());
-                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, ent.getX(), ent.getY() + 1.0, ent.getZ(), 18, 0.5, 0.6, 0.5, 0.04);
+                     Fx.flare(level, ParticleTypes.SCULK_SOUL, ent.position().add(0.0, 1.0, 0.0), 1.0, SCULK_GLOW);
                      ent.setDeltaMovement(ent.getDeltaMovement().add(0.0, 0.5, 0.0));
                      continue;
                   }
@@ -4424,10 +4503,14 @@ public final class BossManager {
                      w.nextDrain = now + 20L;
                      DamageSource src = owner != null ? level.damageSources().indirectMagic(owner, owner) : level.damageSources().magic();
                      ent.hurtServer(level, src, 1.5F);
-                     com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-13726853, 1.0F), ent.getX(), ent.getY() + 1.0, ent.getZ(), 6, 0.3, 0.4, 0.3, 0.03);
-                     if (owner != null && owner.isAlive() && owner.getHealth() < owner.getMaxHealth()) {
+                     // The drain is only paid to a caster in the same world: a heal across
+                     // dimensions is a heal from nowhere. When it is paid, the life is seen going -
+                     // a thread of souls from the wrapped body to the caster.
+                     if (owner != null && owner.isAlive() && owner.level() == level && owner.getHealth() < owner.getMaxHealth()) {
                         owner.heal(1.5F);
-                        com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-8586240, 0.9F), owner.getX(), owner.getY() + 1.0, owner.getZ(), 4, 0.3, 0.3, 0.3, 0.02);
+                        Fx.soulStream(level, ParticleTypes.SCULK_SOUL, ent.position().add(0.0, 1.0, 0.0), owner.position().add(0.0, 1.0, 0.0), 0.4, 14, SCULK_GLOW);
+                     } else {
+                        Fx.flare(level, ParticleTypes.SCULK_SOUL, ent.position().add(0.0, 1.0, 0.0), 0.5, SCULK_TEAL);
                      }
                   }
                }
@@ -4450,7 +4533,8 @@ public final class BossManager {
 
          ExperienceOrb.award(level, killer.position(), Math.min(40, 3 + (int)(mob.getMaxHealth() / 4.0F)));
          killer.heal(2.0F);
-         com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-8586240, 0.9F), killer.getX(), killer.getY() + 1.0, killer.getZ(), 10, 0.4, 0.4, 0.4, 0.02);
+         // The bloom hands the kill's soul back to the caster.
+         Fx.soulStream(level, ParticleTypes.SCULK_SOUL, mob.position().add(0.0, 1.0, 0.0), killer.position().add(0.0, 1.0, 0.0), 0.6, 18, SCULK_GLOW);
       }
    }
 
@@ -4493,24 +4577,18 @@ public final class BossManager {
          panicked++;
       }
 
-      for (int ring = 0; ring < 3; ring++) {
-         for (int i = 0; i < 18; i++) {
-            double a = i / 18.0 * Math.PI * 2.0;
-            double r = 2.0 + ring * 2.0;
-            com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-13726853, 1.4F), x + Math.cos(a) * r, y + 1.0, z + Math.sin(a) * r, 1, 0.03, 0.3, 0.03, 0.0);
-         }
-      }
-
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, x, y + 1.2, z, 1, 0.0, 0.0, 0.0, 0.0);
-      // Modded clients: the shriek as a wall of sound - a shockwave, rings stacked up the body, soul cracks.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.FROST_NOVA, ParticleTypes.SCULK_SOUL, p.position(), Vec3.ZERO, 8.0, 0.0, SCULK_TEAL);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.SCULK_SOUL, p.position(), Vec3.ZERO, 6.0, 0.0, SCULK_TEAL);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.SCULK_SOUL, p.position().add(0.0, 1.4, 0.0), Vec3.ZERO, 1.6, 0.0, SCULK_TEAL);
+      // The shriek as a wall of sound: sculk shockwave crescents racing out in eight directions,
+      // the sculk blooming over the ground the horn was blown on, and a soul-light flare at the
+      // horn's mouth. (It used to be drawn with the frost nova and the ice burst - a sculk horn
+      // that snowed.) Each template carries its own vanilla version for clients without the mod.
       Vec3 mouth = p.position().add(0.0, 1.2, 0.0);
+      Fx.sculkBloom(level, ParticleTypes.SCULK_CHARGE_POP, p.position(), 8.0, 60, SCULK_TEAL);
+      Fx.flare(level, ParticleTypes.SCULK_SOUL, mouth, 1.6, SCULK_GLOW);
       for (int i = 0; i < 8; i++) {
          double a = i * Math.PI / 4.0;
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SONIC, ParticleTypes.SONIC_BOOM, mouth, mouth.add(Math.cos(a) * 9.0, 0.0, Math.sin(a) * 9.0), 0.0, 0.0, SCULK_TEAL);
+         Fx.sonicRing(level, ParticleTypes.SCULK_SOUL, mouth, new Vec3(Math.cos(a), 0.0, Math.sin(a)), 9.0, 16, SCULK_TEAL);
       }
+      Fx.vanilla(level, ParticleTypes.SONIC_BOOM, x, y + 1.2, z, 1, 0.0, 0.0, 0.0, 0.0);
       level.playSound(null, x, y, z, SoundEvents.SCULK_SHRIEKER_SHRIEK, SoundSource.PLAYERS, 1.2F, 0.7F);
       level.playSound(null, x, y, z, SoundEvents.WARDEN_ROAR, SoundSource.PLAYERS, 1.0F, 0.5F);
 
@@ -4614,8 +4692,9 @@ public final class BossManager {
          }
          sensedGlow.put(p.getUUID(), seen);
          if (now % 40L == 0L) {
-            // A sonar ping rolling off the wearer.
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.FROST_NOVA, ParticleTypes.SCULK_SOUL, p.position(), Vec3.ZERO, 7.0, 0.0, SCULK_TEAL);
+            // A sonar ping rolling off the wearer: sculk veins racing out over the ground and a beat
+            // of light at the heart (it was the frost nova - snowflakes off a sculk sensor).
+            Fx.sculkBloom(level, ParticleTypes.SCULK_CHARGE_POP, p.position(), 7.0, 30, SCULK_TEAL);
             level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.SCULK_CLICKING, SoundSource.PLAYERS, 0.4F, 1.2F);
          }
       } catch (Exception ignored) {
@@ -14277,7 +14356,17 @@ public final class BossManager {
          }
          it.remove();
          int tint = h.queen() instanceof net.minecraft.world.entity.monster.warden.Warden ? SCULK_TEAL : 0xBFEFFF;
-         switch (h.cue()) {
+         if (tint == SCULK_TEAL && h.cue() != -1) {
+            // The Elder Warden's delayed hits land in sculk and souls, not in the Snow Queen's
+            // snowflakes, and through Fx so clients without the mod see the spike land too.
+            if (h.cue() == com.fortuneandfavors.net.FfVfx.SONIC) {
+               Fx.shape(level, h.cue(), ParticleTypes.SONIC_BOOM, h.a(), h.b(), 0.0, 0.0, tint);
+            } else {
+               // Blooms creep over the floor, so they are put down on it rather than at hit height.
+               Vec3 floor = new Vec3(h.a().x, groundBelow(level, h.a().x, h.a().z, (int)Math.floor(h.a().y) + 1), h.a().z);
+               Fx.shape(level, h.cue(), ParticleTypes.SCULK_CHARGE_POP, floor, Vec3.ZERO, h.cueA(), 16.0, tint);
+            }
+         } else switch (h.cue()) {
             case com.fortuneandfavors.net.FfVfx.FROST_LANCE, com.fortuneandfavors.net.FfVfx.SONIC -> com.fortuneandfavors.net.FfVfx.shape(level, h.cue(), ParticleTypes.SNOWFLAKE, h.a(), h.b(), 0.0, 0.0, tint);
             case -1 -> {
             }

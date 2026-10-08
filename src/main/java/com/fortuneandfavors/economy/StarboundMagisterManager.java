@@ -3,6 +3,7 @@ package com.fortuneandfavors.economy;
 import com.fortuneandfavors.ModItems;
 import com.fortuneandfavors.ModSounds;
 import com.fortuneandfavors.util.Chat;
+import com.fortuneandfavors.util.FxKinds;
 import com.fortuneandfavors.util.Safe;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -453,8 +454,13 @@ public final class StarboundMagisterManager {
          UUID.randomUUID(), Component.literal(BOSS_NAME), BossBarColor.BLUE, BossBarOverlay.PROGRESS
       );
       bar.setVisible(true);
+      // Her own world only: the bar used to go to every player on the server, the Nether and
+      // the End included, for a fight none of them could see. Late arrivals in her world are
+      // given it by the fight tick as they walk in.
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         bar.addPlayer(p);
+         if (p.level() == level) {
+            bar.addPlayer(p);
+         }
       }
 
       Fight fight = new Fight(boss.getUUID(), summoner.getUUID(), bar);
@@ -481,13 +487,14 @@ public final class StarboundMagisterManager {
       announce(level, "\u00a73\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
 
       // The mark she lands on: a summoning circle turning under a wider ring of her
-      // runes, a spiral climbing to meet her, and slow starlight falling over the spot.
+      // runes, a spiral climbing to meet her, and stars raining onto the spot for as long
+      // as she takes to come down.
       Vec3 spot = new Vec3(x, ground, z);
       Fx.summonCircle(level, ParticleTypes.END_ROD, spot.add(0.0, 0.05, 0.0), 3.5, ARRIVAL_TICKS, STARLIGHT);
       Fx.runeCircle(level, ParticleTypes.ENCHANT, spot.add(0.0, 0.05, 0.0), 6.0, ARRIVAL_TICKS + 10, SOLAR);
       Fx.spiral(level, ParticleTypes.END_ROD, spot, Math.max(4.0, height + 2.0), ARRIVAL_TICKS, NEBULA);
       Fx.pillar(level, ParticleTypes.END_ROD, spot, height + 6.0, STARLIGHT);
-      Fx.emberRain(level, ParticleTypes.END_ROD, spot, 9.0, ARRIVAL_TICKS + 20, STARLIGHT);
+      Fx.starfall(level, ParticleTypes.END_ROD, spot, 9.0, ARRIVAL_TICKS + 20, STARLIGHT);
       level.playSound(null, x, ground, z, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.3F, 1.5F);
       level.playSound(null, x, ground, z, SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.HOSTILE, 1.6F, 0.6F);
       level.playSound(null, x, ground, z, SoundEvents.BEACON_AMBIENT, SoundSource.HOSTILE, 1.6F, 1.4F);
@@ -585,7 +592,13 @@ public final class StarboundMagisterManager {
       // the mod's puppet bodies are not, and late arrivals get the bar as they walk in.
       boolean anyoneNear = false;
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-         if (p.level() != level || !p.isAlive() || p.isSpectator() || BossManager.isFakePlayer(p)) {
+         if (p.level() != level) {
+            // Gone through a portal: the bar goes with them rather than hanging over a
+            // fight in another world.
+            fight.bar.removePlayer(p);
+            continue;
+         }
+         if (!p.isAlive() || p.isSpectator() || BossManager.isFakePlayer(p)) {
             continue;
          }
          if (p.distanceToSqr(boss) < SEEK_RANGE * SEEK_RANGE) {
@@ -715,12 +728,10 @@ public final class StarboundMagisterManager {
       boss.setPos(boss.getX(), y, boss.getZ());
       boss.setDeltaMovement(Vec3.ZERO);
       boss.hurtMarked = true;
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.END_ROD, boss.getX(), y + 1.0, boss.getZ(), 3, 0.3, 0.6, 0.3, 0.02);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      // The spiral and the starfall sent at the summon carry the descent for modded clients;
+      // this trail is the vanilla version. A bare sendParticles inside FfVfx.enter/exit is not
+      // routed through the transport, so it used to reach modded clients too.
+      Fx.vanilla(level, ParticleTypes.END_ROD, boss.getX(), y + 1.0, boss.getZ(), 3, 0.3, 0.6, 0.3, 0.02);
       Vec3 spot = new Vec3(boss.getX(), fight.arrivalGround, boss.getZ());
       if (fight.arrivalTicks > 0 && fight.arrivalTicks % 10 == 0) {
          Fx.ring(level, ParticleTypes.END_ROD, spot.add(0.0, 0.1, 0.0), 2.0 + t * 5.0, t > 0.5 ? SOLAR : STARLIGHT);
@@ -774,14 +785,17 @@ public final class StarboundMagisterManager {
       fight.interruptDamage = Math.min(INTERRUPT_DAMAGE, fight.interruptDamage - INTERRUPT_DAMAGE);
       fight.energy--;
       Vec3 core = boss.position().add(0.0, 1.4, 0.0);
-      Fx.shatter(level, ParticleTypes.END_ROD, core, 1.0, hue(fight.energy + 1));
+      // A broken charge breaks like crystal: faceted shards of the star's own colour burst off
+      // her, with a short spray of rays, so every interrupt is seen landing.
+      Fx.gemShards(level, ParticleTypes.END_ROD, core, 1.1, hue(fight.energy + 1));
+      Fx.starburst(level, ParticleTypes.END_ROD, core, 2.2, hue(fight.energy + 1));
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GLASS_BREAK, SoundSource.HOSTILE, 1.2F, 1.4F);
       announceNear(level, boss, 64.0, "&b\u2726 Star broken &8(&7" + fight.energy + "/" + MAX_ENERGY + "&8)");
    }
 
    /** She has been alone too long. Out through a closing wormhole; nobody is paid. */
    private static void leave(MinecraftServer server, ServerLevel level, Mob boss, Fight fight) {
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 1.0, 0.0), true, NEBULA);
+      wormhole(level, boss.position().add(0.0, 1.0, 0.0), false, NEBULA);
       Fx.pillar(level, ParticleTypes.END_ROD, boss.position(), 20.0, STARLIGHT);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 1.6F, 1.2F);
       announce(level, "\u00a78The Magister finds nobody watching. \u00a77She leaves.");
@@ -828,7 +842,12 @@ public final class StarboundMagisterManager {
             double y = BossGrounding.groundY(level, x, z, boss.getY());
             boss.setPos(x, y, z);
             boss.hurtMarked = true;
-            level.sendParticles(ParticleTypes.END_ROD, x, y + 0.6, z, 1, 0.25, 0.2, 0.25, 0.0);
+            // Stardust where she steps: a few stars settling round her feet every few ticks
+            // for modded clients (one cue that animates itself), a single mote for the rest.
+            if (boss.tickCount % 8 == 0) {
+               com.fortuneandfavors.net.FfVfx.shape(level, FxKinds.STARFALL, ParticleTypes.END_ROD, new Vec3(x, y, z), Vec3.ZERO, 1.0, 10.0, STARLIGHT);
+            }
+            Fx.vanilla(level, ParticleTypes.END_ROD, x, y + 0.6, z, 1, 0.25, 0.2, 0.25, 0.0);
          }
       }
 
@@ -852,11 +871,12 @@ public final class StarboundMagisterManager {
       double y = BossGrounding.groundY(level, x, z, target.getY());
       Vec3 from = boss.position();
       Vec3 to = new Vec3(x, y, z);
-      Fx.wormhole(level, ParticleTypes.REVERSE_PORTAL, from.add(0.0, 1.0, 0.0), true, NEBULA);
+      wormhole(level, from.add(0.0, 1.0, 0.0), false, NEBULA);
       Fx.lightning(level, ParticleTypes.ELECTRIC_SPARK, from.add(0.0, 1.0, 0.0), to.add(0.0, 1.0, 0.0), STARLIGHT);
       boss.setPos(x, y, z);
       boss.setDeltaMovement(Vec3.ZERO);
       boss.hurtMarked = true;
+      wormhole(level, to.add(0.0, 1.0, 0.0), true, NEBULA);
       Fx.flare(level, ParticleTypes.END_ROD, to.add(0.0, 1.0, 0.0), 1.4, STARLIGHT);
       Fx.ring(level, ParticleTypes.END_ROD, to.add(0.0, 0.1, 0.0), 2.0, NEBULA);
       level.playSound(null, x, y, z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.2F, 1.6F);
@@ -944,10 +964,15 @@ public final class StarboundMagisterManager {
       announceNear(level, boss, 64.0, "&e\u2604 Comet &8- &7leave the ring.");
    }
 
-   /** Puts a mark down with its rune circle, timed to run out when the star lands. */
+   /**
+    * Puts a mark down with its rune circle, timed to run out when the star lands, and a
+    * starfall over exactly the ring the hit will cover: small stars come down inside it for
+    * the whole fuse, so the circle to leave reads as "the sky is falling here".
+    */
    private static void addMark(ServerLevel level, Fight fight, Mark mark) {
       fight.marks.add(mark);
       Fx.runeCircle(level, ParticleTypes.END_ROD, mark.pos.add(0.0, 0.05, 0.0), mark.radius, mark.fuse, mark.hue);
+      Fx.starfall(level, ParticleTypes.END_ROD, mark.pos, mark.radius, mark.fuse, mark.hue);
    }
 
    // ----------------------------------------------------------- new: constellation
@@ -1101,6 +1126,8 @@ public final class StarboundMagisterManager {
       Vec3 c = s.a;
       Fx.nova(level, ParticleTypes.END_ROD, c.add(0.0, 0.2, 0.0), s.radius, STARLIGHT);
       Fx.flare(level, ParticleTypes.END_ROD, c.add(0.0, 1.4, 0.0), 2.0, SOLAR);
+      // The stars land: a second of starfall over the whole field as the comets come down.
+      Fx.starfall(level, ParticleTypes.END_ROD, c, 20.0, 24, SOLAR);
       level.playSound(null, c.x, c.y, c.z, SoundEvents.FIREWORK_ROCKET_LARGE_BLAST, SoundSource.HOSTILE, 2.0F, 0.6F);
       double safe2 = s.radius * s.radius;
       int hits = 0;
@@ -1309,13 +1336,9 @@ public final class StarboundMagisterManager {
    private static void tickWell(ServerLevel level, Mob boss, Fight fight) {
       fight.wellTicks--;
       Vec3 c = fight.wellCenter;
-      if (fight.wellTicks % 2 == 0) {
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            level.sendParticles(ParticleTypes.PORTAL, c.x, c.y + 1.0, c.z, 8, 1.2, 1.2, 1.2, 0.1);
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+      // The vortex sent at the cast draws the well for modded clients; this is the vanilla one.
+      if (fight.wellTicks % 4 == 0) {
+         Fx.vanilla(level, ParticleTypes.PORTAL, c.x, c.y + 1.0, c.z, 8, 1.2, 1.2, 1.2, 0.1);
       }
 
       // Pulled in pulses, and the pull is set rather than added. It used to be added every
@@ -1338,12 +1361,7 @@ public final class StarboundMagisterManager {
          Fx.nova(level, ParticleTypes.REVERSE_PORTAL, c.add(0.0, 0.5, 0.0), WELL_BLAST_RADIUS, NEBULA);
          Fx.shockwave(level, ParticleTypes.END_ROD, c, WELL_BLAST_RADIUS + 1.0, STARLIGHT);
          Fx.flare(level, ParticleTypes.END_ROD, c.add(0.0, 1.0, 0.0), 2.0, NEBULA);
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, c.x, c.y + 0.5, c.z, 1, 0.0, 0.0, 0.0, 0.0);
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+         Fx.vanilla(level, ParticleTypes.EXPLOSION_EMITTER, c.x, c.y + 0.5, c.z, 1, 0.0, 0.0, 0.0, 0.0);
          level.playSound(null, c.x, c.y, c.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.6F, 0.8F);
          for (ServerPlayer p : playersNear(level, c.x, c.y, c.z, WELL_BLAST_RADIUS)) {
             p.hurtServer(level, level.damageSources().mobAttack(boss), WELL_DAMAGE);
@@ -1372,17 +1390,17 @@ public final class StarboundMagisterManager {
 
    private static void tickCollapse(ServerLevel level, Mob boss, Fight fight, long now) {
       fight.collapseCharge--;
-      if (fight.collapseCharge % 2 == 0) {
+      // The turning ring is the vanilla clients' timer (the summon circle and spiral sent at the
+      // cast are the modded one). Every fourth tick and twelve points: it used to be twenty
+      // points every other tick, six hundred packets a cast for a Bedrock player through Geyser.
+      if (fight.collapseCharge % 4 == 0) {
          double r = 2.0 + (60 - fight.collapseCharge) * 0.1;
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            for (int i = 0; i < 20; i++) {
-               double a = i * (Math.PI * 2.0 / 20.0) + fight.collapseCharge * 0.06;
-               level.sendParticles(ParticleTypes.END_ROD, boss.getX() + Math.cos(a) * r, boss.getY() + 1.2, boss.getZ() + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
+         Fx.vanillaOnly(() -> {
+            for (int i = 0; i < 12; i++) {
+               double a = i * (Math.PI * 2.0 / 12.0) + fight.collapseCharge * 0.06;
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, boss.getX() + Math.cos(a) * r, boss.getY() + 1.2, boss.getZ() + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
             }
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+         });
       }
       if (fight.collapseCharge % 10 == 0 && fight.collapseCharge > 0) {
          Fx.ring(level, ParticleTypes.END_ROD, boss.position().add(0.0, 1.2, 0.0), 2.0 + (60 - fight.collapseCharge) * 0.1, SOLAR);
@@ -1423,7 +1441,8 @@ public final class StarboundMagisterManager {
          fight.energy = MAX_ENERGY;
          fight.nextWell = Math.max(fight.nextWell, now + 120L);
          fight.nextCollapse = Math.max(fight.nextCollapse, now + 200L);
-         Fx.emberRain(level, ParticleTypes.END_ROD, boss.position(), 16.0, 100, SOLAR);
+         // The phase is named for it: the whole sky round her starts coming down.
+         Fx.starfall(level, ParticleTypes.END_ROD, boss.position(), 16.0, 100, SOLAR);
          Fx.starburst(level, ParticleTypes.END_ROD, core, 8.0, SOLAR);
          Fx.pillar(level, ParticleTypes.END_ROD, boss.position(), 24.0, STARLIGHT);
       }
@@ -1455,16 +1474,23 @@ public final class StarboundMagisterManager {
       }
       for (Iterator<Bolt> it = fight.bolts.iterator(); it.hasNext();) {
          Bolt bolt = it.next();
+         // The trail. Modded clients get one glowing beam segment over this tick's path in
+         // the bolt's own colour; everyone else one mote, and a glow every other tick. It used
+         // to be a vanilla mote on every sub-step to everyone: an Astral Burst at six charges
+         // was over a hundred particle packets a tick, drawn on top of the modded trail.
+         Vec3 start = bolt.pos;
+         Vec3 end = bolt.pos.add(bolt.vel);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, start, end, 0.0, 0.0, bolt.hue);
+         Fx.vanilla(level, ParticleTypes.END_ROD, start.x, start.y, start.z, 1, 0.02, 0.02, 0.02, 0.0);
+         if ((bolt.life & 1) == 0) {
+            Fx.vanilla(level, ParticleTypes.GLOW, end.x, end.y, end.z, 1, 0.02, 0.02, 0.02, 0.0);
+         }
          // Deliberately a fast, small step: at 0.85 blocks a tick a bolt can
          // otherwise tunnel through a player standing still.
          int steps = 4;
          boolean done = false;
          for (int s = 0; s < steps && !done; s++) {
             bolt.pos = bolt.pos.add(bolt.vel.scale(1.0 / steps));
-            level.sendParticles(ParticleTypes.END_ROD, bolt.pos.x, bolt.pos.y, bolt.pos.z, 1, 0.02, 0.02, 0.02, 0.0);
-            if (s == 0) {
-               level.sendParticles(ParticleTypes.GLOW, bolt.pos.x, bolt.pos.y, bolt.pos.z, 1, 0.02, 0.02, 0.02, 0.0);
-            }
             // Stopped by anything with a collision box - not by tall grass or flowers,
             // which used to eat every bolt fired across a meadow.
             if (solid(level, bolt.pos)) {
@@ -1506,18 +1532,17 @@ public final class StarboundMagisterManager {
                mark.falling = true;
                Fx.comet(level, ParticleTypes.END_ROD, mark.pos.add(3.0, 18.0, 2.0), mark.pos.add(0.0, 0.4, 0.0), 6, mark.hue);
             }
-            if (mark.fuse % 2 == 0) {
-               // The rune circle covers modded clients; this ring is for everyone else.
-               com.fortuneandfavors.net.FfVfx.enter();
-               try {
-                  int points = 16;
+            if (mark.fuse % 4 == 0) {
+               // The rune circle and starfall cover modded clients; this ring is for everyone
+               // else - and only for them now (a bare sendParticles in the old enter/exit scope
+               // reached modded clients as well), at twelve points every fourth tick.
+               Fx.vanillaOnly(() -> {
+                  int points = 12;
                   for (int i = 0; i < points; i++) {
                      double a = i * (Math.PI * 2.0 / points) + mark.fuse * 0.08;
-                     level.sendParticles(ParticleTypes.END_ROD, mark.pos.x + Math.cos(a) * mark.radius, mark.pos.y + 0.15, mark.pos.z + Math.sin(a) * mark.radius, 1, 0.0, 0.0, 0.0, 0.0);
+                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, mark.pos.x + Math.cos(a) * mark.radius, mark.pos.y + 0.15, mark.pos.z + Math.sin(a) * mark.radius, 1, 0.0, 0.0, 0.0, 0.0);
                   }
-               } finally {
-                  com.fortuneandfavors.net.FfVfx.exit();
-               }
+               });
             }
             continue;
          }
@@ -1527,13 +1552,10 @@ public final class StarboundMagisterManager {
          if (mark.radius > 5.0) {
             Fx.starburst(level, ParticleTypes.END_ROD, mark.pos.add(0.0, 1.0, 0.0), mark.radius, STARLIGHT);
          }
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, mark.pos.x, mark.pos.y + 0.4, mark.pos.z, 1, 0.0, 0.0, 0.0, 0.0);
-            level.sendParticles(ParticleTypes.GUST, mark.pos.x, mark.pos.y + 0.4, mark.pos.z, 12, mark.radius * 0.6, 0.4, mark.radius * 0.6, 0.15);
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+         Fx.vanillaOnly(() -> {
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, mark.pos.x, mark.pos.y + 0.4, mark.pos.z, 1, 0.0, 0.0, 0.0, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.GUST, mark.pos.x, mark.pos.y + 0.4, mark.pos.z, 8, mark.radius * 0.6, 0.4, mark.radius * 0.6, 0.15);
+         });
          level.playSound(null, mark.pos.x, mark.pos.y, mark.pos.z, ModSounds.BOSS_SLAM, SoundSource.HOSTILE, 1.8F, 1.0F);
          for (ServerPlayer p : playersNear(level, mark.pos.x, mark.pos.y, mark.pos.z, mark.radius)) {
             p.hurtServer(level, level.damageSources().mobAttack(boss), mark.damage);
@@ -1576,6 +1598,8 @@ public final class StarboundMagisterManager {
       Fx.spiral(level, ParticleTypes.END_ROD, at, 10.0, DEATH_CEREMONY_TICKS, STARLIGHT);
       Fx.aura(level, ParticleTypes.END_ROD, at, 3.0, DEATH_CEREMONY_TICKS, SOLAR);
       Fx.runeCircle(level, ParticleTypes.ENCHANT, at.add(0.0, 0.05, 0.0), 5.0, DEATH_CEREMONY_TICKS, NEBULA);
+      // Her own sky comes down round her for the whole ceremony.
+      Fx.starfall(level, ParticleTypes.END_ROD, at, 9.0, DEATH_CEREMONY_TICKS, NEBULA);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 2.0F, 1.4F);
       announce(level, SAY + "\"\u00a7f...oh. \u00a7bYou looked up.\"");
       // FALSE cancels the blow (Fabric: true means "allow the damage"). Returning
@@ -1599,11 +1623,9 @@ public final class StarboundMagisterManager {
          boss.setPos(boss.getX(), boss.getY() + 0.03, boss.getZ());
          boss.hurtMarked = true;
       }
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.END_ROD, boss.getX(), boss.getY() + 1.4, boss.getZ(), 4, 1.2, 1.0, 1.2, 0.08);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
+      // The spiral, aura and starfall sent when the ceremony began carry it for modded clients.
+      if ((fight.deathTicks & 1) == 0) {
+         Fx.vanilla(level, ParticleTypes.END_ROD, boss.getX(), boss.getY() + 1.4, boss.getZ(), 4, 1.2, 1.0, 1.2, 0.08);
       }
       Vec3 heart = boss.position().add(0.0, 1.2, 0.0);
       if (fight.deathTicks > 15 && fight.deathTicks % 12 == 0) {
@@ -1635,13 +1657,11 @@ public final class StarboundMagisterManager {
       Fx.shockwave(level, ParticleTypes.END_ROD, base, 14.0, NEBULA);
       Fx.nova(level, ParticleTypes.FIREWORK, heart, 6.0, STARLIGHT);
       Fx.pillar(level, ParticleTypes.END_ROD, base, 32.0, STARLIGHT);
-      Fx.emberRain(level, ParticleTypes.END_ROD, base, 10.0, 80, STARLIGHT);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 3, 1.5, 1.0, 1.5, 0.0);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      // She goes out like a star: the light breaks into shards, and what is left of her sky
+      // keeps falling over the spot for four seconds after.
+      Fx.gemShards(level, ParticleTypes.END_ROD, heart, 2.4, SOLAR);
+      Fx.starfall(level, ParticleTypes.END_ROD, base, 12.0, 80, STARLIGHT);
+      Fx.vanilla(level, ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 3, 1.5, 1.0, 1.5, 0.0);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 2.0F, 1.3F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.FIREWORK_ROCKET_LARGE_BLAST, SoundSource.HOSTILE, 2.0F, 0.7F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.FIREWORK_ROCKET_TWINKLE, SoundSource.HOSTILE, 2.0F, 1.0F);
@@ -1719,6 +1739,15 @@ public final class StarboundMagisterManager {
    }
 
    // ------------------------------------------------------------------ helpers
+
+   /**
+    * A wormhole that opens ({@code open}) or seals. Sent as the raw cue rather than through
+    * {@code Fx.wormhole}, whose flag runs the wrong way round (its "closing" draws an opening):
+    * every exit of hers used to be drawn as a hole opening behind her.
+    */
+   private static void wormhole(ServerLevel level, Vec3 at, boolean open, int color) {
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, ParticleTypes.REVERSE_PORTAL, at, Vec3.ZERO, 0.0, open ? 1.0 : 0.0, color);
+   }
 
    private static int hue(int energy) {
       int[] hues = {0x88DDFF, 0x99CCFF, 0xAABBFF, 0xBBA0FF, 0xCC99FF, 0xDD88FF, 0xFFCC66};

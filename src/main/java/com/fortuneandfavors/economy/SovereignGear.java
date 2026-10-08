@@ -1,6 +1,8 @@
 package com.fortuneandfavors.economy;
 
 import com.fortuneandfavors.ModItems;
+import com.fortuneandfavors.net.FfVfx;
+import com.fortuneandfavors.util.FxKinds;
 import com.fortuneandfavors.util.Chat;
 import com.fortuneandfavors.util.Safe;
 import java.util.HashMap;
@@ -48,6 +50,8 @@ public final class SovereignGear {
    private static final long SEAL_COOLDOWN_TICKS = 400L;
    private static final int SEAL_EMERALD_COST = 5;
    private static final double BELL_RADIUS = 16.0;
+   /** The most creatures one ring of the Bell marks with a custom cue (the vanilla puff is per mob). */
+   private static final int BELL_CUE_CAP = 16;
    private static final double SEAL_EMERALD_CHANCE = 0.25;
    /** The Royal Guard's lifetime, and how many may answer one contract. */
    private static final int GUARD_TICKS = 60 * 20;
@@ -130,10 +134,14 @@ public final class SovereignGear {
       list.add(new Guard(guard.getUUID(), GUARD_TICKS));
       GUARDS.put(player.getUUID(), list);
 
-      // The contract's seal is pressed into the ground and the guard steps up out of it.
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.HAPPY_VILLAGER, guard.position().add(0.0, 0.05, 0.0), Vec3.ZERO, 1.6, 30.0, EMERALD);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.HAPPY_VILLAGER, guard.position(), Vec3.ZERO, 4.0, 0.0, CROWN);
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, guard.getX(), guard.getY() + 1.0, guard.getZ(), 30, 0.5, 0.8, 0.5, 0.08);
+      // The contract's seal is pressed into the ground and the guard steps up out of it: a gold
+      // rune ring for the wax, a green circle inside it, a shaft of light, and the paper going up
+      // as a puff of cut emeralds - the price of the signature, paid in front of you.
+      Fx.shape(level, FfVfx.SUMMON_CIRCLE, ParticleTypes.HAPPY_VILLAGER, guard.position().add(0.0, 0.05, 0.0), Vec3.ZERO, 1.6, 30.0, EMERALD);
+      Fx.runeCircle(level, ParticleTypes.END_ROD, guard.position().add(0.0, 0.08, 0.0), 2.2, 30, CROWN);
+      Fx.shape(level, FfVfx.PILLAR, ParticleTypes.HAPPY_VILLAGER, guard.position(), Vec3.ZERO, 4.0, 0.0, CROWN);
+      Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 1.2, 0.0).add(player.getLookAngle().scale(0.6)), 0.7, EMERALD);
+      Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, guard.getX(), guard.getY() + 1.0, guard.getZ(), 20, 0.5, 0.8, 0.5, 0.08);
       level.playSound(null, guard.getX(), guard.getY(), guard.getZ(), SoundEvents.VINDICATOR_CELEBRATE, SoundSource.PLAYERS, 1.2F, 1.0F);
       bar(player, "&aRoyal Guard &7- his contract runs for &f60s");
       return null;
@@ -162,20 +170,37 @@ public final class SovereignGear {
       // The toll rolls outward in three rings to the edge of its reach. Three shape cues where the
       // old version sent ninety separate particle packets.
       Vec3 bell = new Vec3(x, y, z);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.NOTE, bell.add(0.0, -0.8, 0.0), Vec3.ZERO, BELL_RADIUS, 0.0, EMERALD);
+      Fx.shape(level, FfVfx.NOVA, ParticleTypes.NOTE, bell.add(0.0, -0.8, 0.0), Vec3.ZERO, BELL_RADIUS, 0.0, EMERALD);
       Fx.flare(level, ParticleTypes.NOTE, bell.add(0.0, 1.2, 0.0), 1.6, CROWN);
       for (int ring = 1; ring <= 3; ring++) {
-         Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.NOTE, bell, Vec3.ZERO, ring * 5.0, 0.0, ring == 2 ? CROWN : EMERALD);
+         Fx.shape(level, FfVfx.RING, ParticleTypes.NOTE, bell, Vec3.ZERO, ring * 5.0, 0.0, ring == 2 ? CROWN : EMERALD);
       }
+      // The bell keeps humming after the strike, and the ground under the ringer shows the reach
+      // as a turning gold seal for the same beat.
+      Fx.resonance(level, ParticleTypes.NOTE, bell.add(0.0, 1.0, 0.0), 30.0, CROWN);
+      Fx.runeCircle(level, ParticleTypes.END_ROD, player.position().add(0.0, 0.06, 0.0), 2.4, 30, CROWN);
 
       int staggered = 0;
       int rung = 0;
+      // Custom cues for the creatures the bell touched are capped: a mob farm in range would
+      // otherwise be a packet per mob, every ring.
+      int cues = 0;
       for (Entity e : level.getEntities(player, player.getBoundingBox().inflate(BELL_RADIUS))) {
+         // The ringer's own sworn mobs (Royal Guards, friendly skeletons) are not staggered by
+         // their own side's bell, and the village does not take up arms against them.
+         if (e instanceof LivingEntity sworn && BossManager.isFriendlySkeleton(sworn)) {
+            continue;
+         }
          if (e instanceof Monster hostile && hostile.isAlive()) {
             hostile.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 120, 2, false, true, true));
             hostile.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 120, 1, false, true, true));
             hostile.addEffect(new MobEffectInstance(MobEffects.GLOWING, 120, 0, false, true, true));
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.NOTE, hostile.getX(), hostile.getY() + 2.0, hostile.getZ(), 8, 0.4, 0.3, 0.4, 0.08);
+            // Dazed: notes circling its head for the first two seconds of the stagger.
+            if (cues++ < BELL_CUE_CAP) {
+               FfVfx.shape(level, FxKinds.PETALS, ParticleTypes.NOTE, hostile.position().add(0.0, hostile.getBbHeight() + 0.3, 0.0),
+                  Vec3.ZERO, 0.6, 40.0, CROWN);
+            }
+            Fx.vanilla(level, ParticleTypes.NOTE, hostile.getX(), hostile.getY() + 2.0, hostile.getZ(), 6, 0.4, 0.3, 0.4, 0.08);
             staggered++;
          } else if (e instanceof Villager villager && villager.isAlive()) {
             // Royal subjects: the village answers its own bell - and it answers
@@ -184,7 +209,14 @@ public final class SovereignGear {
             villager.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 400, 0, false, true, true));
             villager.addEffect(new MobEffectInstance(MobEffects.STRENGTH, 400, 0, false, true, true));
             SUBJECTS.put(villager.getUUID(), now + SUBJECT_TICKS);
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, villager.getX(), villager.getY() + 2.0, villager.getZ(), 20, 0.5, 0.5, 0.5, 0.06);
+            // Called to arms: a gold column goes up through the villager and a green glint of
+            // emeralds breaks over its head.
+            if (cues++ < BELL_CUE_CAP) {
+               FfVfx.shape(level, FfVfx.PILLAR, ParticleTypes.HAPPY_VILLAGER, villager.position(), Vec3.ZERO, 3.0, 0.0, CROWN);
+               FfVfx.shape(level, FxKinds.GEM_SHARDS, ParticleTypes.HAPPY_VILLAGER, villager.position().add(0.0, villager.getBbHeight() + 0.2, 0.0),
+                  Vec3.ZERO, 0.6, 0.0, EMERALD);
+            }
+            Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, villager.getX(), villager.getY() + 2.0, villager.getZ(), 14, 0.5, 0.5, 0.5, 0.06);
             rung++;
          }
       }
@@ -248,8 +280,15 @@ public final class SovereignGear {
             foe.push(away.x * 0.7, 0.3, away.z * 0.7);
             foe.hurtMarked = true;
          }
-         level.sendParticles(ParticleTypes.SWEEP_ATTACK, foe.getX(), foe.getY() + 0.8, foe.getZ(), 6, 0.3, 0.3, 0.3, 0.04);
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, villager.getX(), villager.getY() + 1.6, villager.getZ(), 4, 0.3, 0.3, 0.3, 0.02);
+         // The pitchfork swing: a gold crescent from the villager across the foe for modded
+         // clients, the vanilla sweep for everyone else.
+         Vec3 swing = foe.position().subtract(villager.position());
+         FfVfx.shape(level, FxKinds.CRESCENT, ParticleTypes.CRIT, villager.position().add(0.0, villager.getBbHeight() * 0.6, 0.0),
+            new Vec3(swing.x, 0.0, swing.z), 2.6, 0.0, CROWN);
+         Fx.vanillaOnly(() -> {
+            FfVfx.particles(level, ParticleTypes.SWEEP_ATTACK, foe.getX(), foe.getY() + 0.8, foe.getZ(), 3, 0.3, 0.3, 0.3, 0.04);
+            FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, villager.getX(), villager.getY() + 1.6, villager.getZ(), 4, 0.3, 0.3, 0.3, 0.02);
+         });
          level.playSound(null, villager.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.NEUTRAL, 0.8F, 1.3F);
       }
    }
@@ -258,7 +297,8 @@ public final class SovereignGear {
       Monster best = null;
       double bestDist = SUBJECT_RANGE * SUBJECT_RANGE;
       for (Monster m : level.getEntitiesOfClass(Monster.class, villager.getBoundingBox().inflate(SUBJECT_RANGE))) {
-         if (!m.isAlive() || m.isSpectator()) {
+         // A sworn mob - the ringer's own Royal Guard, a friendly skeleton - is on the village's side.
+         if (!m.isAlive() || m.isSpectator() || BossManager.isFriendlySkeleton(m)) {
             continue;
          }
          double d = villager.distanceToSqr(m);
@@ -289,9 +329,15 @@ public final class SovereignGear {
       player.addEffect(new MobEffectInstance(MobEffects.STRENGTH, 200, 1, false, true, true));
       player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 200, 1, false, true, true));
       SEAL_UNTIL.put(player.getUUID(), now + SEAL_COOLDOWN_TICKS);
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.2, player.getZ(), 30, 0.6, 0.8, 0.6, 0.12);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 2.2, 0.0, CROWN);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.4, 0.0, EMERALD);
+      // The seal is pressed: the five emeralds break into shards in front of you, a gold helix of
+      // tribute winds up around you, and the royal seal turns on the ground under your feet.
+      Vec3 chest = player.position().add(0.0, 1.0, 0.0);
+      Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, chest.add(player.getLookAngle().scale(0.8)), 1.2, EMERALD);
+      Fx.spiral(level, ParticleTypes.TOTEM_OF_UNDYING, player.position(), 2.4, 24, CROWN);
+      Fx.runeCircle(level, ParticleTypes.END_ROD, player.position().add(0.0, 0.06, 0.0), 1.6, 30, CROWN);
+      Fx.shape(level, FfVfx.CLOCK_BURST, ParticleTypes.HAPPY_VILLAGER, chest, Vec3.ZERO, 2.2, 0.0, CROWN);
+      Fx.shape(level, FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.4, 0.0, EMERALD);
+      Fx.vanilla(level, ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.2, player.getZ(), 24, 0.6, 0.8, 0.6, 0.12);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BELL_RESONATE, SoundSource.PLAYERS, 1.4F, 1.3F);
       bar(player, "&a&lROYAL TRIBUTE &7- Strength + Resistance for 10s");
       return null;
@@ -374,7 +420,13 @@ public final class SovereignGear {
       }
       killer.getInventory().placeItemBackInInventory(new ItemStack(Items.EMERALD, 1));
       if (killer.level() instanceof ServerLevel level) {
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, killer.getX(), killer.getY() + 1.2, killer.getZ(), 8, 0.4, 0.4, 0.4, 0.04);
+         // The minted emerald flies out of the kill into your pocket, and glints as it lands.
+         Vec3 purse = killer.position().add(0.0, 1.1, 0.0);
+         if (victim.level() == level) {
+            FfVfx.shape(level, FxKinds.COMET, ParticleTypes.HAPPY_VILLAGER, victim.position().add(0.0, victim.getBbHeight() * 0.6, 0.0),
+               purse, 0.0, 8.0, EMERALD);
+         }
+         Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, purse, 0.5, EMERALD);
       }
    }
 
@@ -400,11 +452,17 @@ public final class SovereignGear {
                   steerGuard(level, mob, owner);
                }
                if (guard.ticks % 20 == 0) {
-                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, mob.getX(), mob.getY() + 1.4, mob.getZ(), 3, 0.3, 0.3, 0.3, 0.0);
+                  // "Under contract": a small emerald glint over the guard's head once a second
+                  // (a one-shot, so it never trails behind a guard on the move).
+                  FfVfx.shape(level, FxKinds.FLARE, ParticleTypes.HAPPY_VILLAGER, mob.position().add(0.0, mob.getBbHeight() + 0.4, 0.0),
+                     Vec3.ZERO, 0.35, 0.0, EMERALD);
+                  Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, mob.getX(), mob.getY() + 1.4, mob.getZ(), 3, 0.3, 0.3, 0.3, 0.0);
                }
                if (guard.ticks == 0) {
-                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, mob.getX(), mob.getY() + 0.8, mob.getZ(), 14, 0.4, 0.4, 0.4, 0.05);
-                  Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, mob.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.2, 0.0, EMERALD);
+                  // The contract runs out: the guard's seal breaks and he is gone in a puff.
+                  Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, mob.position().add(0.0, 1.0, 0.0), 0.8, EMERALD);
+                  Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, mob.getX(), mob.getY() + 0.8, mob.getZ(), 12, 0.4, 0.4, 0.4, 0.05);
+                  Fx.shape(level, FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, mob.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.2, 0.0, EMERALD);
                   level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.VINDICATOR_CELEBRATE, SoundSource.PLAYERS, 1.0F, 0.7F);
                   if (owner != null) {
                      bar(owner, "&7A Royal Guard's contract has expired.");
@@ -424,6 +482,10 @@ public final class SovereignGear {
    }
 
    public static void onServerStopping(MinecraftServer server) {
+      // The bell's call to arms is a server-lifetime ledger keyed by villager; on an integrated
+      // server the statics outlive the world, so it is emptied with the guards.
+      SUBJECTS.clear();
+      SUBJECT_STRIKE.clear();
       for (List<Guard> guards : GUARDS.values()) {
          for (Guard guard : guards) {
             Entity raw = findEntity(server, guard.id);
@@ -497,6 +559,8 @@ public final class SovereignGear {
       BELL_UNTIL.clear();
       SEAL_UNTIL.clear();
       GUARDS.clear();
+      SUBJECTS.clear();
+      SUBJECT_STRIKE.clear();
    }
 
    private static Entity findEntity(MinecraftServer server, UUID id) {

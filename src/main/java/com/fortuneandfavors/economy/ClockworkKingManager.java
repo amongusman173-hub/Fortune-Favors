@@ -100,9 +100,25 @@ public final class ClockworkKingManager {
    private static final String MACHINE_TAG = "ff_clockwork_machine";
    private static final String MACHINE_ROLE_KEY = "ff_machine_role";
    private static final String MACHINE_BOSS_KEY = "ff_machine_boss";
-   /** Entity tag on every block display of his rig - his armour and his machines'
-    *  chassis - so an orphaned one can be swept up after a crash. */
+   /** Entity tag on every block display of his own armour, so an orphaned plate can be
+    *  swept up after a crash or a chunk unload. */
    private static final String PLATE_TAG = "ff_clockwork_rig";
+   /**
+    * Entity tag on the block display bolted to each machine (its chassis).
+    *
+    * <p>The chassis used to carry {@link #PLATE_TAG} too, while the orphan sweep only counted
+    * <i>plate</i> ids as owned - so every fifteen seconds the sweep tore the chassis off every
+    * live machine and the turrets went back to looking like shulkers. A chassis has its own
+    * tag now and is owned while the machine it belongs to is alive in a running fight.
+    */
+   private static final String CHASSIS_TAG = "ff_clockwork_chassis";
+   /**
+    * How often (in ticks) the rig sweep runs: every loaded display carrying one of his tags
+    * whose owner is not alive and loaded is discarded. It runs whether or not a fight is
+    * live, because the displays left behind by an unloaded or crashed fight come back when
+    * their chunk does - typically long after the fight itself is gone.
+    */
+   private static final long RIG_SWEEP_INTERVAL = 100L;
 
    private static final String BOSS_NAME = "\u00a76\u00a7l\u2699 The Clockwork King";
    private static final String SAY = "\u00a76The Clockwork King\u00a7r\u00a77 \u203a \u00a7f";
@@ -233,6 +249,8 @@ public final class ClockworkKingManager {
       Vec3 dashDir;
       int windup;
       int dashTicks;
+      /** The block display riding it, so it can be discarded with the machine. */
+      UUID chassisId;
 
       Machine(UUID id, Role role, long nextAction) {
          this.id = id;
@@ -410,6 +428,7 @@ public final class ClockworkKingManager {
          Safe.run("clockwork abandon", () -> shutDown(server, fight, true));
          ended++;
       }
+      Safe.run("clockwork rig sweep", () -> sweepOrphanPlating(server));
       return ended;
    }
 
@@ -420,6 +439,9 @@ public final class ClockworkKingManager {
       }
       FIGHTS.clear();
       MACHINE_OWNER.clear();
+      // With no fight left, every loaded display or machine carrying one of his tags is an
+      // orphan: take them all now, so none of them is saved into a chunk on the way down.
+      Safe.run("clockwork rig sweep", () -> sweepOrphanPlating(server));
    }
 
    /** Clockwork Core right-click: wind the key, spend it, and let him assemble. */
@@ -538,6 +560,12 @@ public final class ClockworkKingManager {
       Fx.summonCircle(level, ParticleTypes.ELECTRIC_SPARK, pad.add(0.0, 0.05, 0.0), 4.5, RISE_TICKS + 10, BRASS);
       Fx.runeCircle(level, ParticleTypes.ELECTRIC_SPARK, pad.add(0.0, 0.1, 0.0), 7.0, RISE_TICKS, EMBER);
       Fx.spiral(level, ParticleTypes.ELECTRIC_SPARK, pad, 4.0, RISE_TICKS, ARC);
+      // The workshop's own machinery: a great set of cogs turning flat in the floor under him,
+      // and an upright set behind him winding him up like the key that was just turned.
+      double yaw = Math.toRadians(summoner.getYRot());
+      Vec3 facing = new Vec3(-Math.sin(yaw), 0.0, Math.cos(yaw));
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, pad.add(0.0, 0.15, 0.0), Vec3.ZERO, 3.0, RISE_TICKS, BRASS);
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, pad.add(facing.scale(-1.4)).add(0.0, 1.8, 0.0), facing, 1.2, RISE_TICKS, EMBER);
       level.playSound(null, x, y, z, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.4F, 0.6F);
       level.playSound(null, x, y, z, SoundEvents.SMITHING_TABLE_USE, SoundSource.HOSTILE, 1.6F, 0.5F);
       level.playSound(null, x, y, z, SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 1.2F, 0.6F);
@@ -554,21 +582,23 @@ public final class ClockworkKingManager {
       if (!LOOT_PAID.isEmpty()) {
          LOOT_PAID.removeIf(id -> findEntity(server, id) == null);
       }
+      long now = ServerClock.clock(server.overworld());
+
+      // Orphan sweep. Plating and chassis are saved to chunk data like any other entity, so
+      // a crash, a restart or a chunk unloading under a live fight would otherwise bring a
+      // suit of armour back standing over an empty patch of ground forever. This runs before
+      // the no-fight early return on purpose: those displays reappear when their chunk
+      // loads again, which is usually after the fight that owned them has been released.
+      if (now % RIG_SWEEP_INTERVAL == 0L) {
+         Safe.run("clockwork plating sweep", () -> sweepOrphanPlating(server));
+      }
+
       if (FIGHTS.isEmpty()) {
          return;
       }
-      long now = ServerClock.clock(server.overworld());
 
       for (Fight fight : new ArrayList<>(FIGHTS.values())) {
          Safe.run("clockwork king tick", () -> tickFight(server, fight, now));
-      }
-
-      // Orphan sweep. Plating is saved to chunk data like any other entity, so a
-      // crash mid-fight would otherwise resurrect a suit of armour standing over
-      // an empty patch of ground forever. Every 15s, near each player, any plate
-      // no live fight claims is taken away.
-      if (now % 300L == 0L) {
-         Safe.run("clockwork plating sweep", () -> sweepOrphanPlating(server));
       }
 
       // Orphaned machines (their King is gone) shut themselves down, so a kill or a
@@ -587,7 +617,7 @@ public final class ClockworkKingManager {
          }
          Entity machine = findEntity(server, entry.getKey());
          if (machine != null) {
-            shutDownMachine(machine, false);
+            shutDownMachine(machine, null, false);
          }
          it.remove();
       }
@@ -641,32 +671,76 @@ public final class ClockworkKingManager {
       return removed;
    }
 
+   /**
+    * Discards every loaded piece of his rig whose owner is not alive and loaded: armour plates
+    * of a King with no running fight, chassis whose machine is dead, gone or no longer part of
+    * a running fight, and machines nobody is driving any more.
+    *
+    * <p>What counts as owned is rebuilt from the live fights each pass, and only a fight whose
+    * King is actually alive in a loaded chunk owns anything - a fight whose body has vanished
+    * is torn down on its next tick anyway. A plate is owned by id. A chassis is owned only
+    * while it is still riding the machine it was bolted to, so one thrown off a dying machine
+    * (vanilla ejects passengers when an entity is removed) goes even before the machine's
+    * entry is cleared. Every loaded entity in every loaded level is checked, not just the
+    * ones near a player: a suit left standing in an arena the group walked away from is
+    * exactly the one nobody comes back to clean up.
+    */
    private static void sweepOrphanPlating(MinecraftServer server) {
-      Set<UUID> owned = new HashSet<>();
+      Set<UUID> ownedPlates = new HashSet<>();
+      Set<UUID> ownedMachines = new HashSet<>();
+      Set<UUID> ownedChassis = new HashSet<>();
       for (Fight fight : FIGHTS.values()) {
+         Mob boss = bossOf(server, fight);
+         if (boss == null || boss.isRemoved()) {
+            continue;
+         }
          for (Plate plate : fight.plates) {
             if (plate.displayId != null) {
-               owned.add(plate.displayId);
+               ownedPlates.add(plate.displayId);
+            }
+         }
+         for (Machine machine : fight.machines.values()) {
+            ownedMachines.add(machine.id);
+            if (machine.chassisId != null) {
+               ownedChassis.add(machine.chassisId);
             }
          }
       }
-      // Every loaded entity in every loaded level, not just the ones within 96 blocks
-      // of somebody. The radius version could only ever clean up plating near a player,
-      // which is precisely the plating nobody had to look at - a suit left standing in
-      // an arena the group walked away from stayed there until somebody came back, and
-      // the report of "the block displays are still there" is what that looks like.
       List<Entity> orphans = new ArrayList<>();
       for (ServerLevel level : server.getAllLevels()) {
          for (Entity entity : level.getAllEntities()) {
-            if (entity instanceof Display.BlockDisplay display
-               && display.entityTags().contains(PLATE_TAG)
-               && !owned.contains(display.getUUID())) {
-               orphans.add(display);
+            if (entity == null || entity.isRemoved()) {
+               continue;
+            }
+            Set<String> tags = entity.entityTags();
+            if (entity instanceof Display) {
+               if (tags.contains(PLATE_TAG)) {
+                  if (!ownedPlates.contains(entity.getUUID())) {
+                     orphans.add(entity);
+                  }
+               } else if (tags.contains(CHASSIS_TAG)) {
+                  Entity ride = entity.getVehicle();
+                  boolean seated = ride != null && ride.isAlive() && !ride.isRemoved() && ownedMachines.contains(ride.getUUID());
+                  if (!seated || !ownedChassis.contains(entity.getUUID())) {
+                     orphans.add(entity);
+                  }
+               }
+            } else if (tags.contains(MACHINE_TAG) && !ownedMachines.contains(entity.getUUID())) {
+               // A machine no running fight drives: left by a crash, a restart, or a chunk that
+               // unloaded under it. It would otherwise stand in the arena forever with a name
+               // over it and nothing to make it move.
+               orphans.add(entity);
             }
          }
       }
       for (Entity orphan : orphans) {
-         orphan.discard();
+         if (!orphan.isRemoved()) {
+            if (isMachine(orphan)) {
+               shutDownMachine(orphan, null, false);
+            } else {
+               orphan.discard();
+            }
+         }
       }
    }
 
@@ -798,6 +872,7 @@ public final class ClockworkKingManager {
       Fx.starburst(level, ParticleTypes.ELECTRIC_SPARK, chest, 7.0, EMBER);
       Fx.shockwave(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 10.0, BRASS);
       Fx.clockBurst(level, ParticleTypes.ELECTRIC_SPARK, chest, 3.5, ARC);
+      sonicBurst(level, boss.position().add(0.0, 0.3, 0.0), 8.0, 14, BRASS, 4);
       for (ServerPlayer p : participantsNear(level, boss, 6.0)) {
          Vec3 away = flatAway(p.position(), boss.position());
          p.push(away.x * 0.9, 0.4, away.z * 0.9);
@@ -885,22 +960,20 @@ public final class ClockworkKingManager {
       machine.setDropChance(net.minecraft.world.entity.EquipmentSlot.FEET, 0.0F);
 
       level.addFreshEntity(machine);
-      fight.machines.put(machine.getUUID(), new Machine(machine.getUUID(), role, 0));
+      Machine tracked = new Machine(machine.getUUID(), role, 0);
+      fight.machines.put(machine.getUUID(), tracked);
       MACHINE_OWNER.put(machine.getUUID(), boss.getUUID());
 
-      // Unfolded out of him: a beam from his chest to the spot and a small circle where it lands.
+      // Unfolded out of him: a beam from his chest to the spot, a small circle where it lands
+      // and a cog spinning up in the air as the part winds itself together.
       Vec3 at = new Vec3(x, y + 0.4, z);
       Fx.beam(level, ParticleTypes.ELECTRIC_SPARK, boss.position().add(0.0, 1.6, 0.0), at, ARC);
       Fx.summonCircle(level, ParticleTypes.ELECTRIC_SPARK, at, 1.1, 14, BRASS);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, x, y + 0.4, z, 18, 0.4, 0.4, 0.4, 0.05);
-         level.sendParticles(ParticleTypes.CRIT, x, y + 0.4, z, 10, 0.3, 0.3, 0.3, 0.06);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, at, flatAway(at, boss.position()), 0.7, 16, BRASS);
+      Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, x, y + 0.4, z, 18, 0.4, 0.4, 0.4, 0.05);
+      Fx.vanilla(level, ParticleTypes.CRIT, x, y + 0.4, z, 10, 0.3, 0.3, 0.3, 0.06);
       level.playSound(null, x, y, z, SoundEvents.SMITHING_TABLE_USE, SoundSource.HOSTILE, 1.0F, 1.2F);
-      spawnChassis(level, machine, role);
+      tracked.chassisId = spawnChassis(level, machine, role);
       return machine;
    }
 
@@ -910,13 +983,16 @@ public final class ClockworkKingManager {
     * a piston head for the ram and an observer for the drone.
     *
     * <p>The chassis RIDES the machine, so it follows it with no per-tick work at
-    * all, and it is tagged so the orphan sweep can clear it if a machine is ever
-    * removed in a way that ejects its passengers.
+    * all. It carries its own tag ({@link #CHASSIS_TAG}) and its id is kept on the machine,
+    * so it is discarded with the machine however that goes, and the orphan sweep clears any
+    * chassis that ends up riding nothing.
+    *
+    * @return the chassis's id, or null when none could be bolted on
     */
-   private static void spawnChassis(ServerLevel level, Mob machine, Role role) {
+   private static UUID spawnChassis(ServerLevel level, Mob machine, Role role) {
       Display.BlockDisplay display = (Display.BlockDisplay) EntityTypes.BLOCK_DISPLAY.create(level, EntitySpawnReason.COMMAND);
       if (display == null) {
-         return;
+         return null;
       }
       BlockState state = switch (role) {
          case TURRET -> Blocks.DISPENSER.defaultBlockState();
@@ -934,9 +1010,16 @@ public final class ClockworkKingManager {
       display.setTransformation(
          new Transformation(new Vector3f(0.0F, lift, 0.0F), new Quaternionf(), new Vector3f(0.75F), new Quaternionf())
       );
-      display.addTag(PLATE_TAG);
+      display.addTag(CHASSIS_TAG);
+      display.setPos(machine.getX(), machine.getY(), machine.getZ());
       level.addFreshEntity(display);
-      display.startRiding(machine);
+      if (!display.startRiding(machine)) {
+         // A chassis that could not mount would hang in the air where the machine was
+         // made; better a bare machine than a floating block.
+         display.discard();
+         return null;
+      }
+      return display.getUUID();
    }
 
    private static String machineName(Role role) {
@@ -1040,16 +1123,13 @@ public final class ClockworkKingManager {
 
          if (!attached) {
             if (display != null) {
-               // It is being torn off right now: a real clatter of parts leaving.
+               // It is being torn off right now: a real clatter of parts leaving, and the cog
+               // that held it spinning loose.
                Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, display.position(), 0.8, BRASS);
-               com.fortuneandfavors.net.FfVfx.enter();
-               try {
-                  level.sendParticles(ParticleTypes.ELECTRIC_SPARK, display.getX(), display.getY(), display.getZ(), 26, 0.35, 0.35, 0.35, 0.12);
-                  level.sendParticles(ParticleTypes.ITEM_SNOWBALL, display.getX(), display.getY(), display.getZ(), 14, 0.35, 0.35, 0.35, 0.06);
-                  level.sendParticles(ParticleTypes.LARGE_SMOKE, display.getX(), display.getY(), display.getZ(), 10, 0.3, 0.3, 0.3, 0.04);
-               } finally {
-                  com.fortuneandfavors.net.FfVfx.exit();
-               }
+               Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, display.position(), flatAway(display.position(), boss.position()), 0.45, 10, BRASS);
+               Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, display.getX(), display.getY(), display.getZ(), 14, 0.35, 0.35, 0.35, 0.12);
+               Fx.vanilla(level, ParticleTypes.ITEM_SNOWBALL, display.getX(), display.getY(), display.getZ(), 8, 0.35, 0.35, 0.35, 0.06);
+               Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, display.getX(), display.getY(), display.getZ(), 6, 0.3, 0.3, 0.3, 0.04);
                level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.ITEM_BREAK, SoundSource.HOSTILE, 1.0F, 0.6F);
                level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.COPPER_BREAK, SoundSource.HOSTILE, 1.0F, 0.8F);
                display.discard();
@@ -1058,23 +1138,39 @@ public final class ClockworkKingManager {
             continue;
          }
 
+         Vec3 at = worldOffset(boss, plate.ox, plate.oy, plate.oz);
          if (display == null) {
             display = spawnPlate(level, plate);
             if (display == null) {
                continue;
             }
             plate.displayId = display.getUUID();
-            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, display.getX(), display.getY(), display.getZ(), 18, 0.3, 0.3, 0.3, 0.1);
-            level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.COPPER_PLACE, SoundSource.HOSTILE, 1.0F, 0.7F);
+            // Bolted on: a small cog turns it home. Drawn where the plate goes, not where the
+            // fresh display was made - that is the world origin until it is moved below, which
+            // is where these sparks used to land.
+            Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, at, Vec3.ZERO, 0.4, 8, BRASS);
+            Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, at.x, at.y, at.z, 10, 0.3, 0.3, 0.3, 0.1);
+            level.playSound(null, at.x, at.y, at.z, SoundEvents.COPPER_PLACE, SoundSource.HOSTILE, 1.0F, 0.7F);
          }
 
-         Vec3 at = worldOffset(boss, plate.ox, plate.oy, plate.oz);
          display.setPos(at.x, at.y, at.z);
          display.setYRot(boss.getYRot());
          display.hurtMarked = true;
+         // A spark off each plate now and then for clients without the mod; a modded client
+         // gets the turning cog over his core below instead.
          if (now % 15L == 0L) {
-            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, at.x, at.y, at.z, 1, 0.25, 0.25, 0.25, 0.0);
+            Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, at.x, at.y, at.z, 1, 0.25, 0.25, 0.25, 0.0);
          }
+      }
+      // His core is a clock: a cog turns over his chest while he is running. One short shape
+      // every second and a half, so it keeps up with him as he walks.
+      if (fight.riseTicks <= 0 && !fight.dying && now % 30L == 0L) {
+         Vec3 core = worldOffset(boss, 0.0, 1.6, 0.75);
+         double yaw = Math.toRadians(boss.getYRot());
+         // Straight to modded clients: everyone else already has the plate sparks above, and a
+         // fallback every second and a half would be a steady stream of packets for Geyser.
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.GEAR_SPIN, ParticleTypes.ELECTRIC_SPARK, core,
+            new Vec3(-Math.sin(yaw), 0.0, Math.cos(yaw)), 0.45, 14, fight.phase >= 3 ? EMBER : BRASS);
       }
    }
 
@@ -1147,6 +1243,14 @@ public final class ClockworkKingManager {
          Machine machine = entry.getValue();
          Entity raw = findEntity(server, machine.id);
          if (!(raw instanceof Mob mob) || !mob.isAlive() || mob.level() != boss.level()) {
+            // Gone, dead, or carried into another dimension: it is no longer his. The chassis
+            // goes with it, and a machine still standing elsewhere is shut down rather than
+            // left running loose with nothing to drive it.
+            if (raw != null && !raw.isRemoved()) {
+               shutDownMachine(raw, machine.chassisId, false);
+            } else {
+               discardChassis(server, raw, machine.chassisId);
+            }
             it.remove();
             MACHINE_OWNER.remove(machine.id);
             continue;
@@ -1178,6 +1282,9 @@ public final class ClockworkKingManager {
                double z = boss.getZ() + Math.sin(angle) * radius;
                mob.setPos(x, boss.getY() + 1.0, z);
                mob.hurtMarked = true;
+               // The spin glyph is the blade's whole silhouette while it orbits, so it goes to
+               // everyone (one particle every other tick): no template can ride a moving entity,
+               // and a modded player with no cue would only see a bare trapdoor gliding past.
                if (now % 2L == 0L) {
                   level.sendParticles(ParticleTypes.SWEEP_ATTACK, mob.getX(), mob.getY() + 0.4, mob.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
                }
@@ -1235,12 +1342,7 @@ public final class ClockworkKingManager {
          } else {
             mob.setPos(mob.getX() + step.x, mob.getY() + step.y, mob.getZ() + step.z);
             mob.hurtMarked = true;
-            com.fortuneandfavors.net.FfVfx.enter();
-            try {
-               level.sendParticles(ParticleTypes.LARGE_SMOKE, mob.getX(), mob.getY() + 0.3, mob.getZ(), 2, 0.1, 0.1, 0.1, 0.0);
-            } finally {
-               com.fortuneandfavors.net.FfVfx.exit();
-            }
+            Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, mob.getX(), mob.getY() + 0.3, mob.getZ(), 2, 0.1, 0.1, 0.1, 0.0);
             for (ServerPlayer p : participantsNear(level, mob, 1.8)) {
                p.hurtServer(level, level.damageSources().mobAttack(mob), 10.0F);
                p.push(machine.dashDir.x * 1.4, 0.8, machine.dashDir.z * 1.4);
@@ -1262,6 +1364,10 @@ public final class ClockworkKingManager {
          }
          if (machine.windup == 0) {
             machine.dashTicks = 10;
+            // The steam goes: a blast of it driven down the lane it showed.
+            if (machine.dashDir != null) {
+               Fx.gust(level, ParticleTypes.CLOUD, mob.position().add(0.0, 0.4, 0.0), machine.dashDir, 6.0, EMBER);
+            }
             level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.IRON_DOOR_CLOSE, SoundSource.HOSTILE, 1.2F, 0.6F);
          }
          return;
@@ -1296,6 +1402,17 @@ public final class ClockworkKingManager {
 
    /** A machine was torn off him: strip a tier, chip his real health, open a window. */
    public static void onMachineKilled(ServerLevel level, Mob machine, ServerPlayer killer) {
+      // Its chassis comes off with it whatever else happens below - a machine killed after
+      // its King (or during his ceremony) used to throw its block off and leave it standing.
+      UUID chassisId = null;
+      for (Fight f : FIGHTS.values()) {
+         Machine tracked = f.machines.get(machine.getUUID());
+         if (tracked != null) {
+            chassisId = tracked.chassisId;
+            break;
+         }
+      }
+      discardChassis(level.getServer(), machine, chassisId);
       UUID ownerId = machineOwnerOf(machine);
       Entity rawBoss = ownerId == null ? null : findEntity(level.getServer(), ownerId);
       if (!(rawBoss instanceof Mob boss) || !boss.isAlive()) {
@@ -1316,19 +1433,16 @@ public final class ClockworkKingManager {
       boss.setHealth(Math.max(1.0F, before - chip));
       fight.breakWindowUntil = ServerClock.clock(level) + BREAK_WINDOW_TICKS;
 
-      // The part bursts, and the shock runs back up the line into him.
+      // The part bursts - its cogs fly loose and spin down - and the shock runs back up the
+      // line into him.
       Vec3 at = machine.position().add(0.0, 0.5, 0.0);
       Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, at, 1.2, BRASS);
       Fx.flare(level, ParticleTypes.END_ROD, at, 1.2, EMBER);
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, at, flatAway(at, boss.position()), 0.9, 14, EMBER);
       Fx.lightning(level, ParticleTypes.ELECTRIC_SPARK, at, boss.position().add(0.0, 1.6, 0.0), ARC);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, at.x, at.y, at.z, 40, 0.6, 0.6, 0.6, 0.12);
-         level.sendParticles(ParticleTypes.LARGE_SMOKE, at.x, at.y, at.z, 16, 0.4, 0.4, 0.4, 0.04);
-         level.sendParticles(ParticleTypes.ITEM_SNOWBALL, at.x, at.y, at.z, 12, 0.4, 0.4, 0.4, 0.06);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, at.x, at.y, at.z, 40, 0.6, 0.6, 0.6, 0.12);
+      Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, at.x, at.y, at.z, 16, 0.4, 0.4, 0.4, 0.04);
+      Fx.vanilla(level, ParticleTypes.ITEM_SNOWBALL, at.x, at.y, at.z, 12, 0.4, 0.4, 0.4, 0.06);
       level.playSound(null, machine.getX(), machine.getY(), machine.getZ(), SoundEvents.ITEM_BREAK, SoundSource.HOSTILE, 1.2F, 0.8F);
       level.playSound(null, machine.getX(), machine.getY(), machine.getZ(), SoundEvents.STONE_BREAK, SoundSource.HOSTILE, 1.0F, 0.7F);
 
@@ -1427,26 +1541,22 @@ public final class ClockworkKingManager {
       boss.resetFallDistance();
       ServerLevel level = (ServerLevel) boss.level();
       double r = SLAM_RADIUS;
-      int points = 28;
-      // The rune circle draws this ring for modded clients; this is everyone else's copy.
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         for (int i = 0; i < points; i++) {
-            double a = i * (Math.PI * 2.0 / points);
-            level.sendParticles(
-               ParticleTypes.ELECTRIC_SPARK,
-               fight.slamTarget.x + Math.cos(a) * r,
-               fight.slamTarget.y + 0.2,
-               fight.slamTarget.z + Math.sin(a) * r,
-               1,
-               0.0,
-               0.0,
-               0.0,
-               0.0
-            );
-         }
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
+      int points = 20;
+      // The rune circle draws this ring for modded clients; this is everyone else's copy,
+      // redrawn every third tick so Geyser is not paying for a full ring on every tick.
+      for (int i = 0; fight.slamCharge % 3 == 0 && i < points; i++) {
+         double a = i * (Math.PI * 2.0 / points);
+         Fx.vanilla(level,
+            ParticleTypes.ELECTRIC_SPARK,
+            fight.slamTarget.x + Math.cos(a) * r,
+            fight.slamTarget.y + 0.2,
+            fight.slamTarget.z + Math.sin(a) * r,
+            1,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+         );
       }
       fight.slamCharge--;
       if (fight.slamCharge > 0) {
@@ -1462,14 +1572,13 @@ public final class ClockworkKingManager {
       Fx.shockwave(level, ParticleTypes.ELECTRIC_SPARK, at, SLAM_RADIUS + 1.0, BRASS);
       Fx.rockburst(level, ParticleTypes.LARGE_SMOKE, at.add(0.0, 0.3, 0.0), 1.8, EMBER);
       Fx.flare(level, ParticleTypes.END_ROD, at.add(0.0, 0.6, 0.0), 1.6, BRASS);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, x, y + 0.5, z, 2, 0.5, 0.2, 0.5, 0.0);
-         level.sendParticles(ParticleTypes.GUST, x, y + 0.4, z, 24, 2.5, 0.3, 2.5, 0.1);
-         level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + 0.5, z, 40, 2.6, 0.4, 2.6, 0.08);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      // The landing rings out through the floor like a struck bell, and the cogs of his legs
+      // grind round flat under him.
+      sonicBurst(level, at.add(0.0, 0.2, 0.0), SLAM_RADIUS + 2.0, 12, EMBER, 4);
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, at.add(0.0, 0.1, 0.0), Vec3.ZERO, 1.6, 16, BRASS);
+      Fx.vanilla(level, ParticleTypes.EXPLOSION_EMITTER, x, y + 0.5, z, 2, 0.5, 0.2, 0.5, 0.0);
+      Fx.vanilla(level, ParticleTypes.GUST, x, y + 0.4, z, 12, 2.5, 0.3, 2.5, 0.1);
+      Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, x, y + 0.5, z, 24, 2.6, 0.4, 2.6, 0.08);
 
       // The hit is the ring that was drawn: flat distance, plus a little for the player's
       // own width. It used to be a 5-block sphere round a 4.5-block ring.
@@ -1525,6 +1634,7 @@ public final class ClockworkKingManager {
          Fx.crescent(level, ParticleTypes.CRIT, at.add(0.0, 1.0, 0.0), out, SWEEP_OUTER, BRASS);
       }
       Fx.shockwave(level, ParticleTypes.CRIT, at, SWEEP_OUTER, BRASS);
+      Fx.gearSpin(level, ParticleTypes.CRIT, at.add(0.0, 0.1, 0.0), Vec3.ZERO, SWEEP_INNER * 0.6, 12, BRASS);
       // More blades, a meaner cut - but never more than a slam.
       float damage = Math.min(11.0F, 4.0F + 2.5F * blades.size());
       for (ServerPlayer p : playersNear(level, at.x, at.y, at.z, SWEEP_OUTER + 3.0)) {
@@ -1838,6 +1948,8 @@ public final class ClockworkKingManager {
       Fx.dome(level, ParticleTypes.FLAME, at, DETONATE_RADIUS, fight.detonateCharge, EMBER);
       Fx.runeCircle(level, ParticleTypes.FLAME, at.add(0.0, 0.05, 0.0), DETONATE_RADIUS, fight.detonateCharge, EMBER);
       Fx.heartbeat(level, ParticleTypes.FLAME, at.add(0.0, 0.1, 0.0), 4.0, fight.detonateCharge, BRASS);
+      // His mainspring winding past its stop: a big cog turning faster and faster over the core.
+      Fx.gearSpin(level, ParticleTypes.FLAME, at.add(0.0, 0.2, 0.0), Vec3.ZERO, 2.4, fight.detonateCharge, EMBER);
       announceNear(level, boss, 64.0, SAY + "\"\u00a7fStand back. \u00a7cOr don't.\"");
       announceNear(level, boss, 64.0, "\u00a78His core is going. \u00a77Get out of the dome.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 2.0F, 0.4F);
@@ -1853,20 +1965,21 @@ public final class ClockworkKingManager {
       fight.detonateCharge--;
       int elapsed = 60 - fight.detonateCharge;
       double r = 3.0 + elapsed * 0.22;
-      int points = 36;
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
+      int points = 24;
+      // The dome and rune circle draw this for modded clients. Everyone else gets a ring that
+      // widens with the charge, redrawn every third tick to keep Geyser's packet count sane.
+      if (fight.detonateCharge % 3 == 0) {
          for (int i = 0; i < points; i++) {
             double a = i * (Math.PI * 2.0 / points) + elapsed * 0.05;
-            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, at.x + Math.cos(a) * r, at.y + 0.15, at.z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
+            Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, at.x + Math.cos(a) * r, at.y + 0.15, at.z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
          }
-         level.sendParticles(ParticleTypes.CRIT, boss.getX(), boss.getY() + 1.2, boss.getZ(), 8, 1.0, 1.0, 1.0, 0.1);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
+         Fx.vanilla(level, ParticleTypes.CRIT, boss.getX(), boss.getY() + 1.2, boss.getZ(), 8, 1.0, 1.0, 1.0, 0.1);
       }
       if (fight.detonateCharge == 20) {
          level.playSound(null, at.x, at.y, at.z, SoundEvents.CREEPER_PRIMED, SoundSource.HOSTILE, 2.0F, 0.5F);
          Fx.flare(level, ParticleTypes.FLAME, boss.position().add(0.0, 1.6, 0.0), 1.6, EMBER);
+         // The last second: the heat is pulled into the core before it goes.
+         Fx.voidCollapse(level, ParticleTypes.FLAME, at.add(0.0, 1.0, 0.0), 6.0, 20, EMBER);
       }
       if (fight.detonateCharge > 0) {
          return;
@@ -1880,15 +1993,16 @@ public final class ClockworkKingManager {
       Fx.shockwave(level, ParticleTypes.FLAME, at, DETONATE_RADIUS + 1.0, EMBER);
       Fx.starburst(level, ParticleTypes.ELECTRIC_SPARK, core, 9.0, BRASS);
       Fx.rockburst(level, ParticleTypes.LARGE_SMOKE, at.add(0.0, 0.3, 0.0), 2.5, EMBER);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, x, y, z, 8, 2.0, 1.0, 2.0, 0.1);
-         level.sendParticles(ParticleTypes.GUST, x, y, z, 60, 8.0, 1.5, 8.0, 0.2);
-         level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y, z, 200, 9.0, 2.0, 9.0, 0.18);
-         level.sendParticles(ParticleTypes.FLAME, x, y, z, 120, 7.0, 1.5, 7.0, 0.14);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      // The mainspring lets go: his cogs blown out flat across the floor, and the blast
+      // rolling out to the dome's edge.
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, at.add(0.0, 0.2, 0.0), Vec3.ZERO, 4.0, 24, BRASS);
+      sonicBurst(level, at.add(0.0, 0.3, 0.0), DETONATE_RADIUS, 16, EMBER, 6);
+      // Bounded: these used to be nearly four hundred particles in one tick, which Geyser
+      // turns into four hundred packets for every Bedrock player in range.
+      Fx.vanilla(level, ParticleTypes.EXPLOSION_EMITTER, x, y, z, 4, 2.0, 1.0, 2.0, 0.1);
+      Fx.vanilla(level, ParticleTypes.GUST, x, y, z, 20, 8.0, 1.5, 8.0, 0.2);
+      Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, x, y, z, 50, 9.0, 2.0, 9.0, 0.18);
+      Fx.vanilla(level, ParticleTypes.FLAME, x, y, z, 40, 7.0, 1.5, 7.0, 0.14);
       level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 3.0F, 0.5F);
       level.playSound(null, x, y, z, SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.HOSTILE, 1.4F, 0.5F);
 
@@ -1936,12 +2050,11 @@ public final class ClockworkKingManager {
       Fx.shockwave(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 9.0, phase >= 3 ? EMBER : ARC);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 2.0F, 0.6F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 1.6F, 0.5F);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, boss.getX(), boss.getY() + 1.5, boss.getZ(), 90, 3.0, 1.5, 3.0, 0.2);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      // His gears shift up a ratio: an upright set of cogs over his shoulders spinning up.
+      double yaw = Math.toRadians(boss.getYRot());
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, worldOffset(boss, 0.0, 3.2, -0.3), new Vec3(-Math.sin(yaw), 0.0, Math.cos(yaw)), 1.4, 30,
+         phase >= 3 ? EMBER : BRASS);
+      Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, boss.getX(), boss.getY() + 1.5, boss.getZ(), 40, 3.0, 1.5, 3.0, 0.2);
    }
 
    private static String phaseName(Fight fight, Mob boss) {
@@ -2023,6 +2136,8 @@ public final class ClockworkKingManager {
       Fx.aura(level, ParticleTypes.LARGE_SMOKE, boss.position(), 3.2, DEATH_CEREMONY_TICKS, EMBER);
       Fx.runeCircle(level, ParticleTypes.ELECTRIC_SPARK, boss.position().add(0.0, 0.05, 0.0), 5.0, DEATH_CEREMONY_TICKS, BRASS);
       Fx.clockBurst(level, ParticleTypes.ELECTRIC_SPARK, chest, 2.0, ARC);
+      // The works run down: his cogs keep turning flat under him for the whole ceremony.
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, boss.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 2.2, DEATH_CEREMONY_TICKS, BRASS);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 2.0F, 0.5F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.IRON_GOLEM_HURT, SoundSource.HOSTILE, 1.6F, 0.5F);
       announce(level, SAY + "\"\u00a7fNo. \u00a76I'm still ticking.\"");
@@ -2054,13 +2169,8 @@ public final class ClockworkKingManager {
             Entity display = findEntity(server, plate.displayId);
             if (display != null) {
                Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, display.position(), 0.7, BRASS);
-               com.fortuneandfavors.net.FfVfx.enter();
-               try {
-                  level.sendParticles(ParticleTypes.ELECTRIC_SPARK, display.getX(), display.getY(), display.getZ(), 20, 0.3, 0.3, 0.3, 0.1);
-                  level.sendParticles(ParticleTypes.ITEM_SNOWBALL, display.getX(), display.getY(), display.getZ(), 10, 0.3, 0.3, 0.3, 0.05);
-               } finally {
-                  com.fortuneandfavors.net.FfVfx.exit();
-               }
+               Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, display.getX(), display.getY(), display.getZ(), 20, 0.3, 0.3, 0.3, 0.1);
+               Fx.vanilla(level, ParticleTypes.ITEM_SNOWBALL, display.getX(), display.getY(), display.getZ(), 10, 0.3, 0.3, 0.3, 0.05);
                level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.COPPER_BREAK, SoundSource.HOSTILE, 1.0F, 0.7F);
                display.discard();
             }
@@ -2080,7 +2190,9 @@ public final class ClockworkKingManager {
                Fx.lightning(level, ParticleTypes.ELECTRIC_SPARK, at, chest, ARC);
                Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, at, 0.9, BRASS);
                level.playSound(null, raw.getX(), raw.getY(), raw.getZ(), SoundEvents.ITEM_BREAK, SoundSource.HOSTILE, 0.9F, 0.7F);
-               raw.discard();
+               shutDownMachine(raw, machine.chassisId, false);
+            } else {
+               discardChassis(server, null, machine.chassisId);
             }
             fight.machines.remove(machine.id);
             MACHINE_OWNER.remove(machine.id);
@@ -2100,18 +2212,18 @@ public final class ClockworkKingManager {
          // The last second: everything folds into his core.
          Fx.vortex(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 6.0, 20, ARC);
          Fx.dome(level, ParticleTypes.END_ROD, chest, 2.5, 20, BRASS);
+         Fx.voidCollapse(level, ParticleTypes.ELECTRIC_SPARK, chest, 5.0, 20, ARC);
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.6F, 0.8F);
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 1.6F, 1.4F);
       } else if (fight.deathTicks == 8) {
          announce(level, SAY + "\"\u00a7f...tick.\"");
       }
 
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.CRIT, boss.getX(), boss.getY() + 1.5, boss.getZ(), 10, 1.6, 1.2, 1.6, 0.12);
-         level.sendParticles(ParticleTypes.LARGE_SMOKE, boss.getX(), boss.getY() + 1.0, boss.getZ(), 8, 1.2, 1.0, 1.2, 0.05);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
+      // Sparks and smoke venting off him for clients without the mod; the spiral and the aura
+      // laid down when the ceremony began are the modded clients' version.
+      if (fight.deathTicks % 2 == 0) {
+         Fx.vanilla(level, ParticleTypes.CRIT, boss.getX(), boss.getY() + 1.5, boss.getZ(), 8, 1.6, 1.2, 1.6, 0.12);
+         Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, boss.getX(), boss.getY() + 1.0, boss.getZ(), 6, 1.2, 1.0, 1.2, 0.05);
       }
 
       if (fight.deathTicks > 0) {
@@ -2125,14 +2237,14 @@ public final class ClockworkKingManager {
       Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, chest, 2.0, BRASS);
       Fx.pillar(level, ParticleTypes.ELECTRIC_SPARK, boss.position(), 14.0, ARC);
       Fx.emberRain(level, ParticleTypes.FLAME, boss.position(), 8.0, 60, EMBER);
+      // He comes apart into his works: a great set of cogs thrown upright over the wreck,
+      // still turning as they fall, and the bell-ring of it running out across the floor.
+      double yaw = Math.toRadians(boss.getYRot());
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, chest.add(0.0, 0.8, 0.0), new Vec3(-Math.sin(yaw), 0.0, Math.cos(yaw)), 2.6, 50, BRASS);
+      sonicBurst(level, boss.position().add(0.0, 0.3, 0.0), 14.0, 16, BRASS, 6);
       announce(level, "\u00a76\u00a7lThe Clockwork King \u00a7rbursts into brass and springs. \u00a77The ticking stops.");
       discardPlating(server, fight);
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 6, 1.5, 1.0, 1.5, 0.1);
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      Fx.vanilla(level, ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 6, 1.5, 1.0, 1.5, 0.1);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 2.0F, 0.6F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 2.0F, 0.7F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, 0.5F);
@@ -2245,7 +2357,9 @@ public final class ClockworkKingManager {
       for (Machine machine : new ArrayList<>(fight.machines.values())) {
          Entity raw = findEntity(server, machine.id);
          if (raw != null) {
-            raw.discard();
+            shutDownMachine(raw, machine.chassisId, false);
+         } else {
+            discardChassis(server, null, machine.chassisId);
          }
          MACHINE_OWNER.remove(machine.id);
       }
@@ -2262,12 +2376,44 @@ public final class ClockworkKingManager {
       release(server, fight);
    }
 
-   private static void shutDownMachine(Entity machine, boolean fx) {
+   /**
+    * Takes one machine out of the world together with its chassis.
+    *
+    * <p>The chassis has to go first and by name: vanilla throws a removed entity's passengers
+    * off rather than removing them, so discarding only the machine left its dispenser or
+    * piston block hanging in the air where the machine had been.
+    *
+    * @param chassisId the chassis recorded for it, if any; whatever display is still riding
+    *                  it is discarded as well
+    */
+   private static void shutDownMachine(Entity machine, UUID chassisId, boolean fx) {
+      if (machine == null) {
+         return;
+      }
       if (fx && machine.level() instanceof ServerLevel level) {
-         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, machine.getX(), machine.getY() + 0.4, machine.getZ(), 16, 0.3, 0.3, 0.3, 0.08);
+         Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, machine.position().add(0.0, 0.4, 0.0), 0.7, BRASS);
+         Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, machine.getX(), machine.getY() + 0.4, machine.getZ(), 16, 0.3, 0.3, 0.3, 0.08);
          level.playSound(null, machine.getX(), machine.getY(), machine.getZ(), SoundEvents.ITEM_BREAK, SoundSource.HOSTILE, 0.8F, 0.7F);
       }
+      discardChassis(machine.level().getServer(), machine, chassisId);
       machine.discard();
+   }
+
+   /** Discards a machine's chassis: the one recorded for it, and any display still riding it. */
+   private static void discardChassis(MinecraftServer server, Entity machine, UUID chassisId) {
+      if (machine != null) {
+         for (Entity rider : new ArrayList<>(machine.getPassengers())) {
+            if (rider instanceof Display) {
+               rider.discard();
+            }
+         }
+      }
+      if (chassisId != null) {
+         Entity chassis = findEntity(server, chassisId);
+         if (chassis != null) {
+            chassis.discard();
+         }
+      }
    }
 
    // ------------------------------------------------------------------ helpers
@@ -2392,6 +2538,24 @@ public final class ClockworkKingManager {
          }
       }
       return out;
+   }
+
+   /**
+    * A struck-bell ring through the floor: {@code spokes} sonic crescents racing out from
+    * {@code at} along evenly spaced compass lines.
+    *
+    * <p>Sent to modded clients only. A sonic ring is a single directed wave, so the all-round
+    * version is several of them, and every call site already sends a {@link Fx#shockwave}
+    * for the same moment - that is the vanilla clients' copy, and a fallback per spoke would
+    * only pile a few hundred more particles onto Geyser.
+    */
+   private static void sonicBurst(ServerLevel level, Vec3 at, double reach, int ticks, int color, int spokes) {
+      double offset = RANDOM.nextDouble() * Math.PI;
+      for (int i = 0; i < spokes; i++) {
+         double a = offset + i * (Math.PI * 2.0 / spokes);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.SONIC_RING, ParticleTypes.ELECTRIC_SPARK, at,
+            new Vec3(Math.cos(a), 0.0, Math.sin(a)), reach, ticks, color);
+      }
    }
 
    /** A flat unit vector from {@code from} out to {@code at}; straight up-free and never zero. */

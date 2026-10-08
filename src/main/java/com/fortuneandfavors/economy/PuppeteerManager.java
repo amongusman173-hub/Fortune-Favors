@@ -2,6 +2,7 @@ package com.fortuneandfavors.economy;
 
 import com.fortuneandfavors.ModItems;
 import com.fortuneandfavors.ModSounds;
+import com.fortuneandfavors.net.FfVfx;
 import com.fortuneandfavors.util.Chat;
 import com.fortuneandfavors.util.Safe;
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundAnimatePacket;
@@ -396,8 +398,33 @@ public final class PuppeteerManager {
     * boss has ever lasted.
     */
    private static final long POSSESSION_LONGSTOP = 20L * 60L * 45L;
-   /** The contest's own bar, which is separate from the third string's. */
-   private static final String KNOT_BAR = "\u00a75\u00a7lTHE FINAL KNOT";
+   /**
+    * The contest's own bar, which is separate from the third string's.
+    *
+    * <p>Named <b>The Last String</b> on screen - the name players know the move by, and the
+    * one that pays off at his death ("THE LAST STRING IS CUT"). The code keeps calling it the
+    * knot.
+    */
+   private static final String KNOT_BAR = "\u00a75\u00a7lTHE LAST STRING";
+   /**
+    * How long after the third phase turns he first reaches for a body.
+    *
+    * <p>Short on purpose. The phase is the last thirty percent of his health, and a group that
+    * is doing well burns that in well under half a minute - a move that waits ten seconds and
+    * then needs a string to already be on somebody simply never showed up in most fights.
+    */
+   private static final long KNOT_OPENS_AFTER = 100L;
+   /**
+    * The least time between two hands being pulled out of one contest.
+    *
+    * <p>Every blow on him by anyone in the room counts, which is the point - but four people
+    * swinging at once used to land all three breaks inside the same second, so the contest
+    * ended before the victim had read the bar. A hand comes out at most every half second, so
+    * three of them take a real (if short) effort and the escape by distance stays worth it.
+    */
+   private static final long KNOT_BREAK_GAP = 10L;
+   /** How often the strings are seen dropping onto the contested body again. */
+   private static final long KNOT_THREADS_EVERY = 20L;
    /** How long the death ceremony plays: one string cut per two ticks. */
    private static final int DEATH_TICKS = 90;
 
@@ -670,6 +697,10 @@ public final class PuppeteerManager {
       int knotsLeft;
       long nextKnotCue;
       long nextKnotDrag;
+      /** When the strings are next drawn dropping onto the contested body. */
+      long nextKnotThreads;
+      /** The tick the last hand was pulled out, for {@link #KNOT_BREAK_GAP}. */
+      long lastKnotBreak;
       /**
        * Set when the knot lands and he takes the body outright: the string is spent, and
        * the loop that owns this map removes it rather than the call that consumed it.
@@ -723,6 +754,8 @@ public final class PuppeteerManager {
       final double y;
       final double z;
       final long expires;
+      /** When its rune ring is next sent to modded clients (a short cue, re-sent while it waits). */
+      long nextCue;
 
       Snare(UUID bossId, ServerLevel world, double x, double y, double z, long expires) {
          this.bossId = bossId;
@@ -878,6 +911,11 @@ public final class PuppeteerManager {
       THREADS.clear();
       SNARES.clear();
       MARIONETTE_LANDED.clear();
+      // Every fight above was released, which freed its bodies; these are the leftovers of a
+      // fight whose state was already gone, and a test hands the world back with nobody worn.
+      POSSESSED.clear();
+      KNOTS_LANDED.clear();
+      clearAllWindupBars();
       if (server != null) {
          // Every tagged body, fight or no fight. A released fight leaves its boss
          // standing - a released fight is a fight nobody is in, not a corpse - so a
@@ -927,6 +965,10 @@ public final class PuppeteerManager {
       clearAllWindupBars();
       MARIONETTE_LANDED.clear();
       RECENT_LINES.clear();
+      // Released fights freed their bodies already; nothing about a possession may survive into
+      // the next boot of this process (an integrated server reopening a world).
+      POSSESSED.clear();
+      KNOTS_LANDED.clear();
    }
 
    /** Ends every active fight immediately - boss gone, bar gone, puppets gone. */
@@ -950,6 +992,8 @@ public final class PuppeteerManager {
       SNARES.clear();
       clearAllWindupBars();
       MARIONETTE_LANDED.clear();
+      POSSESSED.clear();
+      KNOTS_LANDED.clear();
       clearPuppets(server, false);
       return ended;
    }
@@ -1077,6 +1121,9 @@ public final class PuppeteerManager {
       Fx.runeCircle(level, ParticleTypes.END_ROD, mark.add(0.0, 0.05, 0.0), 3.5, RISE_TICKS + 10, THREAD_VIOLET);
       Fx.pillar(level, ParticleTypes.END_ROD, mark, 14.0, LIMELIGHT);
       Fx.petals(level, ParticleTypes.END_ROD, mark.add(0.0, 0.5, 0.0), 2.5, RISE_TICKS, LIMELIGHT);
+      // The strings he comes down on: they drop out of the dark onto the mark, hang taut for the
+      // whole descent, and snap the moment his feet touch the floor. One cue, timed to the rise.
+      Fx.threads(level, ParticleTypes.END_ROD, mark, 9.0, RISE_TICKS + 6, THREAD_VIOLET);
       level.playSound(null, x, y, z, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.2F, 1.5F);
       level.playSound(null, x, y, z, SoundEvents.VEX_CHARGE, SoundSource.HOSTILE, 1.0F, 0.6F);
       Advancements.grant(summoner, "summon_puppeteer");
@@ -1166,17 +1213,12 @@ public final class PuppeteerManager {
       // 2) Arrival: he is lowered on his own strings.
       if (fight.riseTicks > 0) {
          fight.riseTicks--;
-         // He is on a string: the line runs up out of the arena and he comes down it.
-         drawString(
-            level,
-            boss.getX(),
-            boss.getY() + 1.6,
-            boss.getZ(),
-            boss.getX(),
-            boss.getY() + 12.0,
-            boss.getZ(),
-            10
-         );
+         // He is on a string: the line runs up out of the arena and he comes down it. Modded
+         // clients already see it as the threads cue sent at the summon, so the per-tick dotted
+         // line is the vanilla version only, and only every other tick.
+         if (fight.riseTicks % 2 == 0) {
+            vanillaLine(level, ParticleTypes.END_ROD, new Vec3(boss.getX(), boss.getY() + 1.6, boss.getZ()), new Vec3(boss.getX(), boss.getY() + 12.0, boss.getZ()), 10);
+         }
          boss.setPos(boss.getX(), boss.getY() - 0.13, boss.getZ());
          if (fight.riseTicks % 8 == 0) {
             level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 0.8F, 0.6F);
@@ -1219,6 +1261,9 @@ public final class PuppeteerManager {
          announce(level, SAY + "\"\u00a7fAct two. \u00a7dMore strings.\"");
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.EVOKER_PREPARE_SUMMON, SoundSource.HOSTILE, 1.2F, 0.6F);
          stringBurst(level, boss, 60);
+         // Act two: a ring of mask paint opens under him and the stage light turns red.
+         Fx.runeCircle(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.05, 0.0), 5.0, 40, MASK_PAINT);
+         Fx.heartbeat(level, ParticleTypes.SOUL, boss.position(), 6.0, 36, MASK_PAINT);
          // He threads everyone at once the moment the phase turns: the rule of the fight
          // has to change in a way the room can see, and a cast that suddenly covers
          // everybody is that change. One string each, because the tightening is what
@@ -1234,11 +1279,21 @@ public final class PuppeteerManager {
          announce(level, SAY + "\"\u00a7fFinal act. \u00a7dEveryone back on stage.\"");
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.HOSTILE, 1.4F, 0.5F);
          stringBurst(level, boss, 90);
+         // The final act: every string he owns spirals up off him into the flies.
+         Fx.spiral(level, ParticleTypes.END_ROD, boss.position(), 9.0, 40, THREAD_VIOLET);
+         Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, boss.position().add(0.0, 1.4, 0.0), 6.0, 20, THREAD_VIOLET);
          summonAllPuppets(level, boss, fight);
-         // The knot is the last thing he has, and it is not the first thing he does the
+         // The Last String is the last thing he has, and it is not the first thing he does the
          // moment the phase turns: the phase turn is already a cast, a summon and a colour
-         // change, and a fight should never open a phase with its most expensive move.
-         fight.nextKnot = now + 200L;
+         // change, and a fight should never open a phase with its most expensive move. Five
+         // seconds, though, not ten - the phase is short (see KNOT_OPENS_AFTER).
+         fight.nextKnot = now + KNOT_OPENS_AFTER;
+         // Take It Back's clock started at the summon, so by the time the phase turned it had
+         // long since expired - and it sat ahead of the knot in the rotation. The very first
+         // thing he did in phase three was therefore reel in and cut every string in the room,
+         // and the knot, which needs a string to pull on, found nobody to reach. That is the
+         // main reason the Last String stopped appearing. The rewind now waits its turn.
+         fight.nextRewind = Math.max(fight.nextRewind, now + KNOT_OPENS_AFTER + 200L);
       }
 
       // 4b) Blows already marked on the floor land on their own clock, target or no target.
@@ -1270,6 +1325,16 @@ public final class PuppeteerManager {
             return;
          }
          fight.nextThread = now + 40L;
+      }
+
+      // 6-) The Last String: phase three's signature, checked before the staged attacks so a
+      // busy rotation can never starve it. It picks its own target (see knotTarget) and ties
+      // the string it pulls on if nobody is holding one, so it no longer depends on a string
+      // happening to be on somebody at the moment its clock comes round - which, with every
+      // blow on him cutting one, was almost never.
+      if (fight.phase >= 3 && now >= fight.nextKnot && beginKnot(level, boss, fight, knotTarget(level, boss, fight))) {
+         fight.nextKnot = now + KNOT_COOLDOWN;
+         return;
       }
 
       // 6a) The staged attacks: every one is marked on the floor before it lands.
@@ -1315,14 +1380,6 @@ public final class PuppeteerManager {
          fight.nextRewind = now + REWIND_COOLDOWN;
          return;
       }
-      // The Final Knot: phase three's last word. Like the reel and the rewind it is
-      // conditional on him actually holding somebody - a body has to be strung before he
-      // can go all the way in - so a fight where everybody has cut their strings does not
-      // burn the move's clock on nothing.
-      if (fight.phase >= 3 && now >= fight.nextKnot && beginKnot(level, boss, fight, knotTarget(level, boss, fight))) {
-         fight.nextKnot = now + KNOT_COOLDOWN;
-         return;
-      }
       if (fight.phase >= 3 && !fight.swapped && now >= fight.nextSwap) {
          fight.nextSwap = now + SWAP_COOLDOWN;
          if (puppetSwap(level, boss, fight)) {
@@ -1353,7 +1410,8 @@ public final class PuppeteerManager {
       }
       BossGrounding.resurface(level, boss, 0.6);
       boss.setYRot(faceYaw(boss, target));
-      level.sendParticles(ParticleTypes.END_ROD, boss.getX(), boss.getY() + 2.1, boss.getZ(), 1, 0.5, 0.3, 0.5, 0.01);
+      // A mote off his crown for vanilla clients; modded ones see the idle string cues.
+      Fx.vanilla(level, ParticleTypes.END_ROD, boss.getX(), boss.getY() + 2.1, boss.getZ(), 1, 0.5, 0.3, 0.5, 0.01);
 
       // A slow melee under the strings, so standing on top of him is not free.
       if (dist < 3.4 && now % 30L == 0L) {
@@ -1567,7 +1625,9 @@ public final class PuppeteerManager {
       fight.threaded.add(target.getUUID());
       announce(level, SAY + "\"\u00a7fHold still.\"");
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 1.1F, 0.7F);
-      level.sendParticles(ParticleTypes.END_ROD, target.getX(), target.getY() + 1.2, target.getZ(), 20, 0.4, 0.6, 0.4, 0.05);
+      // The string drops onto them from the flies, then runs back to his hand.
+      Fx.threads(level, ParticleTypes.END_ROD, target.position(), 6.0, 24, THREAD_VIOLET);
+      Fx.vanilla(level, ParticleTypes.END_ROD, target.getX(), target.getY() + 1.2, target.getZ(), 12, 0.4, 0.6, 0.4, 0.05);
       target.sendOverlayMessage(Component.literal(threadLine(1)));
       target.sendSystemMessage(
          Component.literal(
@@ -1590,7 +1650,7 @@ public final class PuppeteerManager {
       }
       ServerPlayer best = null;
       double bestDistance = Double.MAX_VALUE;
-      for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && !pl.isSpectator() && pl.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS)) {
+      for (ServerPlayer p : level.getPlayers(pl -> isRealTarget(pl) && pl.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS)) {
          if (THREADS.containsKey(p.getUUID())) {
             continue;
          }
@@ -1648,7 +1708,9 @@ public final class PuppeteerManager {
       // would visibly do nothing for half a minute.
       thread.nextPull = Math.min(thread.nextPull, ServerClock.clock(level) + stackedPullTicks(thread.power, thread.stacks));
       level.playSound(null, best.getX(), best.getY(), best.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 1.0F, 0.6F + thread.stacks * 0.15F);
-      level.sendParticles(ParticleTypes.END_ROD, best.getX(), best.getY() + 1.2, best.getZ(), 12, 0.4, 0.6, 0.4, 0.04);
+      // Another string comes down on them, and the knot at their feet tightens.
+      Fx.threads(level, ParticleTypes.END_ROD, best.position(), 5.0, 20, THREAD_VIOLET);
+      Fx.ring(level, ParticleTypes.END_ROD, best.position().add(0.0, 0.1, 0.0), 0.9 + thread.stacks * 0.3, THREAD_VIOLET);
       best.sendOverlayMessage(Component.literal(threadLine(thread.stacks)));
       return true;
    }
@@ -1688,6 +1750,10 @@ public final class PuppeteerManager {
       thread.windupTotal = ticks;
       thread.nextWindupCue = now;
       showWindupBar(player, ticks, ticks);
+      // The third string is seen coming the whole way: strings drop onto the spot and hang
+      // there, taut, for exactly as long as the windup runs. The closing ring is drawn per beat
+      // in tickWindup, because the player is moving and the ring has to follow them.
+      Fx.threads(level, ParticleTypes.END_ROD, player.position(), 7.0, ticks, MASK_PAINT);
       announce(level, SAY + "\"\u00a7fOne more. \u00a7dHold still.\"");
       player.sendOverlayMessage(Component.literal("\u00a75\u00a7lSTRINGS CLOSING \u00a78| \u00a7frun, or hit him"));
       player.sendSystemMessage(
@@ -1755,7 +1821,7 @@ public final class PuppeteerManager {
       player.sendOverlayMessage(Component.literal(threadLine(thread.stacks)));
       player.sendSystemMessage(Component.literal("\u00a75\u2726 \u00a7fThe windup slackens \u00a78- \u00a7f" + why));
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.HOSTILE, 1.0F, 0.7F);
-      level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 16, 0.6, 0.6, 0.6, 0.08);
+      Fx.starburst(level, ParticleTypes.END_ROD, player.position().add(0.0, 1.2, 0.0), 2.2, THREAD_VIOLET);
    }
 
    /** The moment the hand arrives - the loudest thing he does in the whole fight. */
@@ -1772,7 +1838,9 @@ public final class PuppeteerManager {
       );
       player.sendSystemMessage(Component.literal("\u00a7fLand a blow on him to cut one string off. \u00a7dThree blows and you are free."));
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.VEX_CHARGE, SoundSource.HOSTILE, 1.3F, 0.6F);
-      level.sendParticles(ParticleTypes.SOUL, player.getX(), player.getY() + 1.0, player.getZ(), 30, 0.6, 0.9, 0.6, 0.06);
+      // The hand arrives: a flash of mask paint at the chest and the strings pulled tight.
+      Fx.flare(level, ParticleTypes.SOUL, player.position().add(0.0, 1.2, 0.0), 1.6, MASK_PAINT);
+      Fx.threads(level, ParticleTypes.SOUL, player.position(), 6.0, 30, THREAD_VIOLET);
    }
 
    /**
@@ -1785,24 +1853,34 @@ public final class PuppeteerManager {
     */
    private static void drawWindup(ServerLevel level, ServerPlayer player, int points, double share) {
       double radius = 3.0 - share * 2.0;
-      long step = ServerClock.clock(level) / 2L;
-      for (int i = 0; i < points; i++) {
-         double angle = step * 0.35 + i * ((Math.PI * 2.0) / points);
-         level.sendParticles(
-            ParticleTypes.END_ROD,
-            player.getX() + Math.cos(angle) * radius,
-            player.getY() + 1.0 + Math.sin(step * 0.2 + i) * 0.35,
-            player.getZ() + Math.sin(angle) * radius,
-            1,
-            0.0,
-            0.0,
-            0.0,
-            0.0
-         );
+      long now = ServerClock.clock(level);
+      long step = now / 2L;
+      // Modded clients: the closing ring as a cue every four ticks (each one shorter than the
+      // last, so it visibly tightens), following the player wherever they run.
+      if (now % 4L == 0L) {
+         cue(level, FfVfx.RING, ParticleTypes.END_ROD, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, Math.max(0.6, radius), 0.0,
+            share > 0.75 ? MASK_PAINT : THREAD_VIOLET);
       }
-      if (share > 0.75) {
-         level.sendParticles(ParticleTypes.CRIT, player.getX(), player.getY() + 1.1, player.getZ(), 4, 0.3, 0.4, 0.3, 0.02);
-      }
+      Fx.vanillaOnly(() -> {
+         for (int i = 0; i < points; i++) {
+            double angle = step * 0.35 + i * ((Math.PI * 2.0) / points);
+            FfVfx.particles(
+               level,
+               ParticleTypes.END_ROD,
+               player.getX() + Math.cos(angle) * radius,
+               player.getY() + 1.0 + Math.sin(step * 0.2 + i) * 0.35,
+               player.getZ() + Math.sin(angle) * radius,
+               1,
+               0.0,
+               0.0,
+               0.0,
+               0.0
+            );
+         }
+         if (share > 0.75) {
+            FfVfx.particles(level, ParticleTypes.CRIT, player.getX(), player.getY() + 1.1, player.getZ(), 4, 0.3, 0.4, 0.3, 0.02);
+         }
+      });
    }
 
    private static void showWindupBar(ServerPlayer player, long remainingTicks, int totalTicks) {
@@ -1879,6 +1957,15 @@ public final class PuppeteerManager {
             clearWindupBar(thread.player);
             continue;
          }
+         // A string does not reach between dimensions. The distance below would be measured
+         // across two worlds' coordinates, and a pull would shove somebody in the Nether
+         // toward a point in the overworld - so a portal is simply the longest way of running.
+         if (player.level() != boss.level()) {
+            it.remove();
+            clearWindupBar(thread.player);
+            player.sendOverlayMessage(Component.literal("\u00a77The string snaps - \u00a7fhis hands do not reach this far."));
+            continue;
+         }
          double distance = player.distanceTo(boss);
          if (distance > THREAD_SNAP_DISTANCE) {
             it.remove();
@@ -1895,8 +1982,11 @@ public final class PuppeteerManager {
             continue;
          }
 
-         // Always visible: a line of dust from your chest to his hands.
-         drawThread(thread.world, boss, player);
+         // Always visible: a line from your chest to his hands. Every third tick - the beam a
+         // modded client draws lingers between cues, and the vanilla dots linger longer still.
+         if (now % 3L == 0L) {
+            drawThread(thread.world, boss, player);
+         }
 
          // The final knot, if one is running on this player, is the thing happening to
          // them: everything else the strings do to them pauses while it is contested.
@@ -1942,7 +2032,8 @@ public final class PuppeteerManager {
          Vec3 toward = flat.normalize().scale(stackedPullPower(thread.power, thread.stacks));
          player.setDeltaMovement(player.getDeltaMovement().add(toward.x, 0.0, toward.z));
          player.hurtMarked = true;
-         thread.world.sendParticles(ParticleTypes.CRIT, player.getX(), player.getY() + 1.0, player.getZ(), 6, 0.25, 0.4, 0.25, 0.02);
+         // The tug lands as a snap of thread at the chest, thrown the way he is pulling.
+         Fx.clash(thread.world, ParticleTypes.CRIT, player.position().add(0.0, 1.0, 0.0), flat.normalize(), THREAD_VIOLET);
          thread.world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_CLICK_ON, SoundSource.HOSTILE, 0.7F, 1.5F);
 
          // Level III: once in a while his hand moves your legs, and then lets go.
@@ -1959,7 +2050,7 @@ public final class PuppeteerManager {
             player.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 20, 0, false, false, false));
             player.sendOverlayMessage(Component.literal("\u00a75Your legs move without you."));
             thread.world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.VEX_CHARGE, SoundSource.HOSTILE, 0.7F, 1.4F);
-            thread.world.sendParticles(ParticleTypes.SOUL, player.getX(), player.getY() + 0.2, player.getZ(), 10, 0.3, 0.2, 0.3, 0.03);
+            Fx.ring(thread.world, ParticleTypes.SOUL, player.position().add(0.0, 0.1, 0.0), 0.9, THREAD_VIOLET);
          }
       }
    }
@@ -2078,8 +2169,10 @@ public final class PuppeteerManager {
    private static LivingEntity stringsTarget(ServerLevel level, ServerPlayer player) {
       LivingEntity best = null;
       double bestDistance = MARIONETTE_REACH * MARIONETTE_REACH;
+      // Real people only: his own puppets are fake players standing in this list too, and a
+      // hand that spent the hold swinging at his own dolls would be no threat at all.
       for (ServerPlayer other : level.getPlayers(
-         pl -> pl.isAlive() && !pl.isSpectator() && !pl.getUUID().equals(player.getUUID())
+         pl -> isRealTarget(pl) && !pl.getUUID().equals(player.getUUID())
       )) {
          double distance = other.distanceToSqr(player);
          if (distance < bestDistance && ClaimManager.pvpAllowed(player, other)) {
@@ -2120,7 +2213,8 @@ public final class PuppeteerManager {
          }
          float damage = BossManager.weaponDamage(level, player, player.getMainHandItem(), victim);
          victim.hurtServer(level, level.damageSources().playerAttack(player), damage);
-         level.sendParticles(ParticleTypes.CRIT, victim.getX(), victim.getY() + 1.0, victim.getZ(), 6, 0.4, 0.5, 0.4, 0.1);
+         // His swing, drawn in his colours: an arc of mask paint off the arm he is using.
+         Fx.slash(level, ParticleTypes.CRIT, player.position(), victim.position().subtract(player.position()), 2.6, MASK_PAINT);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_CLICK_ON, SoundSource.HOSTILE, 0.6F, 1.6F);
       } catch (Throwable ignored) {
       }
@@ -2165,11 +2259,15 @@ public final class PuppeteerManager {
          );
       } else {
          THREADS.remove(player.getUUID());
+         // Any bar this string was carrying goes with it. The windup's is cleared above; a
+         // contest's bar used to stay on screen forever when its string was cut from under it.
+         clearWindupBar(player.getUUID());
          player.sendOverlayMessage(Component.literal("\u00a75\u2726 The last string parts \u00a78| \u00a7fyou have your body back"));
          player.sendSystemMessage(Component.literal("\u00a75\u2726 \u00a7fYour blow lands \u00a78- \u00a7dthe strings tied to you are cut."));
       }
       if (player.level() instanceof ServerLevel level) {
-         level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 24, 0.5, 0.6, 0.5, 0.08);
+         // The cut thread flashes where it parts - brighter, in stage light, when it was the last.
+         Fx.starburst(level, ParticleTypes.END_ROD, player.position().add(0.0, 1.2, 0.0), 1.8, thread.stacks > 0 ? THREAD_VIOLET : LIMELIGHT);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.PLAYERS, 1.2F, 1.5F);
       }
       return thread.stacks;
@@ -2192,7 +2290,9 @@ public final class PuppeteerManager {
          ServerPlayer player = level.getServer() == null ? null : level.getServer().getPlayerList().getPlayer(id);
          if (player != null && player.isAlive()) {
             player.sendOverlayMessage(Component.literal("\u00a75The string is cut."));
-            level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 16, 0.4, 0.5, 0.4, 0.06);
+            if (player.level() == level) {
+               Fx.starburst(level, ParticleTypes.END_ROD, player.position().add(0.0, 1.2, 0.0), 1.6, THREAD_VIOLET);
+            }
          }
       }
       return cut;
@@ -2261,7 +2361,8 @@ public final class PuppeteerManager {
             continue;
          }
          long now = ServerClock.clock(tether.world);
-         if (now >= tether.expires) {
+         // Through a portal, or he went through one: the string does not follow across worlds.
+         if (now >= tether.expires || mob.level() != boss.level()) {
             it.remove();
             releaseThrownMob(tether, mob);
             tether.world.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.HOSTILE, 0.7F, 1.4F);
@@ -2270,17 +2371,19 @@ public final class PuppeteerManager {
 
          // The string is drawn from his hand either way: while it is flown at somebody that
          // line IS the mechanic, and it is what makes the body read as his rather than as a
-         // mob that happens to be moving fast.
-         drawString(
-            tether.world,
-            mob.getX(),
-            mob.getY() + mob.getBbHeight() * 0.8,
-            mob.getZ(),
-            boss.getX(),
-            boss.getY() + 2.0,
-            boss.getZ(),
-            8
-         );
+         // mob that happens to be moving fast. Every third tick; the beam lingers between cues.
+         if (now % 3L == 0L) {
+            drawString(
+               tether.world,
+               mob.getX(),
+               mob.getY() + mob.getBbHeight() * 0.8,
+               mob.getZ(),
+               boss.getX(),
+               boss.getY() + 2.0,
+               boss.getZ(),
+               8
+            );
+         }
 
          // In the air, on its way to somebody.
          if (tether.hurlUntil > now) {
@@ -2320,6 +2423,8 @@ public final class PuppeteerManager {
                // Read once, here, and never again during the spin: asking a silenced body
                // whether it is silenced would answer yes and silence it forever.
                tether.hadNoAi = mob.isNoAi();
+               // The swing, as one timed cue: a funnel of thread round him for the whole windup.
+               Fx.vortex(tether.world, ParticleTypes.END_ROD, boss.position(), 2.8, MOB_HURL_WINDUP, THREAD_VIOLET);
                tether.world.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 1.1F, 1.3F);
                announce(tether.world, SAY + "\"\u00a7fLook up.\"");
                continue;
@@ -2359,7 +2464,7 @@ public final class PuppeteerManager {
       // the windup started - see above.
       mob.setNoAi(true);
       if (now % 4L == 0L) {
-         tether.world.sendParticles(ParticleTypes.END_ROD, x, mob.getY() + mob.getBbHeight() * 0.5, z, 2, 0.1, 0.1, 0.1, 0.0);
+         Fx.vanilla(tether.world, ParticleTypes.END_ROD, x, mob.getY() + mob.getBbHeight() * 0.5, z, 2, 0.1, 0.1, 0.1, 0.0);
       }
       if (now % 10L == 0L) {
          tether.world.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.TRIPWIRE_CLICK_ON, SoundSource.HOSTILE, 0.9F, 0.7F + (now % MOB_HURL_WINDUP) * 0.02F);
@@ -2384,6 +2489,11 @@ public final class PuppeteerManager {
       mob.setDeltaMovement(aim.normalize().scale(MOB_HURL_SPEED).add(0.0, 0.18, 0.0));
       mob.hurtMarked = true;
       tether.hurlUntil = ServerClock.clock(tether.world) + MOB_HURL_TICKS;
+      // The throw is drawn as a comet along the line it was aimed, timed to the body's speed,
+      // so the flight reads before it lands.
+      Vec3 aimAt = target.position().add(0.0, target.getBbHeight() * 0.5, 0.0);
+      int flight = (int)Math.max(4, Math.min(MOB_HURL_TICKS, from.distanceTo(aimAt) / MOB_HURL_SPEED));
+      Fx.comet(tether.world, ParticleTypes.END_ROD, from.add(0.0, mob.getBbHeight() * 0.5, 0.0), aimAt, flight, MASK_PAINT);
       tether.world.playSound(null, from.x, from.y, from.z, SoundEvents.VEX_CHARGE, SoundSource.HOSTILE, 1.2F, 0.8F);
       announce(
          tether.world,
@@ -2405,13 +2515,15 @@ public final class PuppeteerManager {
       // lets the arc be aimed at somebody standing on the ground.
       mob.setDeltaMovement(step.x, step.y - 0.035, step.z);
       mob.hurtMarked = true;
-      tether.world.sendParticles(ParticleTypes.END_ROD, mob.getX(), mob.getY() + mob.getBbHeight() * 0.5, mob.getZ(), 2, 0.15, 0.15, 0.15, 0.02);
+      Fx.vanilla(tether.world, ParticleTypes.END_ROD, mob.getX(), mob.getY() + mob.getBbHeight() * 0.5, mob.getZ(), 2, 0.15, 0.15, 0.15, 0.02);
 
-      for (ServerPlayer p : tether.world.getPlayers(pl -> pl.isAlive() && !pl.isSpectator())) {
+      for (ServerPlayer p : tether.world.getPlayers(pl -> isRealTarget(pl) && !isPossessed(pl))) {
          if (p.distanceTo(mob) > MOB_HURL_HIT) {
             continue;
          }
-         mob.hurtServer(tether.world, tether.world.damageSources().mobAttack(mob), MOB_HURL_DAMAGE);
+         // The body lands on *them*. This used to hurt the thrown mob instead of the player it
+         // hit, so a body flung across the arena did no damage to anybody but itself.
+         p.hurtServer(tether.world, tether.world.damageSources().mobAttack(mob), MOB_HURL_DAMAGE);
          Vec3 away = p.position().subtract(mob.position());
          Vec3 flat = new Vec3(away.x, 0.0, away.z);
          if (flat.lengthSqr() > 1.0E-4) {
@@ -2419,7 +2531,8 @@ public final class PuppeteerManager {
             p.setDeltaMovement(p.getDeltaMovement().add(shove.x, 0.32, shove.z));
             p.hurtMarked = true;
          }
-         tether.world.sendParticles(ParticleTypes.CRIT, p.getX(), p.getY() + 1.0, p.getZ(), 14, 0.5, 0.5, 0.5, 0.08);
+         Fx.clash(tether.world, ParticleTypes.CRIT, p.position().add(0.0, 1.0, 0.0), flat.lengthSqr() > 1.0E-4 ? flat.normalize() : Vec3.ZERO, MASK_PAINT);
+         Fx.shockwave(tether.world, ParticleTypes.CLOUD, p.position(), 2.0, THREAD_VIOLET);
          tether.world.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.PLAYER_ATTACK_CRIT, SoundSource.HOSTILE, 1.0F, 0.7F);
          // One body, one landing: it does not keep hurting everybody it passes through.
          // -1 is "landed": never greater than the clock, so the tick above ends the flight.
@@ -2507,10 +2620,14 @@ public final class PuppeteerManager {
       }
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.HOSTILE, 1.3F, 0.6F);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.VEX_CHARGE, SoundSource.HOSTILE, 1.2F, 0.7F);
-      level.sendParticles(ParticleTypes.SOUL, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 50, 0.8, 1.0, 0.8, 0.08);
-      level.sendParticles(ParticleTypes.END_ROD, puppet.getX(), puppet.getY() + 1.4, puppet.getZ(), 30, 0.7, 0.9, 0.7, 0.05);
+      // The body is hauled back up: strings drop onto it, a ring of mask paint opens under it,
+      // and the soul it is wearing is drawn up out of the floor.
+      Fx.threads(level, ParticleTypes.SOUL, puppet.position(), 9.0, 40, THREAD_VIOLET);
+      Fx.runeCircle(level, ParticleTypes.END_ROD, puppet.position().add(0.0, 0.05, 0.0), 1.8, 40, MASK_PAINT);
+      Fx.spiral(level, ParticleTypes.SOUL, puppet.position(), 2.6, 30, THREAD_VIOLET);
+      Fx.vanilla(level, ParticleTypes.SOUL, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 20, 0.8, 1.0, 0.8, 0.08);
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.getUUID().equals(player.getUUID())) {
+         if (!p.getUUID().equals(player.getUUID()) && fight.participants.contains(p.getUUID())) {
             p.sendSystemMessage(Component.literal("\u00a75\u2726 \u00a7f" + player.getName().getString() + " is on strings now."));
          }
       }
@@ -2624,7 +2741,8 @@ public final class PuppeteerManager {
             "\u00a75\u2726 \u00a77" + state.name + " \u00a7frushes back up with your totem in its grip \u00a78- \u00a7fone heart, and no more."
          );
          level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.TOTEM_USE, SoundSource.HOSTILE, 1.2F, 1.0F);
-         level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, victim.getX(), victim.getY() + 1.0, victim.getZ(), 40, 0.6, 0.9, 0.6, 0.15);
+         Fx.flare(level, ParticleTypes.TOTEM_OF_UNDYING, victim.position().add(0.0, 1.0, 0.0), 1.8, 0xF2D94E);
+         Fx.vanilla(level, ParticleTypes.TOTEM_OF_UNDYING, victim.getX(), victim.getY() + 1.0, victim.getZ(), 20, 0.6, 0.9, 0.6, 0.15);
       }
       return true;
    }
@@ -2708,8 +2826,15 @@ public final class PuppeteerManager {
       }
       Vec3 mine = boss.position();
       Vec3 theirs = candidate.position();
-      level.sendParticles(ParticleTypes.PORTAL, mine.x, mine.y + 1.0, mine.z, 40, 0.5, 0.9, 0.5, 0.2);
-      level.sendParticles(ParticleTypes.REVERSE_PORTAL, theirs.x, theirs.y + 1.0, theirs.z, 40, 0.5, 0.9, 0.5, 0.1);
+      // Two mirrors tear open where they stand, and the strings run between them as they trade.
+      Vec3 across = theirs.subtract(mine);
+      Vec3 axis = new Vec3(-across.z, 0.0, across.x);
+      if (axis.lengthSqr() < 1.0E-4) {
+         axis = new Vec3(1.0, 0.0, 0.0);
+      }
+      Fx.tear(level, ParticleTypes.PORTAL, mine.add(0.0, 1.0, 0.0), axis.normalize(), 1.6, 16, THREAD_VIOLET);
+      Fx.tear(level, ParticleTypes.REVERSE_PORTAL, theirs.add(0.0, 1.0, 0.0), axis.normalize(), 1.6, 16, MASK_PAINT);
+      Fx.soulStream(level, ParticleTypes.SOUL, mine.add(0.0, 1.2, 0.0), theirs.add(0.0, 1.2, 0.0), 0.8, 16, THREAD_VIOLET);
       boss.teleportTo(theirs.x, theirs.y, theirs.z);
       boss.setDeltaMovement(Vec3.ZERO);
       candidate.teleportTo(mine.x, mine.y, mine.z);
@@ -2718,7 +2843,6 @@ public final class PuppeteerManager {
       boss.hurtMarked = true;
       level.playSound(null, mine.x, mine.y, mine.z, SoundEvents.ILLUSIONER_MIRROR_MOVE, SoundSource.HOSTILE, 1.2F, 1.0F);
       level.playSound(null, theirs.x, theirs.y, theirs.z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.0F, 1.4F);
-      level.sendParticles(ParticleTypes.SOUL, mine.x, mine.y + 1.0, mine.z, 24, 0.6, 0.8, 0.6, 0.05);
       announce(level, SAY + "\"\u00a7fWrong one.\"");
       // Once per fight at phase three, then it becomes an ordinary cooldown move.
       fight.swapped = true;
@@ -2757,7 +2881,8 @@ public final class PuppeteerManager {
          now = tick;
          if (tick >= state.until) {
             it.remove();
-            level.sendParticles(ParticleTypes.SOUL, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 20, 0.5, 0.7, 0.5, 0.05);
+            // Its strings are cut and it drops.
+            Fx.ring(level, ParticleTypes.SOUL, puppet.position().add(0.0, 0.1, 0.0), 1.2, THREAD_VIOLET);
             level.playSound(null, puppet.getX(), puppet.getY(), puppet.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.HOSTILE, 0.9F, 1.2F);
             BossManager.removeFakePlayer(server, puppet);
             continue;
@@ -2985,7 +3110,8 @@ public final class PuppeteerManager {
          Entity entity = findEntity(server, id);
          if (entity != null) {
             if (poof && entity.level() instanceof ServerLevel level) {
-               level.sendParticles(ParticleTypes.POOF, entity.getX(), entity.getY() + 1.0, entity.getZ(), 14, 0.4, 0.6, 0.4, 0.04);
+               // removeFakePlayer puffs the body away for vanilla eyes; this is the strings going.
+               Fx.ring(level, ParticleTypes.END_ROD, entity.position().add(0.0, 0.1, 0.0), 1.0, THREAD_VIOLET);
             }
             BossManager.removeFakePlayer(server, entity);
          }
@@ -3000,7 +3126,8 @@ public final class PuppeteerManager {
       announce(level, SAY + "\"\u00a7fMind the wires.\"");
       Vec3 from = boss.position().add(0.0, 1.5, 0.0);
       Vec3 to = target.position().add(0.0, 1.0, 0.0);
-      drawString(level, from.x, from.y, from.z, to.x, to.y, to.z, 30);
+      // The lash is a length of chain-heavy thread cracked across them.
+      Fx.chains(level, ParticleTypes.END_ROD, from, to, THREAD_VIOLET);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.TRIPWIRE_CLICK_ON, SoundSource.HOSTILE, 1.4F, 0.6F);
       target.hurtServer(level, level.damageSources().mobAttack(boss), fight.phase >= 2 ? 7.0F : 5.0F);
       // The lash pulls as well as cuts - same impulse rule as a string: a shove
@@ -3012,9 +3139,10 @@ public final class PuppeteerManager {
          target.setDeltaMovement(target.getDeltaMovement().add(pull.x, 0.12, pull.z));
          target.hurtMarked = true;
       }
-      level.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY() + 1.0, target.getZ(), 16, 0.4, 0.5, 0.4, 0.06);
-      // And a handful of strings thrown at everyone else, so the room stays busy.
-      for (ServerPlayer other : level.getPlayers(p -> p.isAlive() && p != target && p.distanceToSqr(boss) < 900.0)) {
+      Fx.crescent(level, ParticleTypes.CRIT, target.position(), flat.lengthSqr() > 1.0E-4 ? flat.normalize().scale(-1.0) : Vec3.ZERO, 1.6, MASK_PAINT);
+      // And a handful of strings thrown at everyone else, so the room stays busy. Real players
+      // only - not his own puppets, not spectators, not a body he is already wearing.
+      for (ServerPlayer other : level.getPlayers(p -> isRealTarget(p) && !isPossessed(p) && p != target && p.distanceToSqr(boss) < 900.0)) {
          drawString(level, from.x, from.y, from.z, other.getX(), other.getY() + 1.0, other.getZ(), 10);
          other.hurtServer(level, level.damageSources().mobAttack(boss), 2.5F);
       }
@@ -3038,7 +3166,7 @@ public final class PuppeteerManager {
     */
    private static void threadVolley(ServerLevel level, Mob boss) {
       List<ServerPlayer> cast = new ArrayList<>(
-         level.getPlayers(pl -> pl.isAlive() && !pl.isSpectator() && pl.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS)
+         level.getPlayers(pl -> isRealTarget(pl) && !isPossessed(pl) && pl.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS)
       );
       if (cast.isEmpty()) {
          return;
@@ -3064,6 +3192,7 @@ public final class PuppeteerManager {
          level.addFreshEntity(arrow);
          drawString(level, from.x, from.y, from.z, p.getX(), p.getY() + 1.0, p.getZ(), 14);
       }
+      Fx.muzzle(level, ParticleTypes.END_ROD, from, boss.getLookAngle(), THREAD_VIOLET);
       announce(level, SAY + "\"\u00a7fStrings. \u00a7dEverywhere.\"");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ARROW_SHOOT, SoundSource.HOSTILE, 1.2F, 0.7F);
    }
@@ -3130,7 +3259,8 @@ public final class PuppeteerManager {
          // the stacked cadence rather than waiting out the old one.
          thread.nextPull = Math.min(thread.nextPull, now + stackedPullTicks(thread.power, thread.stacks));
          p.sendOverlayMessage(Component.literal("\u00a75Every string pulls at once."));
-         level.sendParticles(ParticleTypes.CRIT, p.getX(), p.getY() + 1.0, p.getZ(), 12, 0.3, 0.5, 0.3, 0.06);
+         // Every string he holds drawn taut at once, as chains between his hands and them.
+         Fx.chains(level, ParticleTypes.CRIT, boss.position().add(0.0, 1.8, 0.0), p.position().add(0.0, 1.0, 0.0), THREAD_VIOLET);
          level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.TRIPWIRE_CLICK_ON, SoundSource.HOSTILE, 1.0F, 0.6F);
          caught++;
       }

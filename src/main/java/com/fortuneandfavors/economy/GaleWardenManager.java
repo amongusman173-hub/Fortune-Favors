@@ -534,8 +534,12 @@ public final class GaleWardenManager {
          UUID.randomUUID(), Component.literal(barName(1)), BossBarColor.WHITE, BossBarOverlay.PROGRESS
       );
       bar.setVisible(true);
+      // Only the people who can see him: the bar used to go to every player online, including
+      // ones in another dimension who would never meet him. tickFight keeps it following the room.
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         bar.addPlayer(p);
+         if (p.level() == level && p.distanceToSqr(boss) <= SEEK_RANGE * SEEK_RANGE) {
+            bar.addPlayer(p);
+         }
       }
 
       Fight fight = new Fight(boss.getUUID(), summoner.getUUID(), bar);
@@ -599,6 +603,8 @@ public final class GaleWardenManager {
       Vec3 at = boss.position();
       if (fight.rise % 12 == 0 && fight.rise > 0) {
          Fx.ring(level, ParticleTypes.CLOUD, at.add(0.0, 0.2, 0.0), 9.0 - progress * 6.0, SKY);
+         // The air arriving: a pair of gusts racing in from opposite sides to where he is forming.
+         gustRing(level, floorUnder(level, at), 2.0, 7.0, 2, true, GALE_WHITE);
          level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_CHARGE, SoundSource.HOSTILE, 1.0F + (float)progress, 0.5F + (float)progress * 0.6F);
       }
       if (fight.rise == 20) {
@@ -607,12 +613,7 @@ public final class GaleWardenManager {
       }
       // Cheap vanilla breath around him while he forms; the client already has the vortex.
       if (fight.rise % 3 == 0) {
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            BossVfx.at(level, at.add(0.0, 1.0, 0.0), 0.0, ParticleTypes.SMALL_GUST, 4, 1.4, 1.0, 1.4, 0.05);
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+         Fx.vanilla(level, ParticleTypes.SMALL_GUST, at.x, at.y + 1.0, at.z, 4, 1.4, 1.0, 1.4, 0.05);
       }
       if (fight.rise > 0) {
          return;
@@ -625,6 +626,8 @@ public final class GaleWardenManager {
       Fx.flare(level, ParticleTypes.END_ROD, heart, 3.0, GALE_WHITE);
       Fx.starburst(level, ParticleTypes.CLOUD, heart, 8.0, SKY);
       Fx.shockwave(level, ParticleTypes.GUST, at, 14.0, STORM);
+      Fx.sonicRing(level, ParticleTypes.GUST, heart, new Vec3(0.0, 1.0, 0.0), 10.0, 14, SKY);
+      gustRing(level, floorUnder(level, at), 2.5, 9.0, 8, false, GALE_WHITE);
       level.playSound(null, at.x, at.y, at.z, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.3F, 1.6F);
       level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.HOSTILE, 2.0F, 0.6F);
       for (ServerPlayer p : playersNear(level, at, 6.0)) {
@@ -798,9 +801,17 @@ public final class GaleWardenManager {
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
          // The loot roll: anyone really there and alive (creative included, as before), but never
          // a spectator watching or a puppet body.
-         if (p.level() == level && p.isAlive() && !p.isSpectator() && !BossManager.isFakePlayer(p)
-            && p.distanceToSqr(boss) < SEEK_RANGE * SEEK_RANGE) {
+         boolean here = p.level() == level;
+         double d2 = here ? p.distanceToSqr(boss) : Double.MAX_VALUE;
+         if (here && p.isAlive() && !p.isSpectator() && !BossManager.isFakePlayer(p) && d2 < SEEK_RANGE * SEEK_RANGE) {
             fight.participants.add(p.getUUID());
+         }
+         // The bar follows the room: walk in and it appears (a late joiner included), change
+         // dimension or walk well clear and it goes.
+         if (here && d2 < SEEK_RANGE * SEEK_RANGE) {
+            fight.bar.addPlayer(p);
+         } else if (!here || d2 > SEEK_RANGE * SEEK_RANGE * 2.25) {
+            fight.bar.removePlayer(p);
          }
       }
 
@@ -852,12 +863,7 @@ public final class GaleWardenManager {
       if (fight.stance > 0) {
          fight.stance--;
          if (fight.stance % 4 == 0) {
-            com.fortuneandfavors.net.FfVfx.enter();
-            try {
-               BossVfx.sphere(level, boss.position().add(0.0, 1.5, 0.0), 2.2, 1, ParticleTypes.SMALL_GUST);
-            } finally {
-               com.fortuneandfavors.net.FfVfx.exit();
-            }
+            vSphere(level, boss.position().add(0.0, 1.5, 0.0), 2.2, ParticleTypes.SMALL_GUST);
          }
          if (fight.stance == 0) {
             overlayNear(level, boss, 50.0, "\u00a78Guard's down. \u00a77Hit him.");
@@ -972,8 +978,11 @@ public final class GaleWardenManager {
 
    private static void enterPhase(ServerLevel level, Mob boss, Fight fight, int phase) {
       Vec3 at = boss.position();
-      BossVfx.ring(level, at, 14.0, PHASE_RING_POINTS, ringParticle(), 0.0);
+      vRing(level, at, 14.0, PHASE_RING_POINTS, ringParticle(), 0.0);
       Fx.shockwave(level, ParticleTypes.GUST, at, 16.0, phase == 3 ? STORM : SKY);
+      // The sky turning over: eight gusts thrown out of him, and a ring climbing his column.
+      gustRing(level, floorUnder(level, at), 2.0, 12.0, 8, false, GALE_WHITE);
+      Fx.sonicRing(level, ParticleTypes.GUST, at.add(0.0, 1.0, 0.0), new Vec3(0.0, 1.0, 0.0), 14.0, 18, phase == 3 ? STORM : SKY);
       Fx.starburst(level, ParticleTypes.CLOUD, at.add(0.0, 2.0, 0.0), 7.0, GALE_WHITE);
       Fx.vortex(level, ParticleTypes.CLOUD, at, 8.0, 30, phase == 3 ? STORM : SKY);
       level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_WHIRL, SoundSource.HOSTILE, 1.8F, phase == 3 ? 0.6F : 0.9F);
@@ -1011,7 +1020,9 @@ public final class GaleWardenManager {
          boss.hurtMarked = true;
       }
       if (fight.now % 20L == 0L) {
-         BossVfx.at(level, boss.position(), 0.0, ParticleTypes.CLOUD, 3, 0.7, 0.5, 0.7, 0.02);
+         // His own weather: the wind he is made of, wrapping him a second at a time.
+         Fx.aura(level, ParticleTypes.SMALL_GUST, boss.position(), 4.4, 20, SKY);
+         Fx.vanilla(level, ParticleTypes.CLOUD, boss.getX(), boss.getY(), boss.getZ(), 3, 0.7, 0.5, 0.7, 0.02);
       }
    }
 
@@ -1089,6 +1100,8 @@ public final class GaleWardenManager {
                p.hurtMarked = true;
                Fx.muzzle(level, ParticleTypes.GUST, p.position().add(0.0, 1.0, 0.0), release, GALE_WHITE);
                Fx.shockwave(level, ParticleTypes.SMALL_GUST, p.position(), 2.5 + power, SKY);
+               // The banked speed, handed back as a visible wind behind the body it throws.
+               Fx.gust(level, ParticleTypes.GUST, p.position().add(0.0, 1.0, 0.0), release, 3.0 + power * 2.0, GALE_WHITE);
                level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.HOSTILE, 1.3F, 0.9F);
             } else {
                fight.theftLeft.put(id, remaining);
@@ -1096,13 +1109,8 @@ public final class GaleWardenManager {
                if (remaining % 10 == 0) {
                   Fx.chains(level, ParticleTypes.END_ROD, boss.position().add(0.0, 2.0, 0.0), p.position().add(0.0, 1.0, 0.0), SKY);
                }
-               com.fortuneandfavors.net.FfVfx.enter();
-               try {
-                  if (remaining % 2 == 0) {
-                     BossVfx.beam(level, boss.position(), p.position().add(0.0, 1.0, 0.0), 0.12, ParticleTypes.END_ROD);
-                  }
-               } finally {
-                  com.fortuneandfavors.net.FfVfx.exit();
+               if (remaining % 4 == 0) {
+                  vBeam(level, boss.position().add(0.0, 2.0, 0.0), p.position().add(0.0, 1.0, 0.0), 0.12, ParticleTypes.END_ROD);
                }
             }
          }
@@ -1256,7 +1264,10 @@ public final class GaleWardenManager {
       }
       fight.reversed.put(target.getUUID(), REVERSAL_TICKS);
       Fx.beam(level, ParticleTypes.END_ROD, boss.position().add(0.0, 2.0, 0.0), target.position().add(0.0, 1.0, 0.0), STORM);
-      Fx.wormhole(level, ParticleTypes.SCULK_SOUL, target.position().add(0.0, 1.0, 0.0), true, STORM);
+      portalWind(level, ParticleTypes.SCULK_SOUL, target.position().add(0.0, 1.0, 0.0), true, STORM);
+      // The wind turning round on them: a gust from where they stand back toward him.
+      Vec3 home = boss.position().subtract(target.position());
+      Fx.gust(level, ParticleTypes.GUST, target.position().add(0.0, 1.0, 0.0), new Vec3(home.x, 0.0, home.z), Math.min(12.0, home.length()), STORM);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.BREEZE_INHALE, SoundSource.HOSTILE, 1.2F, 1.3F);
    }
 
@@ -1279,6 +1290,7 @@ public final class GaleWardenManager {
          // it is a real fuse now, staggered so the trail goes off in the order he walked it.
          fight.pending.add(new Pending("gust", at, null, 16 + i * 6, 0));
          Fx.comet(level, ParticleTypes.CLOUD, at, landing, 4, GALE_WHITE);
+         Fx.gust(level, ParticleTypes.GUST, at.add(0.0, 1.0, 0.0), landing.subtract(at), Math.min(24.0, landing.distanceTo(at)), SKY);
          Fx.runeCircle(level, ParticleTypes.END_ROD, floorUnder(level, at).add(0.0, 0.05, 0.0), 3.4, 16 + i * 6, SKY);
          level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_IDLE_GROUND, SoundSource.HOSTILE, 1.2F, 1.4F);
          at = landing;
@@ -1333,6 +1345,9 @@ public final class GaleWardenManager {
       push(hitter, unit, COUNTER_PUSH);
       Fx.clash(level, ParticleTypes.CRIT, boss.position().add(unit.scale(1.6)).add(0.0, 1.6, 0.0), unit, GALE_WHITE);
       Fx.crescent(level, ParticleTypes.GUST, boss.position().add(0.0, 0.6, 0.0), unit, 5.0, SKY);
+      // The blow, thrown back: a ring of pressure and a gust down the line the hitter flies.
+      Fx.sonicRing(level, ParticleTypes.GUST, boss.position().add(0.0, 1.6, 0.0), unit, 7.0, 10, GALE_WHITE);
+      Fx.gust(level, ParticleTypes.GUST, hitter.position().add(0.0, 1.0, 0.0), unit, 6.0, SKY);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BREEZE_DEFLECT, SoundSource.HOSTILE, 1.6F, 0.8F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.HOSTILE, 1.6F, 1.1F);
       hitter.sendOverlayMessage(Component.literal("\u00a7f\u00a7lCOUNTERED \u00a78He was braced. \u00a77Wait for the drop."));
@@ -1349,6 +1364,8 @@ public final class GaleWardenManager {
    private static void tornado(ServerLevel level, Mob boss, Fight fight) {
       Vec3 at = floorUnder(level, boss.position().add(randomFlat().scale(5.0)));
       fight.pending.add(new Pending("tornado", at, randomFlat(), 0, TORNADO_TICKS));
+      // It touches down: a geyser of air and a ring blown off the floor. The turning column itself
+      // (vortex and spiral) is sent by steerTornado on the first tick and every turn after.
       Fx.geyser(level, ParticleTypes.CLOUD, at, TORNADO_HEIGHT, GALE_WHITE);
       Fx.shockwave(level, ParticleTypes.GUST, at, TORNADO_RADIUS, SKY);
       level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_WHIRL, SoundSource.HOSTILE, 1.6F, 0.9F);
@@ -1362,6 +1379,8 @@ public final class GaleWardenManager {
          Vec3 drift = i == 0 ? new Vec3(-side.z, 0.0, side.x) : new Vec3(side.z, 0.0, -side.x);
          fight.pending.add(new Pending("tornado", at, drift, 0, TORNADO_TICKS));
          Fx.geyser(level, ParticleTypes.CLOUD, at, TORNADO_HEIGHT, GALE_WHITE);
+         // The two of them, drawn together: a gust from each toward the gap between.
+         Fx.gust(level, ParticleTypes.GUST, at.add(0.0, 1.5, 0.0), boss.position().subtract(at), 7.0, SKY);
          Fx.shockwave(level, ParticleTypes.GUST, at, TORNADO_RADIUS, SKY);
          level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_WHIRL, SoundSource.HOSTILE, 1.6F, 1.1F);
       }
@@ -1378,6 +1397,7 @@ public final class GaleWardenManager {
          p.setDeltaMovement(p.getDeltaMovement().add(0.0, liftFor(1.65, fight.airTicks.getOrDefault(p.getUUID(), 0)), 0.0));
          p.hurtMarked = true;
          Fx.geyser(level, ParticleTypes.CLOUD, p.position(), 6.0, GALE_WHITE);
+         Fx.gust(level, ParticleTypes.GUST, p.position(), new Vec3(0.0, 1.0, 0.0), 7.0, SKY);
       }
       Vec3 center = boss.position();
       for (int i = 0; i < 3; i++) {
@@ -1417,6 +1437,7 @@ public final class GaleWardenManager {
       Vec3 end = from.add(dir.scale(reach));
       Fx.comet(level, ParticleTypes.CLOUD, from.add(0.0, 2.0, 0.0), end.add(0.0, 2.0, 0.0), 5, GALE_WHITE);
       Fx.beam(level, ParticleTypes.SMALL_GUST, from.add(0.0, 0.6, 0.0), end.add(0.0, 0.6, 0.0), SKY);
+      Fx.gust(level, ParticleTypes.GUST, from.add(0.0, 1.4, 0.0), dir, reach, GALE_WHITE);
       boss.setPos(end.x, boss.getY(), end.z);
       boss.hurtMarked = true;
       Fx.shockwave(level, ParticleTypes.GUST, end, 5.0, STORM);
@@ -1465,7 +1486,9 @@ public final class GaleWardenManager {
    private static void vacuum(ServerLevel level, Mob boss, Fight fight) {
       fight.pending.add(new Pending("vacuum", boss.position(), null, 0, 60));
       Fx.vortex(level, ParticleTypes.CLOUD, boss.position(), 18.0, 60, STORM);
-      Fx.wormhole(level, ParticleTypes.SMALL_GUST, boss.position().add(0.0, 2.0, 0.0), true, GALE_WHITE);
+      portalWind(level, ParticleTypes.SMALL_GUST, boss.position().add(0.0, 2.0, 0.0), true, GALE_WHITE);
+      // The draw: six gusts racing in from the edge of the pull to him.
+      gustRing(level, floorUnder(level, boss.position()), 2.0, 14.0, 6, true, SKY);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BREEZE_INHALE, SoundSource.HOSTILE, 1.8F, 0.7F);
    }
 
@@ -1479,8 +1502,10 @@ public final class GaleWardenManager {
          p.setDeltaMovement(p.getDeltaMovement().add(0.0, liftFor(1.1, fight.airTicks.getOrDefault(p.getUUID(), 0)), 0.0));
          p.hurtMarked = true;
          Fx.geyser(level, ParticleTypes.CLOUD, p.position(), 5.0, GALE_WHITE);
+         Fx.gust(level, ParticleTypes.GUST, p.position(), new Vec3(0.0, 1.0, 0.0), 6.0, SKY);
       }
       Fx.shockwave(level, ParticleTypes.GUST, boss.position(), 14.0, STORM);
+      Fx.sonicRing(level, ParticleTypes.GUST, boss.position(), new Vec3(0.0, 1.0, 0.0), 12.0, 16, SKY);
       Vec3 center = boss.position();
       for (int i = 0; i < 4; i++) {
          double a = (Math.PI * 2.0 * i) / 4.0;
@@ -1503,12 +1528,7 @@ public final class GaleWardenManager {
    private static void tickZeroPoint(ServerLevel level, Mob boss, Fight fight) {
       fight.zeroPoint--;
       if (fight.zeroPoint % 3 == 0) {
-         com.fortuneandfavors.net.FfVfx.enter();
-         try {
-            BossVfx.ring(level, boss.position(), 3.0 + fight.zeroPoint * 0.4, 30, ParticleTypes.END_ROD, 0.6);
-         } finally {
-            com.fortuneandfavors.net.FfVfx.exit();
-         }
+         vRing(level, boss.position(), 3.0 + fight.zeroPoint * 0.4, 30, ParticleTypes.END_ROD, 0.6);
       }
       if (fight.zeroPoint == 10) {
          overlayNear(level, boss, 90.0, "\u00a78Here it comes.");
@@ -1523,6 +1543,10 @@ public final class GaleWardenManager {
          p.setDeltaMovement(flat.add(0.0, liftFor(0.6, fight.airTicks.getOrDefault(p.getUUID(), 0)), 0.0));
          p.hurtMarked = true;
          Fx.shatter(level, ParticleTypes.END_ROD, p.position().add(0.0, 1.0, 0.0), 1.0, GALE_WHITE);
+         if (flat.lengthSqr() > 1.0E-3) {
+            // Everything it banked, released along the way it was going.
+            Fx.gust(level, ParticleTypes.GUST, p.position().add(0.0, 1.0, 0.0), flat, Math.min(10.0, 3.0 + flat.length() * 4.0), GALE_WHITE);
+         }
       }
       fight.frozen.clear();
       Fx.shockwave(level, ParticleTypes.GUST, boss.position(), 18.0, SKY);
@@ -1534,6 +1558,7 @@ public final class GaleWardenManager {
    private static void heavensDrop(ServerLevel level, Mob boss, Fight fight) {
       for (ServerPlayer p : participants(level, boss)) {
          Fx.geyser(level, ParticleTypes.CLOUD, p.position(), 8.0, GALE_WHITE);
+         Fx.gust(level, ParticleTypes.GUST, p.position(), new Vec3(0.0, 1.0, 0.0), 10.0, SKY);
          p.setDeltaMovement(p.getDeltaMovement().add(0.0, liftFor(2.5, fight.airTicks.getOrDefault(p.getUUID(), 0)), 0.0));
          p.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 120, 0, false, false, false));
          p.hurtMarked = true;
@@ -1581,16 +1606,13 @@ public final class GaleWardenManager {
       fight.charge--;
       double progress = 1.0 - (fight.charge / (double)CHARGE_TICKS);
       boss.setDeltaMovement(boss.getDeltaMovement().multiply(0.3, 1.0, 0.3));
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         if (fight.charge % 2 == 0) {
-            BossVfx.ring(level, boss.position(), 3.0 + progress * 26.0, CHARGE_RING_POINTS, ringParticle(), 0.4);
-         }
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
+      if (fight.charge % 4 == 0) {
+         vRing(level, boss.position(), 3.0 + progress * 26.0, CHARGE_RING_POINTS, ringParticle(), 0.4);
       }
       if (fight.charge % 10 == 0) {
          Fx.ring(level, ParticleTypes.GUST, boss.position().add(0.0, 0.3, 0.0), 3.0 + progress * 26.0, SKY);
+         // The arena's air being drawn into him, harder as the charge fills.
+         gustRing(level, floorUnder(level, boss.position()), 2.0, 6.0 + progress * 14.0, 4, true, STORM);
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BREEZE_CHARGE, SoundSource.HOSTILE, 1.2F + (float)progress, 0.7F);
          // How close the break is, as a bar of its own: the damage check is the whole move.
          int broke = (int)Math.min(10.0F, fight.chargeTaken / CHARGE_BREAK_DAMAGE * 10.0F);
@@ -1610,6 +1632,7 @@ public final class GaleWardenManager {
       Fx.shockwave(level, ParticleTypes.GUST, at, ABSOLUTE_RADIUS, STORM);
       Fx.nova(level, ParticleTypes.CLOUD, at, ABSOLUTE_RADIUS * 0.6, SKY);
       Fx.starburst(level, ParticleTypes.CLOUD, at.add(0.0, 2.0, 0.0), 12.0, GALE_WHITE);
+      gustRing(level, floorUnder(level, at), 3.0, 22.0, 8, false, GALE_WHITE);
       level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.HOSTILE, 2.2F, 0.5F);
       level.playSound(null, at.x, at.y, at.z, SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.HOSTILE, 1.4F, 0.7F);
       for (ServerPlayer p : playersNear(level, at, ABSOLUTE_RADIUS)) {
@@ -1638,7 +1661,7 @@ public final class GaleWardenManager {
       fight.pending.add(new Pending("hurricane", boss.position(), null, 0, HURRICANE_TICKS));
       // The storm is the move: nothing else from the rotation until it has let go.
       fight.nextMove = fight.now + HURRICANE_TICKS + 40L;
-      BossVfx.ring(level, boss.position(), HURRICANE_RADIUS * 0.6, HURRICANE_RING_POINTS, ringParticle(), 0.4);
+      vRing(level, boss.position(), HURRICANE_RADIUS * 0.6, HURRICANE_RING_POINTS, ringParticle(), 0.4);
       Fx.vortex(level, ParticleTypes.CLOUD, boss.position(), HURRICANE_RADIUS * 0.6, HURRICANE_TICKS, STORM);
       Fx.spiral(level, ParticleTypes.CLOUD, boss.position(), 14.0, HURRICANE_TICKS, GALE_WHITE);
       Fx.emberRain(level, ParticleTypes.WHITE_ASH, boss.position(), HURRICANE_RADIUS * 0.5, HURRICANE_TICKS, SKY);
@@ -1657,6 +1680,7 @@ public final class GaleWardenManager {
       Fx.shockwave(level, ParticleTypes.GUST, at, HURRICANE_RADIUS, STORM);
       Fx.nova(level, ParticleTypes.CLOUD, at, HURRICANE_RADIUS * 0.7, SKY);
       Fx.starburst(level, ParticleTypes.CLOUD, at.add(0.0, 3.0, 0.0), 14.0, GALE_WHITE);
+      gustRing(level, floorUnder(level, at), 4.0, 24.0, 8, false, GALE_WHITE);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.HOSTILE, 2.4F, 0.5F);
       for (ServerPlayer p : playersNear(level, boss.position(), HURRICANE_RADIUS)) {
          Vec3 away = p.position().subtract(boss.position());
@@ -1677,6 +1701,9 @@ public final class GaleWardenManager {
       fight.charge = 0;
       Fx.shatter(level, ParticleTypes.END_ROD, boss.position().add(0.0, 2.0, 0.0), 2.4, GALE_WHITE);
       Fx.clash(level, ParticleTypes.CRIT, boss.position().add(0.0, 2.0, 0.0), new Vec3(0.0, 1.0, 0.0), SKY);
+      // The charge spilling out of him, harmless: a burst and the drawn-in wind let loose.
+      Fx.starburst(level, ParticleTypes.CLOUD, boss.position().add(0.0, 2.0, 0.0), 6.0, SKY);
+      gustRing(level, floorUnder(level, boss.position()), 1.5, 6.0, 6, false, SKY);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BREEZE_DEFLECT, SoundSource.HOSTILE, 1.6F, 0.8F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GLASS_BREAK, SoundSource.HOSTILE, 1.4F, 0.7F);
       overlayNear(level, boss, 90.0, "\u00a7f\u00a7lBROKEN \u00a78He's open. \u00a77Go.");
@@ -1796,6 +1823,7 @@ public final class GaleWardenManager {
                s.falling = true;
                if (s.kind == Strike.SHEAR) {
                   Fx.muzzle(level, ParticleTypes.GUST, s.at.add(0.0, 1.0, 0.0), s.dir, GALE_WHITE);
+                  Fx.gust(level, ParticleTypes.GUST, s.at.add(0.0, 1.0, 0.0), s.dir, 5.0, SKY);
                   level.playSound(null, s.at.x, s.at.y, s.at.z, SoundEvents.BREEZE_SHOOT, SoundSource.HOSTILE, 1.6F, 1.3F);
                } else {
                   Fx.shockwave(level, ParticleTypes.CLOUD, s.at, EYE_REACH * 0.8, SKY);
@@ -1817,7 +1845,9 @@ public final class GaleWardenManager {
       for (double d = 0.0; d <= SHEAR_LENGTH; d += 6.0) {
          Fx.crescent(level, ParticleTypes.SWEEP_ATTACK, s.at.add(s.dir.scale(d)), s.dir, 3.0, GALE_WHITE);
       }
-      Fx.comet(level, ParticleTypes.GUST, s.at.add(0.0, 1.0, 0.0), end.add(0.0, 1.0, 0.0), 4, SKY);
+      // The blade itself: pressure crescents racing the length of the lane with a gust riding them.
+      Fx.sonicRing(level, ParticleTypes.GUST, s.at.add(0.0, 1.0, 0.0), s.dir, SHEAR_LENGTH, 14, SKY);
+      Fx.gust(level, ParticleTypes.GUST, s.at.add(0.0, 1.0, 0.0), s.dir, SHEAR_LENGTH, GALE_WHITE);
       Fx.shockwave(level, ParticleTypes.GUST, end, 3.0, STORM);
       Vec3 mid = s.at.add(s.dir.scale(SHEAR_LENGTH * 0.5));
       level.playSound(null, mid.x, mid.y, mid.z, SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.HOSTILE, 1.8F, 1.2F);
@@ -1843,6 +1873,8 @@ public final class GaleWardenManager {
       Fx.shockwave(level, ParticleTypes.GUST, s.at, EYE_REACH, STORM);
       Fx.nova(level, ParticleTypes.CLOUD, s.at, EYE_REACH * 0.7, SKY);
       Fx.flare(level, ParticleTypes.END_ROD, s.at.add(0.0, 2.0, 0.0), 2.4, GALE_WHITE);
+      // The wall throwing itself outward from the edge of the calm.
+      gustRing(level, s.at, EYE_SAFE, EYE_REACH - EYE_SAFE, 8, false, STORM);
       level.playSound(null, s.at.x, s.at.y, s.at.z, SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.HOSTILE, 2.2F, 0.6F);
       level.playSound(null, s.at.x, s.at.y, s.at.z, SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.HOSTILE, 0.9F, 1.2F);
       for (ServerPlayer p : playersNear(level, s.at, EYE_REACH + 4.0)) {
@@ -1914,7 +1946,9 @@ public final class GaleWardenManager {
       }
       pending.pos = floorUnder(level, pending.pos.add(0.0, 2.0, 0.0));
       // The client column is re-sent at each turn, so it follows the floor hazard it draws.
+      // Both halves of the funnel: the spiral climbing it and the vortex turning at its foot.
       Fx.spiral(level, ParticleTypes.CLOUD, pending.pos, TORNADO_HEIGHT, TORNADO_WANDER_TICKS + 2, GALE_WHITE);
+      Fx.vortex(level, ParticleTypes.SMALL_GUST, pending.pos, TORNADO_RADIUS, TORNADO_WANDER_TICKS + 2, SKY);
    }
 
    /**
@@ -1931,12 +1965,12 @@ public final class GaleWardenManager {
       switch (pending.kind) {
          case "gust" -> {
             if (age % 4 == 0) {
-               vanillaOnly(() -> BossVfx.sphere(level, p.add(0.0, 0.8, 0.0), 1.4, 1, ParticleTypes.SMALL_GUST));
+               vSphere(level, p.add(0.0, 0.8, 0.0), 1.4, ParticleTypes.SMALL_GUST);
             }
          }
          case "column" -> {
             if (age % 4 == 0) {
-               vanillaOnly(() -> BossVfx.ring(level, p, COLUMN_RADIUS, TORNADO_RING_POINTS, ParticleTypes.SMALL_GUST, 0.2));
+               vRing(level, p, COLUMN_RADIUS, TORNADO_RING_POINTS, ParticleTypes.SMALL_GUST, 0.2);
             }
          }
          case "skyfall" -> {
@@ -1945,19 +1979,19 @@ public final class GaleWardenManager {
                Fx.comet(level, ParticleTypes.CLOUD, p.add(0.0, 20.0, 0.0), p.add(0.0, 0.4, 0.0), 8, GALE_WHITE);
             }
             if (age % 4 == 0) {
-               vanillaOnly(() -> {
-                  BossVfx.ring(level, p.add(0.0, 0.2, 0.0), 2.4, 20, ParticleTypes.END_ROD, 0.05);
-                  double height = Math.max(1.0, pending.fuse * 0.9);
-                  BossVfx.column(level, p.add(0.0, height * 0.5, 0.0), 1.0, ParticleTypes.CLOUD, 1);
-               });
+               vRing(level, p.add(0.0, 0.2, 0.0), 2.4, 20, ParticleTypes.END_ROD, 0.05);
+               double height = Math.max(1.0, pending.fuse * 0.9);
+               Fx.vanilla(level, ParticleTypes.CLOUD, p.x, p.y + height, p.z, 2, 0.3, 0.3, 0.3, 0.01);
             }
          }
          case "current" -> {
-            if (age % 20 == 0) {
-               Fx.beam(level, ParticleTypes.CLOUD, p.add(0.0, 0.3, 0.0), p.add(pending.drift.scale(9.0)).add(0.0, 0.3, 0.0), SKY);
+            if (age % 10 == 0) {
+               // A current is wind running along the floor, so it is drawn as one: a gust the
+               // length of its push, re-sent as the last one blows out.
+               Fx.gust(level, ParticleTypes.GUST, p.add(0.0, 0.4, 0.0), pending.drift, 9.0, SKY);
             }
-            if (age % 3 == 0) {
-               vanillaOnly(() -> BossVfx.beam(level, p.add(0.0, 0.2, 0.0), p.add(pending.drift.scale(9.0)).add(0.0, 0.2, 0.0), 1.1, ParticleTypes.CLOUD));
+            if (age % 4 == 0) {
+               vBeam(level, p.add(0.0, 0.2, 0.0), p.add(pending.drift.scale(9.0)).add(0.0, 0.2, 0.0), 1.1, ParticleTypes.CLOUD);
             }
             for (ServerPlayer q : playersNear(level, p, 3.2)) {
                q.setDeltaMovement(q.getDeltaMovement().add(pending.drift.scale(CURRENT_PUSH)));
@@ -1968,8 +2002,11 @@ public final class GaleWardenManager {
             if (age % 30 == 0) {
                Fx.spiral(level, ParticleTypes.SMALL_GUST, p, 3.0, 30, SKY);
             }
+            if (age % 15 == 0) {
+               Fx.gust(level, ParticleTypes.GUST, p.add(0.0, 1.0, 0.0), pending.drift, 4.0, GALE_WHITE);
+            }
             if (age % 4 == 0) {
-               vanillaOnly(() -> BossVfx.sphere(level, p.add(0.0, 1.0, 0.0), 2.2, 1, ParticleTypes.SMALL_GUST));
+               vSphere(level, p.add(0.0, 1.0, 0.0), 2.2, ParticleTypes.SMALL_GUST);
             }
             for (ServerPlayer q : playersNear(level, p, 2.6)) {
                q.setDeltaMovement(
@@ -1979,8 +2016,12 @@ public final class GaleWardenManager {
             }
          }
          case "wind" -> {
-            if (age % 3 == 0) {
-               vanillaOnly(() -> BossVfx.column(level, p, 8.0, ParticleTypes.CLOUD, 2));
+            if (age % 20 == 0) {
+               // Each wind visibly leaning on the room toward him.
+               Fx.gust(level, ParticleTypes.GUST, p.add(0.0, 1.2, 0.0), boss.position().subtract(p), 10.0, SKY);
+            }
+            if (age % 4 == 0) {
+               vColumn(level, p, 8.0, ParticleTypes.CLOUD, 2);
             }
             // Each wind shoves everything toward the middle of the arena, which is where he is.
             for (ServerPlayer q : playersNear(level, p, 30.0)) {
@@ -1995,10 +2036,8 @@ public final class GaleWardenManager {
          case "deadair" -> {
             if (age % 4 == 0) {
                double shrink = 1.0 - (pending.life / (double)DEAD_AIR_TICKS) * 0.35;
-               vanillaOnly(() -> {
-                  BossVfx.ring(level, p, DEAD_AIR_RADIUS * shrink, 48, ParticleTypes.CLOUD, 0.4);
-                  BossVfx.sphere(level, p.add(0.0, 1.0, 0.0), DEAD_AIR_RADIUS * 0.55, 1, ParticleTypes.END_ROD);
-               });
+               vRing(level, p, DEAD_AIR_RADIUS * shrink, 32, ParticleTypes.CLOUD, 0.4);
+               vSphere(level, p.add(0.0, 1.0, 0.0), DEAD_AIR_RADIUS * 0.55, ParticleTypes.END_ROD);
             }
             if (pending.life == 20) {
                Fx.ring(level, ParticleTypes.END_ROD, p.add(0.0, 0.2, 0.0), DEAD_AIR_RADIUS, STORM);
@@ -2017,7 +2056,7 @@ public final class GaleWardenManager {
          }
          case "vacuum" -> {
             if (age % 4 == 0) {
-               vanillaOnly(() -> BossVfx.sphere(level, p.add(0.0, 2.0, 0.0), 6.0 + (60 - pending.life) * 0.1, 2, ParticleTypes.CLOUD));
+               vSphere(level, p.add(0.0, 2.0, 0.0), 6.0 + (60 - pending.life) * 0.1, ParticleTypes.CLOUD);
             }
             for (ServerPlayer q : playersNear(level, p, 22.0)) {
                pull(q, p, 0.30);
@@ -2026,14 +2065,15 @@ public final class GaleWardenManager {
          case "tornado" -> {
             // The shape: a column the whole way up, a ring on the floor, and the spiral that says
             // which way it is turning - for the vanilla client, every other tick.
-            if (age % 2 == 0) {
+            if (age % 3 == 0) {
+               vColumn(level, p, TORNADO_HEIGHT, ParticleTypes.CLOUD, 1);
+               vRing(level, p.add(0.0, 0.2, 0.0), TORNADO_RADIUS, TORNADO_RING_POINTS, ParticleTypes.SMALL_GUST, 0.4);
                vanillaOnly(() -> {
-                  BossVfx.column(level, p, TORNADO_HEIGHT, ParticleTypes.CLOUD, 2);
-                  BossVfx.ring(level, p.add(0.0, 0.2, 0.0), TORNADO_RADIUS, TORNADO_RING_POINTS, ParticleTypes.SMALL_GUST, 0.4);
-                  for (int i = 0; i < 10; i++) {
-                     double a = i * (Math.PI * 2.0 / 10.0) + pending.life * 0.22;
+                  for (int i = 0; i < 8; i++) {
+                     double a = i * (Math.PI * 2.0 / 8.0) + pending.life * 0.22;
                      double r = TORNADO_RADIUS * (0.35 + 0.65 * ((i % 4) / 3.0));
-                     BossVfx.at(level, p.add(Math.cos(a) * r, 1.0 + (i % 5) * 1.6, Math.sin(a) * r), 0.0, ParticleTypes.SMALL_GUST, 1, 0.0, 0.0, 0.0, 0.0);
+                     Vec3 q = p.add(Math.cos(a) * r, 1.0 + (i % 5) * 1.6, Math.sin(a) * r);
+                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMALL_GUST, q.x, q.y, q.z, 1, 0.0, 0.0, 0.0, 0.0);
                   }
                });
             }
@@ -2058,18 +2098,26 @@ public final class GaleWardenManager {
             double span = HURRICANE_RADIUS * (0.55 + 0.45 * (1.0 - pending.life / (double)HURRICANE_TICKS));
             if (age % 20 == 0) {
                Fx.ring(level, ParticleTypes.GUST, c.add(0.0, 0.4, 0.0), span, STORM);
+               // The storm's spin: gusts running round the rim, tangent to it.
+               double turn = -pending.life * 0.18;
+               for (int i = 0; i < 4; i++) {
+                  double a = turn + i * Math.PI * 0.5;
+                  Vec3 rim = c.add(Math.cos(a) * span * 0.75, 1.5, Math.sin(a) * span * 0.75);
+                  Fx.gust(level, ParticleTypes.GUST, rim, new Vec3(Math.sin(a), 0.0, -Math.cos(a)), 10.0, GALE_WHITE);
+               }
                Fx.lightning(
                   level, ParticleTypes.END_ROD, c.add(randomFlat().scale(span * 0.7)).add(0.0, 18.0, 0.0), floorUnder(level, c.add(randomFlat().scale(span * 0.7))), GALE_WHITE
                );
             }
-            if (age % 2 == 0) {
+            if (age % 4 == 0) {
+               vRing(level, c, span, HURRICANE_RING_POINTS, ringParticle(), 0.5);
+               vRing(level, c, span * 0.7, 32, ParticleTypes.CLOUD, 6.0);
+               vColumn(level, c, 12.0, ParticleTypes.CLOUD, 1);
                vanillaOnly(() -> {
-                  BossVfx.ring(level, c.add(0.0, 0.4, 0.0), span, HURRICANE_RING_POINTS, ringParticle(), 0.5);
-                  BossVfx.ring(level, c.add(0.0, 6.0, 0.0), span * 0.7, 36, ParticleTypes.CLOUD, 0.4);
-                  BossVfx.column(level, c, 12.0, ParticleTypes.CLOUD, 2);
-                  for (int i = 0; i < 12; i++) {
-                     double a = i * (Math.PI * 2.0 / 12.0) - pending.life * 0.18;
-                     BossVfx.at(level, c.add(Math.cos(a) * span * 0.6, 2.0 + (i % 4) * 2.0, Math.sin(a) * span * 0.6), 0.0, ParticleTypes.SMALL_GUST, 1, 0.0, 0.0, 0.0, 0.0);
+                  for (int i = 0; i < 8; i++) {
+                     double a = i * (Math.PI * 2.0 / 8.0) - pending.life * 0.18;
+                     Vec3 q = c.add(Math.cos(a) * span * 0.6, 2.0 + (i % 4) * 2.0, Math.sin(a) * span * 0.6);
+                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMALL_GUST, q.x, q.y, q.z, 1, 0.0, 0.0, 0.0, 0.0);
                   }
                });
             }
@@ -2093,13 +2141,95 @@ public final class GaleWardenManager {
       }
    }
 
-   /** Runs vanilla-only particles: the modded client already has the Fx shape for this. */
+   /**
+    * Runs vanilla-only particles: the modded client already has the Fx shape for this. Delegates
+    * to {@link Fx#vanillaOnly} so a scope opened here nests safely inside a template's own.
+    *
+    * <p>Only {@code FfVfx.particles} calls inside it are routed - which is why the shapes below
+    * ({@link #vRing}, {@link #vSphere}, {@link #vColumn}, {@link #vBeam}) exist. These used to be
+    * {@code BossVfx} shapes, and BossVfx sends with a per-player {@code level.sendParticles}: that
+    * never goes through the transport, so it reached modded clients too and piled vanilla puffs
+    * on top of every custom tornado, ring and current - the exact bug the scopes were meant to fix.
+    */
    private static void vanillaOnly(Runnable draw) {
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         draw.run();
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
+      Fx.vanillaOnly(draw);
+   }
+
+   /** A vanilla-only ring of {@code points} sites (at most 36), sent as eight clustered puffs. */
+   private static void vRing(ServerLevel level, Vec3 c, double radius, int points, net.minecraft.core.particles.ParticleOptions p, double y) {
+      if (radius <= 0.0 || points <= 0) {
+         return;
+      }
+      int sites = Math.min(36, points);
+      int step = Math.max(1, sites / 8);
+      vanillaOnly(() -> {
+         for (int i = 0; i < sites; i += step) {
+            double a = (Math.PI * 2.0 * i) / sites;
+            com.fortuneandfavors.net.FfVfx.particles(
+               level, p, c.x + Math.cos(a) * radius, c.y + y, c.z + Math.sin(a) * radius, step, 0.08, 0.04, 0.08, 0.01
+            );
+         }
+      });
+   }
+
+   /** A vanilla-only shell of fourteen puffs round {@code c}. */
+   private static void vSphere(ServerLevel level, Vec3 c, double radius, net.minecraft.core.particles.ParticleOptions p) {
+      vanillaOnly(() -> {
+         int n = 14;
+         for (int i = 0; i < n; i++) {
+            // A Fibonacci spiral over the sphere, so fourteen points read as a shell, not a cluster.
+            double y = 1.0 - 2.0 * (i + 0.5) / n;
+            double ring = Math.sqrt(Math.max(0.0, 1.0 - y * y));
+            double a = i * 2.399963;
+            com.fortuneandfavors.net.FfVfx.particles(
+               level, p, c.x + Math.cos(a) * ring * radius, c.y + y * radius, c.z + Math.sin(a) * ring * radius, 1, 0.05, 0.05, 0.05, 0.01
+            );
+         }
+      });
+   }
+
+   /** A vanilla-only column, one puff every block and a half up to {@code height}. */
+   private static void vColumn(ServerLevel level, Vec3 base, double height, net.minecraft.core.particles.ParticleOptions p, int each) {
+      vanillaOnly(() -> {
+         int n = Math.max(2, Math.min(12, (int)(height / 1.5)));
+         for (int i = 0; i <= n; i++) {
+            com.fortuneandfavors.net.FfVfx.particles(level, p, base.x, base.y + height * i / n, base.z, Math.max(1, each), 0.3, 0.1, 0.3, 0.02);
+         }
+      });
+   }
+
+   /** A vanilla-only line from {@code from} to {@code to}, a puff a block, at most twenty-four. */
+   private static void vBeam(ServerLevel level, Vec3 from, Vec3 to, double thickness, net.minecraft.core.particles.ParticleOptions p) {
+      vanillaOnly(() -> {
+         int n = Math.max(2, Math.min(24, (int)from.distanceTo(to)));
+         for (int i = 0; i <= n; i++) {
+            Vec3 q = from.lerp(to, i / (double)n);
+            com.fortuneandfavors.net.FfVfx.particles(level, p, q.x, q.y, q.z, 1, thickness * 0.3, thickness * 0.3, thickness * 0.3, 0.0);
+         }
+      });
+   }
+
+   /**
+    * The portal-wind cue, open or shut. {@code Fx.wormhole}'s flag reads backwards (its
+    * {@code closing=true} draws the arrival), so every call here names what it wants instead:
+    * {@code open} is the swirl widening out of a flash, shut is the swirl drawing in and sealing.
+    */
+   private static void portalWind(ServerLevel level, net.minecraft.core.particles.ParticleOptions p, Vec3 at, boolean open, int color) {
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, p, at, Vec3.ZERO, 0.0, open ? 1.0 : 0.0, color);
+   }
+
+   /**
+    * {@code count} gusts thrown out of a ring of {@code from} blocks round {@code center} (inward
+    * when {@code inward}), {@code reach} blocks long - the shape of the whole arena's wind turning
+    * at once. Kept to six or eight: each is one cue, and the fallback is one bounded line.
+    */
+   private static void gustRing(ServerLevel level, Vec3 center, double from, double reach, int count, boolean inward, int color) {
+      double turn = RANDOM.nextDouble() * Math.PI * 2.0;
+      for (int i = 0; i < count; i++) {
+         double a = turn + Math.PI * 2.0 * i / count;
+         Vec3 out = new Vec3(Math.cos(a), 0.0, Math.sin(a));
+         Vec3 start = inward ? center.add(out.scale(from + reach)) : center.add(out.scale(from));
+         Fx.gust(level, ParticleTypes.GUST, start.add(0.0, 1.2, 0.0), inward ? out.scale(-1.0) : out, reach, color);
       }
    }
 
@@ -2109,6 +2239,8 @@ public final class GaleWardenManager {
          case "gust" -> {
             Fx.shockwave(level, ParticleTypes.GUST, p, 3.4, SKY);
             Fx.starburst(level, ParticleTypes.CLOUD, p.add(0.0, 1.0, 0.0), 3.0, GALE_WHITE);
+            // The footprint he left goes off: a pressure ring punched straight up out of it.
+            Fx.sonicRing(level, ParticleTypes.GUST, p.add(0.0, 0.3, 0.0), new Vec3(0.0, 1.0, 0.0), 6.0, 10, SKY);
             level.playSound(null, p.x, p.y, p.z, SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.HOSTILE, 1.4F, 1.1F);
             for (ServerPlayer q : playersNear(level, p, 3.4)) {
                q.hurtServer(level, level.damageSources().mobAttack(boss), COLUMN_DAMAGE * 0.7F);
@@ -2118,6 +2250,7 @@ public final class GaleWardenManager {
          }
          case "column" -> {
             Fx.geyser(level, ParticleTypes.CLOUD, p, 7.0, GALE_WHITE);
+            Fx.gust(level, ParticleTypes.GUST, p, new Vec3(0.0, 1.0, 0.0), 7.0, SKY);
             Fx.shockwave(level, ParticleTypes.GUST, p, COLUMN_RADIUS + 0.6, SKY);
             level.playSound(null, p.x, p.y, p.z, SoundEvents.BREEZE_WHIRL, SoundSource.HOSTILE, 1.4F, 0.8F);
             for (ServerPlayer q : playersNear(level, p, COLUMN_RADIUS)) {
@@ -2157,7 +2290,8 @@ public final class GaleWardenManager {
          case "vacuum" -> {
             Fx.flare(level, ParticleTypes.END_ROD, at.add(0.0, 2.0, 0.0), 2.6, GALE_WHITE);
             Fx.shockwave(level, ParticleTypes.GUST, at, 20.0, STORM);
-            Fx.wormhole(level, ParticleTypes.SMALL_GUST, at.add(0.0, 2.0, 0.0), false, SKY);
+            portalWind(level, ParticleTypes.SMALL_GUST, at.add(0.0, 2.0, 0.0), false, SKY);
+            gustRing(level, floorUnder(level, at), 2.0, 14.0, 6, false, GALE_WHITE);
             level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.HOSTILE, 2.0F, 0.5F);
             for (ServerPlayer q : playersNear(level, at, 20.0)) {
                Vec3 away = q.position().subtract(at);
@@ -2165,7 +2299,11 @@ public final class GaleWardenManager {
                q.hurtServer(level, level.damageSources().mobAttack(boss), 9.0F);
             }
          }
-         case "tornado" -> Fx.wormhole(level, ParticleTypes.CLOUD, at.add(0.0, 2.0, 0.0), true, GALE_WHITE);
+         // The funnel unwinding: the swirl draws in and seals, and its last breath blows out.
+         case "tornado" -> {
+            portalWind(level, ParticleTypes.CLOUD, at.add(0.0, 2.0, 0.0), false, GALE_WHITE);
+            Fx.shockwave(level, ParticleTypes.SMALL_GUST, at, TORNADO_RADIUS, SKY);
+         }
          case "hurricane" -> releaseHurricane(level, boss, fight);
          default -> {
          }
@@ -2207,11 +2345,13 @@ public final class GaleWardenManager {
       if (fight.deathTicks == 16) {
          // The last breath in: everything turns toward him before it is thrown out.
          Fx.vortex(level, ParticleTypes.CLOUD, at, 12.0, 16, STORM);
-         Fx.wormhole(level, ParticleTypes.SMALL_GUST, at.add(0.0, 2.0, 0.0), true, GALE_WHITE);
+         // The swirl drawing in on him (shut, not open - the last breath is an inhale).
+         portalWind(level, ParticleTypes.SMALL_GUST, at.add(0.0, 2.0, 0.0), false, GALE_WHITE);
+         gustRing(level, floorUnder(level, at), 2.0, 10.0, 6, true, SKY);
          level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_INHALE, SoundSource.HOSTILE, 2.2F, 0.5F);
       }
       if (fight.deathTicks % 3 == 0) {
-         vanillaOnly(() -> BossVfx.sphere(level, at.add(0.0, 1.0, 0.0), 2.0 + progress * 3.0, 1, ParticleTypes.CLOUD));
+         vSphere(level, at.add(0.0, 1.0, 0.0), 2.0 + progress * 3.0, ParticleTypes.CLOUD);
       }
       if (fight.deathTicks > 0) {
          return;
@@ -2222,6 +2362,10 @@ public final class GaleWardenManager {
       Fx.shockwave(level, ParticleTypes.GUST, floorUnder(level, at), 20.0, STORM);
       Fx.nova(level, ParticleTypes.CLOUD, at, 10.0, GALE_WHITE);
       Fx.petals(level, ParticleTypes.WHITE_ASH, heart, 6.0, 60, SKY);
+      // And the wind he was made of, thrown out across the arena and up into the sky.
+      Fx.starburst(level, ParticleTypes.END_ROD, heart, 6.0, GALE_WHITE);
+      Fx.sonicRing(level, ParticleTypes.GUST, heart, new Vec3(0.0, 1.0, 0.0), 16.0, 20, GALE_WHITE);
+      gustRing(level, floorUnder(level, at), 2.0, 16.0, 8, false, SKY);
       for (ServerPlayer p : playersNear(level, at, 12.0)) {
          Vec3 away = p.position().subtract(at);
          push(p, new Vec3(away.x, 0.0, away.z), 1.2);

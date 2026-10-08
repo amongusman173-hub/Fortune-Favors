@@ -2,6 +2,8 @@ package com.fortuneandfavors.economy;
 
 import com.fortuneandfavors.ModItems;
 import com.fortuneandfavors.ModSounds;
+import com.fortuneandfavors.net.FfVfx;
+import com.fortuneandfavors.util.FxKinds;
 import com.fortuneandfavors.util.Chat;
 import com.fortuneandfavors.util.Safe;
 import java.util.ArrayList;
@@ -106,6 +108,8 @@ public final class EmeraldSovereignManager {
    private static final float COFFIN_DAMAGE = 8.0F;
    /** Crownfall: how long each piece hangs in the air, and how wide its impact is. */
    private static final int CROWN_FUSE = 30;
+   /** How many ticks a volley emerald flies before it gives up (0.9 blocks a tick). */
+   private static final int VOLLEY_LIFE = 100;
    private static final double CROWN_RADIUS = 3.2;
    /** The wheel: a full turn in about fifty ticks, in three arms. */
    private static final int WHEEL_TICKS = 70;
@@ -491,7 +495,10 @@ public final class EmeraldSovereignManager {
       double y = Math.min(boss.getY(), floor.y + height);
       boss.setPos(floor.x, Math.max(floor.y, y), floor.z);
       boss.setDeltaMovement(Vec3.ZERO);
-      vanillaOnly(() -> level.sendParticles(ParticleTypes.HAPPY_VILLAGER, boss.getX(), boss.getY() + 1.4, boss.getZ(), 4, 0.6, 1.0, 0.6, 0.02));
+      // The helix sent at the summon is the descent for modded clients; this is everyone else's.
+      if (fight.arrivalTicks % 2 == 0) {
+         Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, boss.getX(), boss.getY() + 1.4, boss.getZ(), 4, 0.6, 1.0, 0.6, 0.02);
+      }
       if (fight.arrivalTicks > 0 && fight.arrivalTicks % 10 == 0) {
          float pitch = 0.6F + (ARRIVAL_TICKS - fight.arrivalTicks) * 0.012F;
          level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 1.4F, pitch);
@@ -508,7 +515,10 @@ public final class EmeraldSovereignManager {
       Fx.starburst(level, ParticleTypes.HAPPY_VILLAGER, head, 6.5, EMERALD);
       Fx.shockwave(level, ParticleTypes.HAPPY_VILLAGER, floor, 11.0, EMERALD);
       Fx.nova(level, ParticleTypes.END_ROD, floor.add(0.0, 0.2, 0.0), 5.0, DEEP_GREEN);
-      level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, head.x, head.y, head.z, 50, 1.2, 1.0, 1.2, 0.25);
+      // He lands in a spray of cut emeralds and gold: the court's treasury, thrown up by his feet.
+      Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, head, 2.2, EMERALD);
+      Fx.gemShards(level, ParticleTypes.TOTEM_OF_UNDYING, floor.add(0.0, 0.6, 0.0), 1.6, CROWN_GOLD);
+      Fx.vanilla(level, ParticleTypes.TOTEM_OF_UNDYING, head.x, head.y, head.z, 30, 1.2, 1.0, 1.2, 0.25);
       level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.HOSTILE, 1.6F, 0.7F);
       level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 1.8F, 0.8F);
       // Off the throne: a shove, not a hit - nobody is punished for standing where he landed.
@@ -715,7 +725,7 @@ public final class EmeraldSovereignManager {
             Vec3 at = raw.position().add(0.0, 0.9, 0.0);
             Fx.shatter(level, ParticleTypes.HAPPY_VILLAGER, at, 1.0, EMERALD);
             Fx.ring(level, ParticleTypes.END_ROD, raw.position().add(0.0, 0.1, 0.0), 1.4, DEEP_GREEN);
-            vanillaOnly(() -> level.sendParticles(ParticleTypes.LARGE_SMOKE, at.x, at.y, at.z, 12, 0.4, 0.4, 0.4, 0.06));
+            Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, at.x, at.y, at.z, 12, 0.4, 0.4, 0.4, 0.06);
             level.playSound(null, raw.getX(), raw.getY(), raw.getZ(), SoundEvents.VINDICATOR_CELEBRATE, SoundSource.HOSTILE, 1.0F, 0.8F);
          }
          announceNear(level, boss, ARENA_RADIUS, fight.guards.isEmpty()
@@ -838,7 +848,10 @@ public final class EmeraldSovereignManager {
       for (ServerPlayer p : participantsNear(level, boss, 22.0)) {
          p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 80, 2, false, true, true));
          p.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 80, 0, false, true, true));
-         level.sendParticles(ParticleTypes.NOTE, p.getX(), p.getY() + 2.0, p.getZ(), 10, 0.4, 0.4, 0.4, 0.1);
+         // Rung: notes circle the head of everyone the bell caught for two seconds - a "dazed"
+         // read that shows who was in range.
+         Fx.petals(level, ParticleTypes.NOTE, p.position().add(0.0, p.getBbHeight() + 0.3, 0.0), 0.6, 40, CROWN_GOLD);
+         Fx.vanilla(level, ParticleTypes.NOTE, p.getX(), p.getY() + 2.0, p.getZ(), 6, 0.4, 0.4, 0.4, 0.1);
       }
       announce(level, SAY + "\"§fOrder.\"");
       announceNear(level, boss, ARENA_RADIUS, "&8BELL TOLL &7- slowed. Distance beats it.");
@@ -860,9 +873,19 @@ public final class EmeraldSovereignManager {
       for (int i = 0; i < count; i++) {
          double spread = (i - (count - 1) / 2.0) * 0.05;
          Vec3 vel = new Vec3(dir.x + spread, dir.y + 0.08, dir.z + spread).normalize().scale(0.9);
-         fight.emeralds.add(new Emerald(from, vel, 6.0F, 100));
+         fight.emeralds.add(new Emerald(from, vel, 6.0F, VOLLEY_LIFE));
+         // A volley emerald flies dead straight at a fixed speed, so its whole flight is known the
+         // moment it is thrown: one comet cue per gem, sent once, travelling to the first block in
+         // its path at the gem's own speed, is the flight for modded clients. (A gem that catches
+         // a player sooner bursts there, and the shards cover the last few blocks of comet.)
+         // Shape only (no Fx fallback): vanilla clients already get the gem's own trail each tick.
+         double reach = rayReach(level, from, vel.normalize(), Math.min(VOLLEY_LIFE * 0.9, ARENA_RADIUS));
+         int flight = Math.max(2, (int) Math.ceil(reach / 0.9));
+         FfVfx.shape(level, FxKinds.COMET, ParticleTypes.HAPPY_VILLAGER, from,
+            from.add(vel.normalize().scale(reach)), 0.0, flight, EMERALD);
       }
       Fx.muzzle(level, ParticleTypes.HAPPY_VILLAGER, from, dir, EMERALD);
+      Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, from, 0.8, CROWN_GOLD);
       level.playSound(null, from.x, from.y, from.z, SoundEvents.VILLAGER_TRADE, SoundSource.HOSTILE, 1.2F, 0.6F);
    }
 
@@ -899,8 +922,13 @@ public final class EmeraldSovereignManager {
       }
       if (taken > 0) {
          Fx.aura(level, ParticleTypes.TOTEM_OF_UNDYING, boss.position(), boss.getBbHeight(), 30, CROWN_GOLD);
+         // The tithe lands in his treasury: gold coming down over the throne, a little longer
+         // for every head he taxed.
+         Fx.starfall(level, ParticleTypes.TOTEM_OF_UNDYING, boss.position(), 2.5, 20 + taken * 6, CROWN_GOLD);
       }
-      level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, x, y, z, 20, 1.6, 1.2, 1.6, 0.1);
+      // The levy ring is drawn either way, so a player out of reach still sees where "close" ended.
+      Fx.ring(level, ParticleTypes.TOTEM_OF_UNDYING, boss.position().add(0.0, 0.1, 0.0), 18.0, CROWN_GOLD);
+      Fx.vanilla(level, ParticleTypes.TOTEM_OF_UNDYING, x, y, z, 20, 1.6, 1.2, 1.6, 0.1);
       level.playSound(null, x, y, z, SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 1.4F, 1.2F);
       announce(level, SAY + "\"§fTax day.\"");
       announceNear(level, boss, ARENA_RADIUS, taken == 0
@@ -966,7 +994,7 @@ public final class EmeraldSovereignManager {
                int points = 16;
                for (int i = 0; i < points; i++) {
                   double a = i * (Math.PI * 2.0 / points) + mark.fuse * 0.05;
-                  level.sendParticles(ParticleTypes.HAPPY_VILLAGER, mark.pos.x + Math.cos(a) * mark.radius, mark.pos.y + 0.2,
+                  FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, mark.pos.x + Math.cos(a) * mark.radius, mark.pos.y + 0.2,
                      mark.pos.z + Math.sin(a) * mark.radius, 1, 0.0, 0.0, 0.0, 0.0);
                }
             });
@@ -980,8 +1008,10 @@ public final class EmeraldSovereignManager {
             continue;
          }
          Fx.shockwave(level, ParticleTypes.HAPPY_VILLAGER, mark.pos, mark.radius + 0.6, EMERALD);
-         Fx.rockburst(level, ParticleTypes.TOTEM_OF_UNDYING, mark.pos.add(0.0, 0.4, 0.0), 1.2, CROWN_GOLD);
-         level.sendParticles(ParticleTypes.EXPLOSION, mark.pos.x, mark.pos.y + 0.5, mark.pos.z, 2, 0.4, 0.2, 0.4, 0.0);
+         // The piece of the crown breaks on the floor: gold and cut emeralds thrown out of the hit.
+         Fx.gemShards(level, ParticleTypes.TOTEM_OF_UNDYING, mark.pos.add(0.0, 0.5, 0.0), 1.4, CROWN_GOLD);
+         Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, mark.pos.add(0.0, 0.3, 0.0), 1.0, EMERALD);
+         Fx.vanilla(level, ParticleTypes.EXPLOSION, mark.pos.x, mark.pos.y + 0.5, mark.pos.z, 2, 0.4, 0.2, 0.4, 0.0);
          level.playSound(null, mark.pos.x, mark.pos.y, mark.pos.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.2F, 1.4F);
          // The hit matches the ring that was drawn: a player whose feet are outside it is
          // safe. This used to reach 1.4 blocks past the drawn edge, in all three axes.
@@ -1173,6 +1203,9 @@ public final class EmeraldSovereignManager {
       fight.wheelHits.clear();
       Fx.runeCircle(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.05, 0.0), 3.0, WHEEL_TICKS, CROWN_GOLD);
       Fx.vortex(level, ParticleTypes.HAPPY_VILLAGER, boss.position(), 2.5, WHEEL_TICKS, EMERALD);
+      // The mechanism of the wheel, lying flat under him: gold cogs turning for as long as the
+      // rays do, so the spin reads as machinery he is driving rather than three loose beams.
+      Fx.gearSpin(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.08, 0.0), Vec3.ZERO, 2.4, WHEEL_TICKS, CROWN_GOLD);
       announce(level, SAY + "\"§fRound we go.\"");
       announceNear(level, boss, ARENA_RADIUS, "&8Three rays. &7Stand in the gaps or behind a wall.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 2.0F, 1.3F);
@@ -1193,7 +1226,7 @@ public final class EmeraldSovereignManager {
             Fx.beam(level, ParticleTypes.HAPPY_VILLAGER, origin, tip, EMERALD);
             if (reach < WHEEL_REACH - 0.5) {
                // Where an arm is broken by cover, the break is visible.
-               vanillaOnly(() -> level.sendParticles(ParticleTypes.CRIT, tip.x, tip.y, tip.z, 4, 0.2, 0.2, 0.2, 0.04));
+               Fx.vanilla(level, ParticleTypes.CRIT, tip.x, tip.y, tip.z, 4, 0.2, 0.2, 0.2, 0.04);
             }
          }
          for (ServerPlayer p : playersNear(level, origin.x, origin.y, origin.z, reach + 2.0)) {
@@ -1294,7 +1327,7 @@ public final class EmeraldSovereignManager {
             vanillaOnly(() -> {
                for (int i = 0; i < 20; i++) {
                   double a = i * (Math.PI * 2.0 / 20.0);
-                  level.sendParticles(ParticleTypes.HAPPY_VILLAGER, at.x + Math.cos(a) * 1.7, at.y + 0.15, at.z + Math.sin(a) * 1.7, 1, 0.0, 0.0, 0.0, 0.0);
+                  FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, at.x + Math.cos(a) * 1.7, at.y + 0.15, at.z + Math.sin(a) * 1.7, 1, 0.0, 0.0, 0.0, 0.0);
                }
             });
          }
@@ -1308,10 +1341,11 @@ public final class EmeraldSovereignManager {
       fight.coffinHold--;
       Vec3 at = fight.coffinAt;
       if (fight.coffinHold % 4 == 0) {
-         vanillaOnly(() -> level.sendParticles(ParticleTypes.HAPPY_VILLAGER, at.x, at.y + 1.0, at.z, 8, 1.0, 1.0, 1.0, 0.05));
+         Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, at.x, at.y + 1.0, at.z, 8, 1.0, 1.0, 1.0, 0.05);
       }
       if (fight.coffinHold <= 0) {
          Fx.shatter(level, ParticleTypes.HAPPY_VILLAGER, at.add(0.0, 1.2, 0.0), 1.4, EMERALD);
+         Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, at.add(0.0, 1.0, 0.0), 1.2, EMERALD);
          level.playSound(null, at.x, at.y, at.z, SoundEvents.GLASS_BREAK, SoundSource.HOSTILE, 1.2F, 0.8F);
          dropCoffin(level, fight);
          announceNear(level, boss, ARENA_RADIUS, "&8The coffin opens.");
@@ -1414,7 +1448,7 @@ public final class EmeraldSovereignManager {
             vanillaOnly(() -> {
                for (double d = 0; d < reach; d += 1.0) {
                   Vec3 point = floorStart.add(dir.scale(d));
-                  level.sendParticles(ParticleTypes.HAPPY_VILLAGER, point.x, point.y, point.z, 1, 0.05, 0.0, 0.05, 0.0);
+                  FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, point.x, point.y, point.z, 1, 0.05, 0.0, 0.05, 0.0);
                }
             });
          }
@@ -1465,7 +1499,9 @@ public final class EmeraldSovereignManager {
          ServerPlayer struck = null;
          for (int s = 0; s < steps && !done; s++) {
             emerald.pos = emerald.pos.add(emerald.vel.scale(1.0 / steps));
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, emerald.pos.x, emerald.pos.y, emerald.pos.z, 1, 0.05, 0.05, 0.05, 0.0);
+            // The comet sent at the throw is the flight for modded clients; this is the trail for
+            // everyone else.
+            Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, emerald.pos.x, emerald.pos.y, emerald.pos.z, 1, 0.05, 0.05, 0.05, 0.0);
             if (!level.getBlockState(BlockPos.containing(emerald.pos)).isAir()) {
                done = true;
                break;
@@ -1479,10 +1515,13 @@ public final class EmeraldSovereignManager {
          }
          emerald.life--;
          if (done || emerald.life <= 0) {
+            // Every gem breaks where it stops: a full burst of shards on a hit, a small one where
+            // it shatters on a wall or simply runs out of flight.
             if (struck != null) {
+               Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, emerald.pos, 1.0, EMERALD);
                Fx.clash(level, ParticleTypes.HAPPY_VILLAGER, emerald.pos, emerald.vel, EMERALD);
             } else {
-               level.sendParticles(ParticleTypes.CRIT, emerald.pos.x, emerald.pos.y, emerald.pos.z, 6, 0.2, 0.2, 0.2, 0.05);
+               Fx.gemShards(level, ParticleTypes.CRIT, emerald.pos, 0.5, EMERALD);
             }
             it.remove();
          }
@@ -1603,7 +1642,9 @@ public final class EmeraldSovereignManager {
          Fx.summonCircle(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.05, 0.0), 3.0, 20, CROWN_GOLD);
          level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_POWER_SELECT, SoundSource.HOSTILE, 1.8F, 0.5F);
       }
-      vanillaOnly(() -> level.sendParticles(ParticleTypes.HAPPY_VILLAGER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 8, 1.4, 1.2, 1.4, 0.1));
+      if (fight.deathTicks % 2 == 0) {
+         Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 8, 1.4, 1.2, 1.4, 0.1);
+      }
       // He sinks, a little, towards one knee.
       if (fight.deathTicks > 20) {
          boss.setPos(boss.getX(), boss.getY() - 0.006, boss.getZ());
@@ -1634,8 +1675,13 @@ public final class EmeraldSovereignManager {
       Fx.shockwave(level, ParticleTypes.HAPPY_VILLAGER, floor, 16.0, EMERALD);
       Fx.nova(level, ParticleTypes.END_ROD, floor.add(0.0, 0.3, 0.0), 8.0, DEEP_GREEN);
       Fx.pillar(level, ParticleTypes.HAPPY_VILLAGER, floor, 14.0, EMERALD);
-      Fx.emberRain(level, ParticleTypes.TOTEM_OF_UNDYING, floor, 8.0, 70, CROWN_GOLD);
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 3, 1.5, 1.5, 1.5, 0.1);
+      // The crown itself breaks in the air - gold and emerald shards - and what is left of his
+      // treasury comes down over the hall as falling stars of gold for the next few seconds.
+      Fx.gemShards(level, ParticleTypes.TOTEM_OF_UNDYING, head, 3.0, CROWN_GOLD);
+      Fx.gemShards(level, ParticleTypes.HAPPY_VILLAGER, head.add(0.0, 0.4, 0.0), 2.2, EMERALD);
+      Fx.starfall(level, ParticleTypes.TOTEM_OF_UNDYING, floor, 9.0, 80, CROWN_GOLD);
+      Fx.gearSpin(level, ParticleTypes.END_ROD, floor.add(0.0, 0.08, 0.0), Vec3.ZERO, 3.0, 40, CROWN_GOLD);
+      Fx.vanilla(level, ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 3, 1.5, 1.5, 1.5, 0.1);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 2.0F, 0.9F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, 0.5F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.TOTEM_USE, SoundSource.HOSTILE, 1.4F, 0.7F);
@@ -1666,7 +1712,8 @@ public final class EmeraldSovereignManager {
       if (fight.missingTicks < MISSING_GRACE_TICKS) {
          return;
       }
-      if (fight.everSeen && !fight.dying && fight.lastSeenLevel != null && !LOOT_PAID.contains(fight.bossId)) {
+      // A body that vanished mid-ceremony had already taken its killing blow, so it pays too.
+      if (fight.everSeen && fight.lastSeenLevel != null && !LOOT_PAID.contains(fight.bossId)) {
          LOOT_PAID.add(fight.bossId);
          ServerLevel level = fight.lastSeenLevel;
          announce(level, "&8The hall is empty. &7He left what he owed on the floor.");
@@ -1820,14 +1867,14 @@ public final class EmeraldSovereignManager {
    /**
     * Runs plain-particle drawing as the vanilla-only fallback: modded clients already see
     * the Fx shape it stands in for, so only clients without the mod get these.
+    *
+    * <p>Only {@code FfVfx.particles} inside the block is scoped - a bare
+    * {@code level.sendParticles} is not routed through the transport and reaches everyone, which
+    * is how every "vanilla-only" ring in this file used to land on modded clients too. Goes
+    * through {@link Fx#vanillaOnly} so the scope nests safely with the templates' own.
     */
    private static void vanillaOnly(Runnable draw) {
-      com.fortuneandfavors.net.FfVfx.enter();
-      try {
-         draw.run();
-      } finally {
-         com.fortuneandfavors.net.FfVfx.exit();
-      }
+      Fx.vanillaOnly(draw);
    }
 
    private static void announce(ServerLevel level, String message) {

@@ -84,6 +84,14 @@ public final class ClockworkGear {
       }
       int charge = OVERDRIVE.merge(attacker.getUUID(), 1, Integer::sum);
       if (charge < OVERDRIVE_HITS) {
+         // One hit from full: the gauntlet's works wind tight - a small cog spins up over the
+         // fist and the mainspring clicks - so the ram is never a surprise to its owner.
+         if (charge == OVERDRIVE_HITS - 1 && attacker.level() instanceof ServerLevel primed) {
+            Vec3 look = attacker.getViewVector(1.0F);
+            Vec3 fist = attacker.getEyePosition().add(look.scale(0.6)).add(0.0, -0.45, 0.0);
+            Fx.gearSpin(primed, ParticleTypes.ELECTRIC_SPARK, fist, look, 0.35, 20, BRASS);
+            primed.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), SoundEvents.CROSSBOW_LOADING_END, SoundSource.PLAYERS, 0.7F, 1.4F);
+         }
          return;
       }
       OVERDRIVE.put(attacker.getUUID(), 0);
@@ -111,6 +119,10 @@ public final class ClockworkGear {
       Fx.shape(level, com.fortuneandfavors.net.FfVfx.SLASH, ParticleTypes.CRIT, attacker.position(), flat, RAM_RANGE, 0.0, BRASS);
       Fx.shockwave(level, ParticleTypes.CLOUD, attacker.position().add(flat.scale(RAM_RANGE)), RAM_WIDTH + 1.4, BRASS);
       Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.ELECTRIC_SPARK, end.add(0.0, -0.3, 0.0), Vec3.ZERO, RAM_WIDTH + 0.4, 0.0, BRASS);
+      // The piston's own works: a set of cogs turning upright behind the fist as it drives,
+      // and the steam it vents blown down the line after it.
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, low.add(flat.scale(0.4)), flat, 0.8, 14, BRASS);
+      Fx.gust(level, ParticleTypes.CLOUD, attacker.position().add(0.0, 0.3, 0.0), flat, RAM_RANGE, SOULFIRE);
       level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), ModSounds.BOSS_SLAM, SoundSource.PLAYERS, 1.1F, 1.5F);
       level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), SoundEvents.ANVIL_LAND, SoundSource.PLAYERS, 0.8F, 1.2F);
 
@@ -138,7 +150,7 @@ public final class ClockworkGear {
    private static List<LivingEntity> lineTargets(ServerLevel level, ServerPlayer attacker, Vec3 from, Vec3 flat) {
       List<LivingEntity> out = new ArrayList<>();
       for (Entity e : level.getEntities(attacker, attacker.getBoundingBox().inflate(RAM_RANGE + 2.0))) {
-         if (!(e instanceof LivingEntity living) || living == attacker || !living.isAlive()) {
+         if (!(e instanceof LivingEntity living) || living == attacker || !living.isAlive() || living.isSpectator()) {
             continue;
          }
          if (living instanceof ServerPlayer other && isAlly(attacker, other)) {
@@ -216,9 +228,13 @@ public final class ClockworkGear {
          LAST_REPAIR.put(player.getUUID(), now);
          player.heal(HEART_REPAIR);
          if (player.level() instanceof ServerLevel level) {
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HEART, player.getX(), player.getY() + 1.4, player.getZ(), 3, 0.3, 0.2, 0.3, 0.0);
-            // A gear turns once over the heart with every repair.
-            Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.ELECTRIC_SPARK, player.position().add(0.0, 1.2, 0.0), Vec3.ZERO, 0.9, 0.0, BRASS);
+            // A gear turns once over the heart with every repair, and the heart beats under it.
+            // The vanilla hearts are the plain clients' copy of that beat; a modded client
+            // draws the heartbeat itself.
+            Vec3 chest = player.position().add(0.0, 1.2, 0.0);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.ELECTRIC_SPARK, chest, Vec3.ZERO, 0.9, 0.0, BRASS);
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.util.FxKinds.HEARTBEAT, ParticleTypes.HEART, chest, Vec3.ZERO, 0.7, 16, BRASS);
+            Fx.vanilla(level, ParticleTypes.HEART, player.getX(), player.getY() + 1.4, player.getZ(), 3, 0.3, 0.2, 0.3, 0.0);
             level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 0.5F, 1.6F);
          }
       }
