@@ -300,11 +300,11 @@ public final class RareMobVariantManager {
       double y = mob.getY() + mob.getBbHeight() * (0.4 + RANDOM.nextDouble() * 0.5);
       double z = mob.getZ() + (RANDOM.nextDouble() - 0.5) * 0.6;
       switch (tier) {
-         case 1 -> level.sendParticles(new DustParticleOptions(0xC7C9CC, 1.0F), x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
-         case 2 -> level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x, y, z, 1, 0.0, 0.0, 0.0, 0.02);
-         case 3 -> level.sendParticles(ParticleTypes.ENCHANT, x, y, z, 2, 0.2, 0.3, 0.2, 0.04);
-         case 4 -> level.sendParticles(ParticleTypes.PORTAL, x, y, z, 1, 0.15, 0.2, 0.15, 0.02);
-         case 5 -> level.sendParticles(ParticleTypes.ELECTRIC_SPARK, x, y, z, 2, 0.15, 0.25, 0.15, 0.05);
+         case 1 -> com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(0xC7C9CC, 1.0F), x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+         case 2 -> com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, x, y, z, 1, 0.0, 0.0, 0.0, 0.02);
+         case 3 -> com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, x, y, z, 2, 0.2, 0.3, 0.2, 0.04);
+         case 4 -> com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, x, y, z, 1, 0.15, 0.2, 0.15, 0.02);
+         case 5 -> com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ELECTRIC_SPARK, x, y, z, 2, 0.15, 0.25, 0.15, 0.05);
          default -> {
          }
       }

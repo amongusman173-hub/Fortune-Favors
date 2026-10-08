@@ -96,8 +96,8 @@ public final class MiningPity {
          double x = pos.getX() + 0.5;
          double y = pos.getY() + 0.6;
          double z = pos.getZ() + 0.5;
-         level.sendParticles(new net.minecraft.core.particles.DustParticleOptions(itemColor(drop), 1.0F), x, y, z, 10, 0.3, 0.15, 0.3, 0.02);
-         level.sendParticles(ParticleTypes.END_ROD, x, y, z, 8, 0.45, 0.2, 0.45, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, new net.minecraft.core.particles.DustParticleOptions(itemColor(drop), 1.0F), x, y, z, 10, 0.3, 0.15, 0.3, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x, y, z, 8, 0.45, 0.2, 0.45, 0.05);
          level.playSound(null, pos, net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, net.minecraft.sounds.SoundSource.PLAYERS, 0.5F, 1.4F);
          if (player != null) {
             player.sendSystemMessage(

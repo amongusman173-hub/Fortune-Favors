@@ -53,7 +53,7 @@ public final class ExcaliburSlash {
          FfVfx.shape(level, FfVfx.SLASH, ParticleTypes.SWEEP_ATTACK, at, p.getLookAngle(), LAND, 0.0, GOLD);
          FfVfx.enter();
          try {
-            level.sendParticles(ParticleTypes.SWEEP_ATTACK, at.x, at.y, at.z, 3, 0.6, 0.3, 0.6, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SWEEP_ATTACK, at.x, at.y, at.z, 3, 0.6, 0.3, 0.6, 0.0);
          } finally {
             FfVfx.exit();
          }
@@ -80,8 +80,8 @@ public final class ExcaliburSlash {
          victim.hurtServer(cut.level, cut.level.damageSources().playerAttack(p), damage);
          FfVfx.enter();
          try {
-            cut.level.sendParticles(ParticleTypes.CRIT, victim.getX(), victim.getY() + victim.getBbHeight() * 0.55, victim.getZ(), 30, 0.5, 0.6, 0.5, 0.4);
-            cut.level.sendParticles(ParticleTypes.EXPLOSION, victim.getX(), victim.getY() + victim.getBbHeight() * 0.55, victim.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(cut.level, ParticleTypes.CRIT, victim.getX(), victim.getY() + victim.getBbHeight() * 0.55, victim.getZ(), 30, 0.5, 0.6, 0.5, 0.4);
+            com.fortuneandfavors.net.FfVfx.particles(cut.level, ParticleTypes.EXPLOSION, victim.getX(), victim.getY() + victim.getBbHeight() * 0.55, victim.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
          } finally {
             FfVfx.exit();
          }

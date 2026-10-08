@@ -70,7 +70,7 @@ public final class BountyCompassManager {
             to = from.add(target.subtract(from).normalize().scale(64.0));
          }
          drawThread(sl, from, to, Math.min(32, Math.max(6, (int)(from.distanceTo(to) / 2.0))));
-         sl.sendParticles(ParticleTypes.FLAME, player.getX(), player.getY() + 1.3, player.getZ(), 1, 0.15, 0.25, 0.15, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.FLAME, player.getX(), player.getY() + 1.3, player.getZ(), 1, 0.15, 0.25, 0.15, 0.01);
       }
    }
 
@@ -139,7 +139,7 @@ public final class BountyCompassManager {
    private static void drawThread(ServerLevel level, Vec3 from, Vec3 to, int steps) {
       for (int i = 0; i < steps; i++) {
          double t = (i + 1) / (double)steps;
-         level.sendParticles(ParticleTypes.FLAME, from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, from.z + (to.z - from.z) * t, 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.FLAME, from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, from.z + (to.z - from.z) * t, 1, 0.0, 0.0, 0.0, 0.0);
       }
    }
 }

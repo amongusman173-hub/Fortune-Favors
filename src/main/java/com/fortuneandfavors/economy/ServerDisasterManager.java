@@ -394,7 +394,7 @@ public final class ServerDisasterManager {
          if (remaining <= 200L && remaining > 0L && now % 40L == 0L) {
             // Warning particles as event winds down
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-               p.level().sendParticles(ParticleTypes.END_ROD, p.getX(), p.getY() + 2, p.getZ(), 10, 1.5, 0.8, 1.5, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(p.level(), ParticleTypes.END_ROD, p.getX(), p.getY() + 2, p.getZ(), 10, 1.5, 0.8, 1.5, 0.05);
             }
             if (remaining <= 200L && remaining > 160L) {
                broadcast(server, "§7§oThe " + displayName(activeEvent) + "§7§o is fading...");
@@ -435,7 +435,7 @@ public final class ServerDisasterManager {
             clearEventSkies(server);
             // Big ending broadcast with effects
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-               p.level().sendParticles(ParticleTypes.FIREWORK, p.getX(), p.getY() + 1, p.getZ(), 30, 1.0, 1.0, 1.0, 0.1);
+               com.fortuneandfavors.net.FfVfx.particles(p.level(), ParticleTypes.FIREWORK, p.getX(), p.getY() + 1, p.getZ(), 30, 1.0, 1.0, 1.0, 0.1);
                p.level().playSound(null, p.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 0.8F, 1.0F);
             }
             broadcast(server, "§8§m──────────────────────────§r");
@@ -812,14 +812,14 @@ public final class ServerDisasterManager {
 
             // The main fall, twice as thick as it was. One send carries the count, so this is
             // the same one packet for nearly double the flakes.
-            level.sendParticles(
+            com.fortuneandfavors.net.FfVfx.particles(level, 
                ParticleTypes.SNOWFLAKE, x + wx * 0.5, y, z + wz * 0.5, SNOWSTORM_FLAKE_COUNT, SNOWSTORM_FLAKE_SPREAD, 5.0, SNOWSTORM_FLAKE_SPREAD, 0.02
             );
             // A subzero area gets a second, denser blanket on top of the same one packet, so
             // the worst of the storm is also the one you can see: white-out where the cold is
             // instantly lethal, ordinary snowfall everywhere else.
             if (subzero) {
-               level.sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(level, 
                   ParticleTypes.SNOWFLAKE,
                   x + wx * 0.25,
                   y + 2.0,
@@ -830,14 +830,14 @@ public final class ServerDisasterManager {
                   SNOWSTORM_FLAKE_SPREAD + 4.0,
                   0.04
                );
-               level.sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(level, 
                   ParticleTypes.WHITE_ASH, x, y - 1.0, z, SNOWSTORM_FLAKE_COUNT, SNOWSTORM_FLAKE_SPREAD, 2.0, SNOWSTORM_FLAKE_SPREAD, 0.01
                );
             }
             // Fine ash above it: the layer that reads as distance, and the only one that looks
             // like driving snow rather than falling snow. Every other cycle now.
             if (now % (SNOWSTORM_FLAKE_EVERY * 2L) == 0L) {
-               level.sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(level, 
                   ParticleTypes.WHITE_ASH,
                   x + wx,
                   y + 6.0,
@@ -852,7 +852,7 @@ public final class ServerDisasterManager {
             // A ground layer just above the feet: drifting snow along the floor, which is what
             // makes the storm feel like weather in the room rather than a filter on the screen.
             if (now % (SNOWSTORM_FLAKE_EVERY * 4L) == 0L) {
-               level.sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(level, 
                   ParticleTypes.SNOWFLAKE,
                   x + wx,
                   p.getY() + 0.4,
@@ -867,7 +867,7 @@ public final class ServerDisasterManager {
             // And a gust every three seconds, a wall of flakes arriving from upwind. Batched,
             // so the whole burst is one packet.
             if (now % 60L == 0L) {
-               level.sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(level, 
                   ParticleTypes.SNOWFLAKE,
                   x - wx * 3.0,
                   p.getY() + 3.0,
@@ -878,7 +878,7 @@ public final class ServerDisasterManager {
                   SNOWSTORM_FLAKE_SPREAD * 0.8,
                   0.35
                );
-               level.sendParticles(ParticleTypes.WHITE_ASH, x - wx * 3.0, p.getY() + 2.0, z - wz * 3.0, 12, 6.0, 2.0, 6.0, 0.25);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.WHITE_ASH, x - wx * 3.0, p.getY() + 2.0, z - wz * 3.0, 12, 6.0, 2.0, 6.0, 0.25);
             }
          } catch (Throwable ignored) {
          }
@@ -1011,7 +1011,7 @@ public final class ServerDisasterManager {
                if (!STORM_ICE.containsKey(new CoverKey(level.dimension(), ground))) {
                   STORM_ICE.put(new CoverKey(level.dimension(), ground), below);
                   level.setBlock(ground, Blocks.ICE.defaultBlockState(), 3);
-                  level.sendParticles(ParticleTypes.SNOWFLAKE, x + 0.5, top + 0.2, z + 0.5, 2, 0.3, 0.1, 0.3, 0.01);
+                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SNOWFLAKE, x + 0.5, top + 0.2, z + 0.5, 2, 0.3, 0.1, 0.3, 0.01);
                   budget--;
                }
                continue;
@@ -1167,7 +1167,7 @@ public final class ServerDisasterManager {
                   SNOW_MOB_FROZEN.put(id, now);
                   if (now % 40L == 0L) {
                      mob.hurtServer(level, level.damageSources().freeze(), 1.0F);
-                     level.sendParticles(ParticleTypes.SNOWFLAKE, mob.getX(), mob.getY() + 1.0, mob.getZ(), 6, 0.4, 0.5, 0.4, 0.02);
+                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SNOWFLAKE, mob.getX(), mob.getY() + 1.0, mob.getZ(), 6, 0.4, 0.5, 0.4, 0.02);
                   }
                }
             }
@@ -1470,7 +1470,7 @@ public final class ServerDisasterManager {
             for (int i = 0; i < 6; i++) {
                double a = RANDOM.nextDouble() * Math.PI * 2.0;
                double r = 2.0 + RANDOM.nextDouble() * 3.0;
-               level.sendParticles(ParticleTypes.CRIMSON_SPORE, x + Math.cos(a) * r, y + 1.0 + RANDOM.nextDouble() * 2.0, z + Math.sin(a) * r, 2, 0.2, 0.3, 0.2, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIMSON_SPORE, x + Math.cos(a) * r, y + 1.0 + RANDOM.nextDouble() * 2.0, z + Math.sin(a) * r, 2, 0.2, 0.3, 0.2, 0.02);
             }
       } else if (ev.equals(SNOWSTORM)) {
          // Deliberately empty: the storm draws its own snow in
@@ -1480,38 +1480,38 @@ public final class ServerDisasterManager {
       } else if (ev.equals(MINING_COLLAPSE)) {
          // Falling stone particles
          for (int i = 0; i < 4; i++) {
-            level.sendParticles(ParticleTypes.CRIT, x + (RANDOM.nextDouble() - 0.5) * 8, y + 4.0 + RANDOM.nextDouble() * 3.0, z + (RANDOM.nextDouble() - 0.5) * 8, 1, 0.5, 0.1, 0.5, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, x + (RANDOM.nextDouble() - 0.5) * 8, y + 4.0 + RANDOM.nextDouble() * 3.0, z + (RANDOM.nextDouble() - 0.5) * 8, 1, 0.5, 0.1, 0.5, 0.0);
          }
       } else if (ev.equals(MERCHANT_FESTIVAL)) {
          // Happy villager / heart particles (golden aura)
          for (int i = 0; i < 4; i++) {
             double a = RANDOM.nextDouble() * Math.PI * 2.0;
             double r = 1.5 + RANDOM.nextDouble() * 2.0;
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, x + Math.cos(a) * r, y + 1.5, z + Math.sin(a) * r, 1, 0.2, 0.2, 0.2, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, x + Math.cos(a) * r, y + 1.5, z + Math.sin(a) * r, 1, 0.2, 0.2, 0.2, 0.02);
          }
          // Occasional note particle
          if (RANDOM.nextInt(3) == 0) {
-            level.sendParticles(ParticleTypes.NOTE, x, y + 2.0, z, 1, 0.5, 0.3, 0.5, 1.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.NOTE, x, y + 2.0, z, 1, 0.5, 0.3, 0.5, 1.0);
          }
       } else if (ev.equals(MONSTER_INVASION)) {
          // Angry villager + large smoke particles (ominous aura)
          for (int i = 0; i < 5; i++) {
             double a = RANDOM.nextDouble() * Math.PI * 2.0;
             double r = 3.0 + RANDOM.nextDouble() * 4.0;
-            level.sendParticles(ParticleTypes.ANGRY_VILLAGER, x + Math.cos(a) * r, y + 1.5, z + Math.sin(a) * r, 1, 0.3, 0.3, 0.3, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ANGRY_VILLAGER, x + Math.cos(a) * r, y + 1.5, z + Math.sin(a) * r, 1, 0.3, 0.3, 0.3, 0.02);
          }
-         level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + 0.5, z, 3, 1.5, 0.5, 1.5, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, x, y + 0.5, z, 3, 1.5, 0.5, 1.5, 0.01);
       } else if (ev.equals(GOLD_RUSH)) {
          // Sparkling gold particles
          for (int i = 0; i < 6; i++) {
             double a = RANDOM.nextDouble() * Math.PI * 2.0;
             double r = 1.0 + RANDOM.nextDouble() * 4.0;
-            level.sendParticles(ParticleTypes.END_ROD, x + Math.cos(a) * r, y + 0.5 + RANDOM.nextDouble() * 3.0, z + Math.sin(a) * r, 1, 0.1, 0.1, 0.1, 0.03);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x + Math.cos(a) * r, y + 0.5 + RANDOM.nextDouble() * 3.0, z + Math.sin(a) * r, 1, 0.1, 0.1, 0.1, 0.03);
          }
       } else if (ev.equals(THUNDERSTORM)) {
          // Electric / enchant particles
          for (int i = 0; i < 4; i++) {
-            level.sendParticles(ParticleTypes.ENCHANT, x + (RANDOM.nextDouble() - 0.5) * 6, y + 1.0 + RANDOM.nextDouble() * 3.0, z + (RANDOM.nextDouble() - 0.5) * 6, 2, 0.5, 0.5, 0.5, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, x + (RANDOM.nextDouble() - 0.5) * 6, y + 1.0 + RANDOM.nextDouble() * 3.0, z + (RANDOM.nextDouble() - 0.5) * 6, 2, 0.5, 0.5, 0.5, 0.05);
          }
          // Occasional lightning strike nearby
          if (RANDOM.nextInt(60) == 0) {
@@ -1528,27 +1528,27 @@ public final class ServerDisasterManager {
          for (int i = 0; i < 6; i++) {
             double a = RANDOM.nextDouble() * Math.PI * 2.0;
             double r = 2.0 + RANDOM.nextDouble() * 5.0;
-            level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x + Math.cos(a) * r, y + 1.0, z + Math.sin(a) * r, 2, 0.3, 0.4, 0.3, 0.02);
-            level.sendParticles(ParticleTypes.SOUL, x + Math.cos(a) * r, y + 1.5, z + Math.sin(a) * r, 1, 0.1, 0.1, 0.1, 0.01);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, x + Math.cos(a) * r, y + 1.0, z + Math.sin(a) * r, 2, 0.3, 0.4, 0.3, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, x + Math.cos(a) * r, y + 1.5, z + Math.sin(a) * r, 1, 0.1, 0.1, 0.1, 0.01);
          }
       } else if (ev.equals(XP_FRENZY)) {
          // Learning sparks: enchant glyphs spiralling upward in a tight spiral.
          double t = (level.getGameTime() % 60L) / 60.0 * Math.PI * 2.0;
          for (int i = 0; i < 3; i++) {
             double a = t + i * (Math.PI * 2.0 / 3.0);
-            level.sendParticles(ParticleTypes.ENCHANT, x + Math.cos(a) * 1.4, y + 0.6 + i * 0.5, z + Math.sin(a) * 1.4, 3, 0.15, 0.2, 0.15, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, x + Math.cos(a) * 1.4, y + 0.6 + i * 0.5, z + Math.sin(a) * 1.4, 3, 0.15, 0.2, 0.15, 0.02);
          }
          if (RANDOM.nextInt(4) == 0) {
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, x, y + 1.8, z, 2, 0.6, 0.4, 0.6, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, x, y + 1.8, z, 2, 0.6, 0.4, 0.6, 0.0);
          }
       } else if (ev.equals(PHANTOM_SWARM)) {
          // Wing shimmer above the player, plus a low drift of ash.
          for (int i = 0; i < 5; i++) {
             double a = RANDOM.nextDouble() * Math.PI * 2.0;
             double r = 3.0 + RANDOM.nextDouble() * 4.0;
-            level.sendParticles(ParticleTypes.WITCH, x + Math.cos(a) * r, y + 3.0 + RANDOM.nextDouble() * 2.0, z + Math.sin(a) * r, 1, 0.2, 0.2, 0.2, 0.01);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.WITCH, x + Math.cos(a) * r, y + 3.0 + RANDOM.nextDouble() * 2.0, z + Math.sin(a) * r, 1, 0.2, 0.2, 0.2, 0.01);
          }
-         level.sendParticles(ParticleTypes.ASH, x, y + 1.0, z, 4, 3.0, 1.5, 3.0, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ASH, x, y + 1.0, z, 4, 3.0, 1.5, 3.0, 0.01);
       }
    }
 
@@ -1700,27 +1700,27 @@ public final class ServerDisasterManager {
             for (int i = 0; i < 30; i++) {
                double a = RANDOM.nextDouble() * Math.PI * 2.0;
                double r = 2.0 + RANDOM.nextDouble() * 5.0;
-               lvl.sendParticles(ParticleTypes.PORTAL, p.getX() + Math.cos(a) * r, p.getY() + 1.0, p.getZ() + Math.sin(a) * r, 3, 0.5, 1.0, 0.5, 0.3);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.PORTAL, p.getX() + Math.cos(a) * r, p.getY() + 1.0, p.getZ() + Math.sin(a) * r, 3, 0.5, 1.0, 0.5, 0.3);
             }
             // Type-specific startup particles
             if (key.equals(BLOOD_MOON)) {
-               lvl.sendParticles(ParticleTypes.CRIMSON_SPORE, p.getX(), p.getY() + 1, p.getZ(), 40, 2.0, 1.5, 2.0, 0.1);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.CRIMSON_SPORE, p.getX(), p.getY() + 1, p.getZ(), 40, 2.0, 1.5, 2.0, 0.1);
             } else if (key.equals(GOLD_RUSH)) {
-               lvl.sendParticles(ParticleTypes.END_ROD, p.getX(), p.getY() + 1, p.getZ(), 40, 2.0, 1.5, 2.0, 0.1);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.END_ROD, p.getX(), p.getY() + 1, p.getZ(), 40, 2.0, 1.5, 2.0, 0.1);
             } else if (key.equals(MONSTER_INVASION) || key.equals(DOUBLE_TROUBLE)) {
-               lvl.sendParticles(ParticleTypes.LARGE_SMOKE, p.getX(), p.getY() + 0.5, p.getZ(), 20, 3.0, 0.5, 3.0, 0.05);
-               lvl.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, p.getX(), p.getY() + 1.5, p.getZ(), 15, 2.0, 1.0, 2.0, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.LARGE_SMOKE, p.getX(), p.getY() + 0.5, p.getZ(), 20, 3.0, 0.5, 3.0, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.SOUL_FIRE_FLAME, p.getX(), p.getY() + 1.5, p.getZ(), 15, 2.0, 1.0, 2.0, 0.05);
             } else if (key.equals(MERCHANT_FESTIVAL)) {
-               lvl.sendParticles(ParticleTypes.HAPPY_VILLAGER, p.getX(), p.getY() + 1, p.getZ(), 30, 2.0, 1.5, 2.0, 0.05);
-               lvl.sendParticles(ParticleTypes.NOTE, p.getX(), p.getY() + 2, p.getZ(), 10, 1.5, 0.5, 1.5, 1.0);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.HAPPY_VILLAGER, p.getX(), p.getY() + 1, p.getZ(), 30, 2.0, 1.5, 2.0, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.NOTE, p.getX(), p.getY() + 2, p.getZ(), 10, 1.5, 0.5, 1.5, 1.0);
             } else if (key.equals(THUNDERSTORM)) {
-               lvl.sendParticles(ParticleTypes.ENCHANT, p.getX(), p.getY() + 1, p.getZ(), 40, 2.0, 2.0, 2.0, 0.1);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.ENCHANT, p.getX(), p.getY() + 1, p.getZ(), 40, 2.0, 2.0, 2.0, 0.1);
             } else if (key.equals(XP_FRENZY)) {
-               lvl.sendParticles(ParticleTypes.ENCHANT, p.getX(), p.getY() + 1, p.getZ(), 60, 1.5, 1.5, 1.5, 0.4);
-               lvl.sendParticles(ParticleTypes.HAPPY_VILLAGER, p.getX(), p.getY() + 1, p.getZ(), 20, 2.0, 1.5, 2.0, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.ENCHANT, p.getX(), p.getY() + 1, p.getZ(), 60, 1.5, 1.5, 1.5, 0.4);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.HAPPY_VILLAGER, p.getX(), p.getY() + 1, p.getZ(), 20, 2.0, 1.5, 2.0, 0.05);
             } else if (key.equals(PHANTOM_SWARM)) {
-               lvl.sendParticles(ParticleTypes.WITCH, p.getX(), p.getY() + 2, p.getZ(), 40, 3.0, 2.0, 3.0, 0.05);
-               lvl.sendParticles(ParticleTypes.ASH, p.getX(), p.getY() + 1, p.getZ(), 50, 3.0, 1.0, 3.0, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.WITCH, p.getX(), p.getY() + 2, p.getZ(), 40, 3.0, 2.0, 3.0, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(lvl, ParticleTypes.ASH, p.getX(), p.getY() + 1, p.getZ(), 50, 3.0, 1.0, 3.0, 0.02);
             }
          }
       }
@@ -1765,7 +1765,7 @@ public final class ServerDisasterManager {
       // Ending effects
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
          p.level().playSound(null, p.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 0.8F, 1.0F);
-         p.level().sendParticles(ParticleTypes.FIREWORK, p.getX(), p.getY() + 1, p.getZ(), 30, 1.0, 1.0, 1.0, 0.1);
+         com.fortuneandfavors.net.FfVfx.particles(p.level(), ParticleTypes.FIREWORK, p.getX(), p.getY() + 1, p.getZ(), 30, 1.0, 1.0, 1.0, 0.1);
       }
 
       broadcast(server, "§8§m──────────────────────────§r");
@@ -2132,12 +2132,12 @@ public final class ServerDisasterManager {
             m.body.setPos(x, y, z);
          }
 
-         m.level.sendParticles(ParticleTypes.FLAME, x, y, z, 14, 0.7, 0.7, 0.7, 0.06);
-         m.level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y, z, 8, 0.8, 0.8, 0.8, 0.03);
-         m.level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x, y, z, 6, 0.5, 0.5, 0.5, 0.04);
+         com.fortuneandfavors.net.FfVfx.particles(m.level, ParticleTypes.FLAME, x, y, z, 14, 0.7, 0.7, 0.7, 0.06);
+         com.fortuneandfavors.net.FfVfx.particles(m.level, ParticleTypes.LARGE_SMOKE, x, y, z, 8, 0.8, 0.8, 0.8, 0.03);
+         com.fortuneandfavors.net.FfVfx.particles(m.level, ParticleTypes.SOUL_FIRE_FLAME, x, y, z, 6, 0.5, 0.5, 0.5, 0.04);
 
          if (m.age % 6 == 0) {
-            m.level.sendParticles(ParticleTypes.EXPLOSION, x, y, z, 1, 0.1, 0.1, 0.1, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(m.level, ParticleTypes.EXPLOSION, x, y, z, 1, 0.1, 0.1, 0.1, 0.0);
             m.level.playSound(null, x, y, z, SoundEvents.FIREWORK_ROCKET_BLAST, SoundSource.WEATHER, 1.4F, 0.6F);
          }
 
@@ -2212,7 +2212,7 @@ public final class ServerDisasterManager {
       level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE, SoundSource.WEATHER, 2.0F, 0.5F);
       level.playSound(null, x, y, z, SoundEvents.DRAGON_FIREBALL_EXPLODE, SoundSource.WEATHER, 1.4F, 0.6F);
       level.playSound(null, x, y, z, SoundEvents.FIREWORK_ROCKET_LARGE_BLAST, SoundSource.WEATHER, 1.6F, 0.4F);
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, x, y + 1.0, z, 3, 1.5, 0.6, 1.5, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, x, y + 1.0, z, 3, 1.5, 0.6, 1.5, 0.0);
 
       // The shockwave: rings on the ground and a column of it going up, both of which are
       // what a player on the other side of the hill actually notices.
@@ -2220,12 +2220,12 @@ public final class ServerDisasterManager {
          double r = 3.0 + ring * 3.0;
          for (int i = 0; i < 48; i++) {
             double angle = i / 48.0 * Math.PI * 2.0;
-            level.sendParticles(
+            com.fortuneandfavors.net.FfVfx.particles(level, 
                ParticleTypes.LARGE_SMOKE, x + Math.cos(angle) * r, y + 0.3, z + Math.sin(angle) * r,
                1, 0.2, 0.1, 0.2, 0.01
             );
             if (ring == 0) {
-               level.sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(level, 
                   ParticleTypes.FLAME, x + Math.cos(angle) * r, y + 0.3, z + Math.sin(angle) * r, 1, 0.1, 0.1, 0.1, 0.02
                );
             }
@@ -2234,8 +2234,8 @@ public final class ServerDisasterManager {
 
       for (int i = 0; i < 36; i++) {
          double t = i / 36.0;
-         level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + t * 14.0, z, 3, 0.8, 0.5, 0.8, 0.02);
-         level.sendParticles(ParticleTypes.FLAME, x, y + t * 10.0, z, 2, 0.6, 0.4, 0.6, 0.03);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, x, y + t * 14.0, z, 3, 0.8, 0.5, 0.8, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.FLAME, x, y + t * 10.0, z, 2, 0.6, 0.4, 0.6, 0.03);
       }
 
       // Loot, in the hole: what a meteor is worth walking for.
@@ -2267,10 +2267,10 @@ public final class ServerDisasterManager {
          double x = p.getX() + (RANDOM.nextDouble() - 0.5) * 46.0;
          double z = p.getZ() + (RANDOM.nextDouble() - 0.5) * 46.0;
          double y = base + RANDOM.nextDouble() * 14.0;
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             new net.minecraft.core.particles.DustParticleOptions(0x5CF2A0, 1.6F), x, y, z, 1, 2.4, 0.4, 2.4, 0.005
          );
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             new net.minecraft.core.particles.DustParticleOptions(0xB47CF2, 1.2F), x, y - 2.0, z, 1, 2.0, 0.3, 2.0, 0.005
          );
       }
@@ -2351,7 +2351,7 @@ public final class ServerDisasterManager {
                mob.setHealth(mob.getMaxHealth());
                level.addFreshEntity(mob);
                // Particle effect on spawn
-               level.sendParticles(ParticleTypes.SMOKE, mob.getX(), mob.getY() + 0.5, mob.getZ(), 8, 0.3, 0.5, 0.3, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMOKE, mob.getX(), mob.getY() + 0.5, mob.getZ(), 8, 0.3, 0.5, 0.3, 0.02);
                RareMobVariantManager.apply(mob);
             }
          }
@@ -2393,7 +2393,7 @@ public final class ServerDisasterManager {
                phantom.setPos(x, Math.max(surface, p.getY()) + 6.0, z);
                phantom.setPersistenceRequired();
                level.addFreshEntity(phantom);
-               level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, phantom.getX(), phantom.getY(), phantom.getZ(), 6, 0.3, 0.3, 0.3, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, phantom.getX(), phantom.getY(), phantom.getZ(), 6, 0.3, 0.3, 0.3, 0.02);
                RareMobVariantManager.apply(phantom);
             }
          }

@@ -767,6 +767,8 @@ public final class ScarletDevilManager {
 
    /** Burns her sigil under every fighter; a lance of blood drops on each a beat and a half later. */
    private static void brand(ServerLevel level, Mob boss, Fight fight, long now) {
+      // Her sigil turns under her as she brands - a ring of crimson runes on the floor.
+      Fx.crimsonSigil(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 0.05, 0.0), 3.2, 40, CRIMSON);
       int marked = 0;
       for (UUID id : fight.participants) {
          ServerPlayer p = level.getServer().getPlayerList().getPlayer(id);
@@ -838,6 +840,9 @@ public final class ScarletDevilManager {
       if (target.distanceToSqr(boss) > PACT_BREAK * PACT_BREAK) {
          return;
       }
+      // The pact is sealed in a sigil under the victim and a chain of blood between them.
+      Fx.crimsonSigil(level, ParticleTypes.CRIMSON_SPORE, target.position().add(0.0, 0.05, 0.0), 1.6, 60, MOON);
+      Fx.chains(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 1.4, 0.0), target.position().add(0.0, 1.0, 0.0), CRIMSON);
       fight.pactTarget = target.getUUID();
       fight.pactTicks = PACT_TICKS;
       announce(level, SAY + "\"\u00a7fShare a little.\u00a7f\"");
@@ -887,6 +892,7 @@ public final class ScarletDevilManager {
     * backwards through it work just as well as timing it.
     */
    private static void startTide(ServerLevel level, Mob boss, Fight fight) {
+      Fx.bloodSplash(level, ParticleTypes.CRIMSON_SPORE, boss.position(), new Vec3(0.0, 1.0, 0.0), 2.4, CRIMSON);
       fight.nextTide = ServerClock.clock(level) + TIDE_COOLDOWN;
       fight.tideWaves = TIDE_WAVES;
       fight.tideRadius = 1.2;
@@ -977,6 +983,8 @@ public final class ScarletDevilManager {
    // ------------------------------------------------------------- blood rain
 
    private static void startBloodRain(ServerLevel level, Mob boss, Fight fight) {
+      // The blood moon rises for the length of the rain.
+      Fx.bloodMoon(level, ParticleTypes.CRIMSON_SPORE, boss.position(), 6.0, (int)RAIN_TICKS, MOON);
       fight.rainUntil = ServerClock.clock(level) + RAIN_TICKS;
       fight.nextRain = ServerClock.clock(level) + RAIN_COOLDOWN + RAIN_TICKS;
       fight.nextRainPulse = ServerClock.clock(level);

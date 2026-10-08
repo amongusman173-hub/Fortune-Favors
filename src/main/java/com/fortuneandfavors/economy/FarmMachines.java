@@ -120,7 +120,7 @@ public final class FarmMachines {
          }
       }
       if (planted > 0) {
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 8, 0.5, 0.3, 0.5, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 8, 0.5, 0.3, 0.5, 0.01);
          level.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 0.5F, 0.8F);
       }
    }
@@ -150,7 +150,7 @@ public final class FarmMachines {
          }
       }
       if (cut > 0) {
-         level.sendParticles(ParticleTypes.CRIT, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 10, 0.5, 0.4, 0.5, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 10, 0.5, 0.4, 0.5, 0.05);
          collect(level, pos, owner);
       }
    }
@@ -212,7 +212,7 @@ public final class FarmMachines {
       double y = pos.getY() + 1.1;
       double z = pos.getZ() + 0.5;
       for (int i = 0; i < 4; i++) {
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             ParticleTypes.SPLASH,
             x + (level.getRandom().nextDouble() - 0.5) * SPRINKLER_RADIUS,
             pos.getY() + 1.6,
@@ -220,7 +220,7 @@ public final class FarmMachines {
             1, 0.2, 0.1, 0.2, 0.0
          );
       }
-      level.sendParticles(ParticleTypes.DRIPPING_WATER, x, y, z, 2, 0.25, 0.1, 0.25, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.DRIPPING_WATER, x, y, z, 2, 0.25, 0.1, 0.25, 0.0);
       if (any && level.getGameTime() % 60L == 0L) {
          level.playSound(null, x, pos.getY() + 0.5, z, SoundEvents.WATER_AMBIENT, SoundSource.BLOCKS, 0.4F, 1.6F);
       }
@@ -246,7 +246,7 @@ public final class FarmMachines {
          int now = (Integer)state.getValue(age);
          if (now < crop.getMaxAge()) {
             level.setBlock(p, state.setValue(age, now + 1), 2);
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, p.getX() + 0.5, p.getY() + 0.4, p.getZ() + 0.5, 2, 0.2, 0.2, 0.2, 0.01);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, p.getX() + 0.5, p.getY() + 0.4, p.getZ() + 0.5, 2, 0.2, 0.2, 0.2, 0.01);
             return true;
          }
          return false;

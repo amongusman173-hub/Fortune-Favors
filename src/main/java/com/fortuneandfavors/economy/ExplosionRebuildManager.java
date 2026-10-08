@@ -426,7 +426,7 @@ public final class ExplosionRebuildManager {
                p.setPos(tx, ty, tz);
                p.hurtMarked = true;
                p.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 160, 0, false, false));
-               level.sendParticles(ParticleTypes.CLOUD, p.getX(), p.getY() + 0.5, p.getZ(), 14, 0.5, 0.3, 0.5, 0.06);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CLOUD, p.getX(), p.getY() + 0.5, p.getZ(), 14, 0.5, 0.3, 0.5, 0.06);
             }
          }
       } catch (Exception var20) {
@@ -479,7 +479,7 @@ public final class ExplosionRebuildManager {
       double x = pos.getX() + 0.5;
       double y = pos.getY() + 0.5;
       double z = pos.getZ() + 0.5;
-      level.sendParticles(ParticleTypes.END_ROD, x, y, z, 1, 0.3, 0.3, 0.3, 0.04);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x, y, z, 1, 0.3, 0.3, 0.3, 0.04);
       if (RANDOM.nextInt(15) == 0) {
          level.playSound(null, pos, SoundEvents.ENCHANTMENT_TABLE_USE, SoundSource.BLOCKS, 0.2F, 1.4F);
       }
@@ -501,7 +501,7 @@ public final class ExplosionRebuildManager {
                      p.teleportTo(p.getX(), surfaceY, p.getZ());
                      p.setDeltaMovement(0.0, 0.5, 0.0);
                      p.hurtMarked = true;
-                     level.sendParticles(ParticleTypes.CLOUD, p.getX(), p.getY() + 0.5, p.getZ(), 10, 0.5, 0.3, 0.5, 0.06);
+                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CLOUD, p.getX(), p.getY() + 0.5, p.getZ(), 10, 0.5, 0.3, 0.5, 0.06);
                      break;
                   }
                }

@@ -321,6 +321,6 @@ public final class CosmeticManager {
       double px = p.getX() + (RANDOM.nextDouble() - 0.5) * 1.2;
       double py = p.getY() + RANDOM.nextDouble() * 1.6;
       double pz = p.getZ() + (RANDOM.nextDouble() - 0.5) * 1.2;
-      p.level().sendParticles(particle, px, py, pz, 1, 0.1, 0.1, 0.1, 0.01);
+      com.fortuneandfavors.net.FfVfx.particles(p.level(), particle, px, py, pz, 1, 0.1, 0.1, 0.1, 0.01);
    }
 }

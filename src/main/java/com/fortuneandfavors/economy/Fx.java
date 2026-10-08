@@ -464,4 +464,46 @@ public final class Fx {
    private static void burst(ServerLevel level, ParticleOptions p, Vec3 at, double spread, int count) {
       FfVfx.particles(level, p, at.x, at.y, at.z, Math.max(1, Math.min(MAX_FALLBACK, count)), spread, spread, spread, 0.04);
    }
+
+   // ------------------------------------------------------------------ templates 128-137
+
+   public static void bloodMoon(ServerLevel level, ParticleOptions p, Vec3 under, double radius, int ticks, int color) {
+      shape(level, FxKinds.BLOOD_MOON, p, under, Vec3.ZERO, radius, ticks, color);
+   }
+
+   public static void crimsonSigil(ServerLevel level, ParticleOptions p, Vec3 center, double radius, int ticks, int color) {
+      shape(level, FxKinds.CRIMSON_SIGIL, p, center, Vec3.ZERO, radius, ticks, color);
+   }
+
+   public static void whirlpool(ServerLevel level, ParticleOptions p, Vec3 center, double radius, int ticks, int color) {
+      shape(level, FxKinds.WHIRLPOOL, p, center, Vec3.ZERO, radius, ticks, color);
+   }
+
+   public static void tentacle(ServerLevel level, ParticleOptions p, Vec3 base, double height, int ticks, int color) {
+      shape(level, FxKinds.TENTACLE, p, base, Vec3.ZERO, height, ticks, color);
+   }
+
+   public static void stormCell(ServerLevel level, ParticleOptions p, Vec3 ground, double radius, int ticks, int color) {
+      shape(level, FxKinds.STORM_CELL, p, ground, Vec3.ZERO, radius, ticks, color);
+   }
+
+   public static void featherStorm(ServerLevel level, ParticleOptions p, Vec3 center, double radius, int ticks, int color) {
+      shape(level, FxKinds.FEATHER_STORM, p, center, Vec3.ZERO, radius, ticks, color);
+   }
+
+   public static void cogBurst(ServerLevel level, ParticleOptions p, Vec3 at, double size, int color) {
+      shape(level, FxKinds.COG_BURST, p, at, Vec3.ZERO, size, 0.0, color);
+   }
+
+   public static void gemRain(ServerLevel level, ParticleOptions p, Vec3 center, double radius, int ticks, int color) {
+      shape(level, FxKinds.GEM_RAIN, p, center, Vec3.ZERO, radius, ticks, color);
+   }
+
+   public static void starTrail(ServerLevel level, ParticleOptions p, Vec3 center, double radius, int ticks, int color) {
+      shape(level, FxKinds.STAR_TRAIL, p, center, Vec3.ZERO, radius, ticks, color);
+   }
+
+   public static void soulPillar(ServerLevel level, ParticleOptions p, Vec3 base, double height, int ticks, int color) {
+      shape(level, FxKinds.SOUL_PILLAR, p, base, Vec3.ZERO, height, ticks, color);
+   }
 }

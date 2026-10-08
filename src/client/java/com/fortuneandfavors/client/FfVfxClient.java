@@ -252,6 +252,11 @@ public final class FfVfxClient {
                case FxKinds.SCULK_BLOOM, FxKinds.SOUL_STREAM, FxKinds.GEAR_SPIN, FxKinds.STARFALL, FxKinds.THREADS ->
                   start(level, c, Math.max(6, Math.min(400, (int)c.b())), true);
                case FxKinds.TIDE_WAVE, FxKinds.SONIC_RING -> start(level, c, Math.max(8, Math.min(80, (int)c.b())), true);
+               // Templates 128-137.
+               case FxKinds.BLOOD_MOON, FxKinds.CRIMSON_SIGIL, FxKinds.WHIRLPOOL, FxKinds.TENTACLE, FxKinds.STORM_CELL,
+                  FxKinds.FEATHER_STORM, FxKinds.GEM_RAIN, FxKinds.STAR_TRAIL, FxKinds.SOUL_PILLAR ->
+                  start(level, c, Math.max(6, Math.min(400, (int)c.b())), true);
+               case FxKinds.COG_BURST -> cogBurst(level, c);
                case FxKinds.GUST -> start(level, c, 16, true);
                case FxKinds.GEM_SHARDS -> start(level, c, 20, true);
                case FxKinds.BLOOD_SPLASH -> start(level, c, 22, false);
@@ -332,6 +337,15 @@ public final class FfVfxClient {
          case FxKinds.VOID_COLLAPSE -> voidCollapse(level, l);
          case FxKinds.RIFT_PORTAL -> riftPortal(level, l);
          case FxKinds.SONIC_RING -> sonicRing(level, l);
+         case FxKinds.BLOOD_MOON -> bloodMoon(level, l);
+         case FxKinds.CRIMSON_SIGIL -> crimsonSigil(level, l);
+         case FxKinds.WHIRLPOOL -> whirlpool(level, l);
+         case FxKinds.TENTACLE -> tentacle(level, l);
+         case FxKinds.STORM_CELL -> stormCell(level, l);
+         case FxKinds.FEATHER_STORM -> featherStorm(level, l);
+         case FxKinds.GEM_RAIN -> gemRain(level, l);
+         case FxKinds.STAR_TRAIL -> starTrail(level, l);
+         case FxKinds.SOUL_PILLAR -> soulPillar(level, l);
          default -> {
          }
       }
@@ -2043,6 +2057,164 @@ public final class FfVfxClient {
       flash(level, c.x(), c.y(), c.z(), rgb, s * 1.6F);
       p(level, Tex.FLARE, WHITE, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, s, 8, 1.4F, 0.1F, 1.0F);
       p(level, Tex.RING, rgb, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, s * 0.6F, 10, s * 2.4F, 0.0F, 0.8F);
+   }
+
+   // ------------------------------------------------------------------ templates 128-137
+
+   /** BLOOD_MOON: a crimson halo hung overhead, blood dripping from it, bats of shadow circling under it. */
+   private static void bloodMoon(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      RandomSource r = level.getRandom();
+      double y = c.y() + 7.0, rad = Math.max(1.0, c.a());
+      if (l.age % 4 == 0) {
+         p(level, Tex.RING, c.color(), c.x(), y, c.z(), 0.0, 0.0, 0.0, (float)rad * 0.8F, 6, 1.05F, 0.0F, 1.0F, 0.8F);
+         p(level, Tex.GLOW, 0x400008, c.x(), y, c.z(), 0.0, 0.0, 0.0, (float)rad * 0.7F, 6, 1.0F, 0.0F, 1.0F, 0.6F);
+      }
+      for (int i = 0; i < 3; i++) {
+         double a = r.nextDouble() * Math.PI * 2.0, d = r.nextDouble() * rad;
+         p(level, Tex.DROPLET, c.color(), c.x() + Math.cos(a) * d, y, c.z() + Math.sin(a) * d, 0.0, -0.35, 0.0, 0.18F, 22, 0.8F, 0.0F, 1.0F);
+      }
+      double a = l.age * 0.2;
+      p(level, Tex.WISP, 0x1A0008, c.x() + Math.cos(a) * rad * 0.6, y - 2.0, c.z() + Math.sin(a) * rad * 0.6, -Math.sin(a) * 0.2, 0.0, Math.cos(a) * 0.2, 0.4F, 8, 0.6F, 0.2F, 0.95F);
+   }
+
+   /** CRIMSON_SIGIL: a turning ring of runes on the ground, sigils flaring at its points. */
+   private static void crimsonSigil(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      double rad = Math.max(0.8, c.a()), spin = l.age * 0.06;
+      int n = Math.max(8, (int)(rad * 5));
+      if ((l.age & 1) == 0) {
+         for (int i = 0; i < n; i++) {
+            double a = spin + Math.PI * 2.0 * i / n;
+            p(level, i % 4 == 0 ? Tex.HEXRUNE : Tex.RUNE2, c.color(), c.x() + Math.cos(a) * rad, c.y() + 0.1, c.z() + Math.sin(a) * rad, 0.0, 0.0, 0.0, i % 4 == 0 ? 0.4F : 0.2F, 3, 1.0F, 0.0F, 1.0F);
+         }
+      }
+      if (l.age % 10 == 0) {
+         p(level, Tex.RING, c.color(), c.x(), c.y() + 0.1, c.z(), 0.0, 0.0, 0.0, (float)rad * 0.4F, 10, 5.0F, 0.0F, 1.0F, 0.6F);
+      }
+   }
+
+   /** WHIRLPOOL: water spiralling in and down, foam on the rim, a dark eye at the heart. */
+   private static void whirlpool(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      double rad = Math.max(1.0, c.a());
+      for (int i = 0; i < 6; i++) {
+         double a = l.age * 0.3 + i * Math.PI / 3.0, d = rad * (0.3 + 0.7 * ((l.age + i * 3) % 12) / 12.0);
+         double x = c.x() + Math.cos(a) * d, z = c.z() + Math.sin(a) * d;
+         p(level, i % 2 == 0 ? Tex.DROPLET : Tex.BUBBLE, i % 3 == 0 ? WHITE : c.color(), x, c.y() + 0.15, z, -Math.sin(a) * 0.25 - Math.cos(a) * 0.06, -0.01, Math.cos(a) * 0.25 - Math.sin(a) * 0.06, 0.2F, 8, 0.6F, 0.2F, 0.9F);
+      }
+      if ((l.age & 3) == 0) {
+         p(level, Tex.GLOW, 0x041828, c.x(), c.y() + 0.1, c.z(), 0.0, 0.0, 0.0, (float)rad * 0.5F, 6, 1.0F, 0.0F, 1.0F, 0.6F);
+         p(level, Tex.RING, WHITE, c.x(), c.y() + 0.12, c.z(), 0.0, 0.0, 0.0, (float)rad * 1.8F, 6, 0.85F, 0.0F, 1.0F, 0.5F);
+      }
+   }
+
+   /** TENTACLE: a curling arm rising out of the ground to height a, then slapping down. */
+   private static void tentacle(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      double h = Math.max(1.0, c.a()), t = Math.min(1.0, l.t() * 1.6);
+      int segs = 14;
+      for (int i = 0; i < segs * t; i++) {
+         double k = i / (double)segs;
+         double curl = Math.sin(k * 3.0 + l.age * 0.25) * 0.6 * k;
+         double x = c.x() + curl, y = c.y() + k * h, z = c.z() + Math.cos(k * 3.0 + l.age * 0.25) * 0.4 * k;
+         p(level, i % 3 == 0 ? Tex.SCULK_TENDRIL : Tex.GLOW, i % 3 == 0 ? WHITE : c.color(), x, y, z, 0.0, 0.0, 0.0, (float)(0.5 - 0.3 * k), 2, 1.0F, 0.0F, 1.0F);
+      }
+      if (l.age == l.life - 2) {
+         iceShatter(level, c.x(), c.y() + 0.3, c.z(), 1.0, c.color());
+      }
+   }
+
+   /** STORM_CELL: a dark cloud over the spot, flickering, bolts striking down from it. */
+   private static void stormCell(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      RandomSource r = level.getRandom();
+      double y = c.y() + 9.0, rad = Math.max(1.0, c.a());
+      for (int i = 0; i < 2; i++) {
+         p(level, Tex.SMOKE, 0x2A3040, c.x() + r.nextGaussian() * rad, y + r.nextGaussian() * 0.4, c.z() + r.nextGaussian() * rad, 0.0, 0.0, 0.0, 3.0F, 12, 1.2F, 0.02F, 1.0F, 0.7F);
+      }
+      if (r.nextInt(6) == 0) {
+         p(level, Tex.GLOW, 0xCFE8FF, c.x() + r.nextGaussian() * rad, y, c.z() + r.nextGaussian() * rad, 0.0, 0.0, 0.0, 3.0F, 2, 1.0F, 0.0F, 1.0F, 0.6F);
+      }
+      if (l.age % 10 == 9) {
+         double x = c.x() + r.nextGaussian() * rad * 0.5, z = c.z() + r.nextGaussian() * rad * 0.5;
+         Vec3 prev = new Vec3(x, y, z);
+         for (int k = 1; k <= 8; k++) {
+            Vec3 next = new Vec3(x + r.nextGaussian() * 0.5, y - (y - c.y()) * k / 8.0, z + r.nextGaussian() * 0.5);
+            line(level, Tex.GLOW, WHITE, prev, next, 4, 0.18F, 3, 1.0F);
+            prev = next;
+         }
+         flash(level, prev.x, prev.y, prev.z, c.color(), 4.0F);
+         p(level, Tex.SHOCK, c.color(), prev.x, prev.y + 0.3, prev.z, 0.0, 0.0, 0.0, 1.2F, 6, 1.4F, 0.2F, 1.0F);
+      }
+   }
+
+   /** FEATHER_STORM: feathers whirled up in a widening spiral. */
+   private static void featherStorm(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      double rad = Math.max(1.0, c.a());
+      for (int i = 0; i < 4; i++) {
+         double a = l.age * 0.35 + i * Math.PI / 2.0, d = rad * (0.4 + 0.6 * l.t());
+         p(level, Tex.FEATHER, i % 2 == 0 ? WHITE : c.color(), c.x() + Math.cos(a) * d, c.y() + 0.3 + l.age * 0.12, c.z() + Math.sin(a) * d,
+            -Math.sin(a) * 0.15, 0.06, Math.cos(a) * 0.15, 0.3F, 14, 0.8F, 0.4F, 0.95F);
+      }
+   }
+
+   /** COG_BURST: cogs flung out of a point, spinning, falling. */
+   private static void cogBurst(ClientLevel level, Cue c) {
+      RandomSource r = level.getRandom();
+      int n = Math.max(6, (int)(c.a() * 8));
+      flash(level, c.x(), c.y(), c.z(), c.color(), 3.0F);
+      for (int i = 0; i < n; i++) {
+         FfParticle e = p(level, Tex.COG, i % 3 == 0 ? WHITE : c.color(), c.x(), c.y(), c.z(), r.nextGaussian() * 0.25, 0.2 + r.nextDouble() * 0.25, r.nextGaussian() * 0.25, 0.3F, 30, 1.0F, (r.nextFloat() - 0.5F), 0.97F);
+         if (e != null) {
+            e.fall(0.04F);
+         }
+      }
+   }
+
+   /** GEM_RAIN: gems falling over a circle, flashing as they land. */
+   private static void gemRain(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      RandomSource r = level.getRandom();
+      double rad = Math.max(1.0, c.a());
+      for (int i = 0; i < 3; i++) {
+         double a = r.nextDouble() * Math.PI * 2.0, d = Math.sqrt(r.nextDouble()) * rad;
+         p(level, Tex.GEM, i == 0 ? WHITE : c.color(), c.x() + Math.cos(a) * d, c.y() + 8.0, c.z() + Math.sin(a) * d, 0.0, -0.45, 0.0, 0.35F, 18, 1.0F, 0.3F, 1.0F);
+      }
+   }
+
+   /** STAR_TRAIL: a constellation drawn star by star over the spot, lines joining them, then a flare. */
+   private static void starTrail(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      java.util.Random r = new java.util.Random((long)(c.x() * 31 + c.z() * 17));
+      double rad = Math.max(1.0, c.a());
+      int stars = 7, lit = Math.min(stars, 1 + l.age / 3);
+      Vec3 prev = null;
+      for (int i = 0; i < lit; i++) {
+         Vec3 s = new Vec3(c.x() + (r.nextDouble() - 0.5) * rad * 2, c.y() + 2.0 + r.nextDouble() * rad, c.z() + (r.nextDouble() - 0.5) * rad * 2);
+         p(level, Tex.STAR, WHITE, s.x, s.y, s.z, 0.0, 0.0, 0.0, 0.35F, 2, 1.0F, 0.1F, 1.0F);
+         if (prev != null && (l.age & 1) == 0) {
+            line(level, Tex.GLOW, c.color(), prev, s, 6, 0.08F, 2, 0.7F);
+         }
+         prev = s;
+      }
+      if (l.age == l.life - 2 && prev != null) {
+         p(level, Tex.FLARE, WHITE, prev.x, prev.y, prev.z, 0.0, 0.0, 0.0, 2.5F, 10, 1.3F, 0.05F, 1.0F);
+      }
+   }
+
+   /** SOUL_PILLAR: souls climbing a column of height a, rings rising with them. */
+   private static void soulPillar(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      RandomSource r = level.getRandom();
+      double h = Math.max(1.0, c.a());
+      for (int i = 0; i < 3; i++) {
+         p(level, Tex.SOUL_WISP, i == 0 ? WHITE : c.color(), c.x() + r.nextGaussian() * 0.35, c.y(), c.z() + r.nextGaussian() * 0.35, 0.0, h / 18.0, 0.0, 0.3F, 18, 0.6F, 0.2F, 1.0F);
+      }
+      if (l.age % 5 == 0) {
+         p(level, Tex.RING, c.color(), c.x(), c.y() + (l.age % 20) / 20.0 * h, c.z(), 0.0, 0.0, 0.0, 1.0F, 6, 1.4F, 0.0F, 1.0F, 0.7F);
+      }
    }
 
    // ------------------------------------------------------------------ the themed set (FxKinds 116-127)

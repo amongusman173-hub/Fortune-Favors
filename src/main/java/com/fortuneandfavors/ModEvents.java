@@ -938,6 +938,7 @@ public final class ModEvents {
                Safe.run("starbound magister tick", () -> com.fortuneandfavors.economy.StarboundMagisterManager.tick(server));
                Safe.run("void shaper tick", () -> com.fortuneandfavors.economy.VoidShaperManager.tick(server));
                Safe.run("void shaper loose blocks", () -> com.fortuneandfavors.economy.VoidShaperManager.tickLoose(server));
+               Safe.run("boss hazards", () -> com.fortuneandfavors.economy.Hazards.tick());
                Safe.run("emerald sovereign tick", () -> com.fortuneandfavors.economy.EmeraldSovereignManager.tick(server));
                Safe.run("magister gear tick", () -> com.fortuneandfavors.economy.MagisterGear.tick(server));
                Safe.run("void shaper gear tick", () -> com.fortuneandfavors.economy.VoidShaperGear.tick(server));
@@ -1358,7 +1359,7 @@ public final class ModEvents {
                   atkSpeed.addTransientModifier(new AttributeModifier(FortuneFavorsMod.id("warlord_rage_speed"), 0.15, net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
                }
                warlordRageCooldown.put(uuid, now + 1200L); // 1 minute
-               sp.level().sendParticles(ParticleTypes.ANGRY_VILLAGER, sp.getX(), sp.getY() + 1.6, sp.getZ(), 25, 0.8, 0.8, 0.8, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(sp.level(), ParticleTypes.ANGRY_VILLAGER, sp.getX(), sp.getY() + 1.6, sp.getZ(), 25, 0.8, 0.8, 0.8, 0.05);
                sp.level().playSound(null, sp.blockPosition(), SoundEvents.WITHER_AMBIENT, SoundSource.PLAYERS, 1.0F, 1.4F);
                Chat.msg(sp, "&c&lWARLORD'S RAGE! &7Strength II, Resistance I and +15% attack speed for 12s.");
                return InteractionResult.SUCCESS;
@@ -1373,7 +1374,7 @@ public final class ModEvents {
                sp.addEffect(new MobEffectInstance(MobEffects.HEALTH_BOOST, 200, 0, false, true, true));
                RaidGearManager.summonCloakVex(sp);
                evokerVitalityCooldown.put(uuid, now + 900L); // 45 seconds
-               sp.level().sendParticles(ParticleTypes.TOTEM_OF_UNDYING, sp.getX(), sp.getY() + 1.0, sp.getZ(), 24, 0.5, 0.6, 0.5, 0.1);
+               com.fortuneandfavors.net.FfVfx.particles(sp.level(), ParticleTypes.TOTEM_OF_UNDYING, sp.getX(), sp.getY() + 1.0, sp.getZ(), 24, 0.5, 0.6, 0.5, 0.1);
                sp.level().playSound(null, sp.blockPosition(), SoundEvents.TOTEM_USE, SoundSource.PLAYERS, 1.0F, 1.0F);
                Chat.msg(sp, "&5Totem of Vitality: &f120 HP&7 healed, +2 hearts max for 10s, an extra vex joins you.");
                return InteractionResult.SUCCESS;
@@ -1390,7 +1391,7 @@ public final class ModEvents {
                sp.addEffect(new MobEffectInstance(MobEffects.INVISIBILITY, 30, 0, false, true, true));
                sp.addEffect(new MobEffectInstance(MobEffects.SPEED, 40, 2, false, true, true));
                illusionDashCooldown.put(uuid, now + 400L); // 20 seconds
-               sp.level().sendParticles(ParticleTypes.END_ROD, sp.getX(), sp.getY() + 1.0, sp.getZ(), 20, 0.4, 0.5, 0.4, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(sp.level(), ParticleTypes.END_ROD, sp.getX(), sp.getY() + 1.0, sp.getZ(), 20, 0.4, 0.5, 0.4, 0.05);
                sp.level().playSound(null, sp.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 0.9F, 1.3F);
                Chat.msg(sp, "&9Illusion dash - &fvanish!&7");
                return InteractionResult.SUCCESS;
@@ -1460,7 +1461,7 @@ public final class ModEvents {
             if (now >= next) {
                player.heal(1.0F);
                crownRegenCooldown.put(uuid, now + 120L);
-               player.level().sendParticles(ParticleTypes.SOUL_FIRE_FLAME, player.getX(), player.getY() + 1.4, player.getZ(), 3, 0.3, 0.4, 0.3, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(player.level(), ParticleTypes.SOUL_FIRE_FLAME, player.getX(), player.getY() + 1.4, player.getZ(), 3, 0.3, 0.4, 0.3, 0.01);
             }
          }
 
@@ -1497,20 +1498,20 @@ public final class ModEvents {
             if (crown) {
                for (int i = 0; i < 3; i++) {
                   double a = (sl.getGameTime() * 0.2 + i * (Math.PI * 2.0 / 3.0)) % (Math.PI * 2);
-                  sl.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x + Math.cos(a) * 0.4, y + 1.9, z + Math.sin(a) * 0.4, 1, 0.0, 0.0, 0.0, 0.0);
+                  com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SOUL_FIRE_FLAME, x + Math.cos(a) * 0.4, y + 1.9, z + Math.sin(a) * 0.4, 1, 0.0, 0.0, 0.0, 0.0);
                }
             }
 
             if (crown || ModItems.isWitherStaff(held) || ModItems.isWitherBlade(held)) {
-               sl.sendParticles(ParticleTypes.ENCHANT, x, y + 1.3, z, 2, 0.35, 0.5, 0.35, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, x, y + 1.3, z, 2, 0.35, 0.5, 0.35, 0.05);
             }
 
             if (ModItems.isWitherStaff(held)) {
-               sl.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x, y + 1.3, z, 2, 0.3, 0.4, 0.3, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SOUL_FIRE_FLAME, x, y + 1.3, z, 2, 0.3, 0.4, 0.3, 0.02);
             }
 
             if (ModItems.isRaidBossToken(held)) {
-               sl.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x, y + 1.5, z, 2, 0.3, 0.4, 0.3, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SOUL_FIRE_FLAME, x, y + 1.5, z, 2, 0.3, 0.4, 0.3, 0.02);
             }
          }
       }
@@ -3329,9 +3330,9 @@ public final class ModEvents {
                      double y = hitPos.getY() + 0.5;
                      double z = hitPos.getZ() + 0.5;
                      if (level instanceof ServerLevel sl) {
-                        sl.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + 0.5, z, 8, 0.15, 0.1, 0.15, 0.02);
-                        sl.sendParticles(ParticleTypes.FIREWORK, x, y + 0.3, z, 6, 0.2, 0.15, 0.2, 0.015);
-                        sl.sendParticles(ParticleTypes.ENCHANT, x, y, z, 12, 0.3, 0.4, 0.3, 0.06);
+                        com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.LARGE_SMOKE, x, y + 0.5, z, 8, 0.15, 0.1, 0.15, 0.02);
+                        com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.FIREWORK, x, y + 0.3, z, 6, 0.2, 0.15, 0.2, 0.015);
+                        com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, x, y, z, 12, 0.3, 0.4, 0.3, 0.06);
                      }
 
                      SoundSource src = SoundSource.BLOCKS;

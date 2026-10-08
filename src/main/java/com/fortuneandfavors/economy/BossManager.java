@@ -3745,6 +3745,7 @@ public final class BossManager {
    }
 
    private static void wardenSculkSummon(ServerLevel level, Mob wardenMob) {
+      Fx.soulPillar(level, ParticleTypes.SCULK_SOUL, wardenMob.position(), 6.0, 30, SCULK_TEAL);
       int count = 1 + RANDOM.nextInt(2);
 
       for (int i = 0; i < count; i++) {

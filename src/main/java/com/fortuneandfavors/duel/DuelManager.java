@@ -1247,7 +1247,7 @@ public final class DuelManager {
          swordBlockHolding.put(p.getUUID(), System.currentTimeMillis());
          // Only the Distant Memory sword gets block VFX - regular sword blocking stays clean.
          if (!wasBlocking && isDistantSword && p.level() instanceof ServerLevel sl) {
-            sl.sendParticles(ParticleTypes.ENCHANT, p.getX(), p.getY() + 1.2, p.getZ(), 10, 0.3, 0.4, 0.3, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, p.getX(), p.getY() + 1.2, p.getZ(), 10, 0.3, 0.4, 0.3, 0.05);
          }
 
          return true;
@@ -2636,7 +2636,7 @@ public final class DuelManager {
          }
       }
 
-      realm.sendParticles(ParticleTypes.ENCHANT, bot.getX(), bot.getY() + 1.2, bot.getZ(), 3, 0.5, 0.7, 0.5, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.ENCHANT, bot.getX(), bot.getY() + 1.2, bot.getZ(), 3, 0.5, 0.7, 0.5, 0.0);
    }
 
    public static void tick(MinecraftServer server) {
@@ -3077,19 +3077,19 @@ public final class DuelManager {
                   p.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal("§7You have been eliminated")));
                }
 
-               realm.sendParticles(ParticleTypes.EXPLOSION_EMITTER, p.getX(), p.getY() + 1.0, p.getZ(), 5, 0.3, 0.4, 0.3, 0.15);
-               realm.sendParticles(ParticleTypes.EXPLOSION, p.getX(), p.getY() + 1.5, p.getZ(), 8, 0.4, 0.5, 0.4, 0.08);
-               realm.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, p.getX(), p.getY() + 0.1, p.getZ(), 35, 0.4, 1.0, 0.4, 0.04);
-               realm.sendParticles(ParticleTypes.SOUL, p.getX(), p.getY() + 1.0, p.getZ(), 25, 0.5, 0.8, 0.5, 0.03);
+               com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.EXPLOSION_EMITTER, p.getX(), p.getY() + 1.0, p.getZ(), 5, 0.3, 0.4, 0.3, 0.15);
+               com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.EXPLOSION, p.getX(), p.getY() + 1.5, p.getZ(), 8, 0.4, 0.5, 0.4, 0.08);
+               com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.SOUL_FIRE_FLAME, p.getX(), p.getY() + 0.1, p.getZ(), 35, 0.4, 1.0, 0.4, 0.04);
+               com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.SOUL, p.getX(), p.getY() + 1.0, p.getZ(), 25, 0.5, 0.8, 0.5, 0.03);
 
                for (double angle = 0.0; angle < Math.PI * 2; angle += Math.PI / 8) {
                   double ox = Math.cos(angle) * 1.5;
                   double oz = Math.sin(angle) * 1.5;
-                  realm.sendParticles(ParticleTypes.LARGE_SMOKE, p.getX() + ox, p.getY() + 0.8, p.getZ() + oz, 2, 0.1, 0.2, 0.1, 0.02);
+                  com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.LARGE_SMOKE, p.getX() + ox, p.getY() + 0.8, p.getZ() + oz, 2, 0.1, 0.2, 0.1, 0.02);
                }
 
-               realm.sendParticles(ParticleTypes.LAVA, p.getX(), p.getY() + 0.5, p.getZ(), 20, 0.5, 0.5, 0.5, 0.05);
-               realm.sendParticles(ParticleTypes.CRIT, p.getX(), p.getY() + 0.5, p.getZ(), 30, 0.4, 0.5, 0.4, 0.08);
+               com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.LAVA, p.getX(), p.getY() + 0.5, p.getZ(), 20, 0.5, 0.5, 0.5, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CRIT, p.getX(), p.getY() + 0.5, p.getZ(), 30, 0.4, 0.5, 0.4, 0.08);
                realm.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.GLASS_BREAK, SoundSource.PLAYERS, 2.0F, 0.5F);
                realm.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.WITHER_DEATH, SoundSource.PLAYERS, 1.5F, 1.4F);
                realm.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.WITHER_BREAK_BLOCK, SoundSource.PLAYERS, 1.2F, 0.8F);
@@ -3603,7 +3603,7 @@ public final class DuelManager {
          announce(d, "&d✨ Kits! &7Right-click the &eNether Star&7 in your hotbar to pick your fun kit - the fight starts in &e15&7 seconds!");
       }
 
-      realm.sendParticles(ParticleTypes.PORTAL, ox, 102.0, oz, 80, 10.0, 3.0, 10.0, 0.1);
+      com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.PORTAL, ox, 102.0, oz, 80, 10.0, 3.0, 10.0, 0.1);
       return d;
    }
 
@@ -4150,7 +4150,7 @@ public final class DuelManager {
                if (!part.bot && part.player != null && part.player.isAlive()) {
                   ItemStack held = part.player.getMainHandItem();
                   if (held.has(DataComponents.CUSTOM_NAME) && ((Component)held.get(DataComponents.CUSTOM_NAME)).getString().contains("Excalibur")) {
-                     realm.sendParticles(ParticleTypes.END_ROD, part.player.getX(), part.player.getY() + 1.3, part.player.getZ(), 3, 0.25, 0.4, 0.25, 0.01);
+                     com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.END_ROD, part.player.getX(), part.player.getY() + 1.3, part.player.getZ(), 3, 0.25, 0.4, 0.25, 0.01);
                   }
                }
             }
@@ -4174,8 +4174,8 @@ public final class DuelManager {
       }
 
       if (sp.level() instanceof ServerLevel sl) {
-         sl.sendParticles(ParticleTypes.END_ROD, sp.getX(), sp.getY() + 1.4, sp.getZ(), 14, 0.3, 0.5, 0.3, 0.06);
-         sl.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, sp.getX(), sp.getY() + 1.0, sp.getZ(), 10, 0.4, 0.4, 0.4, 0.12);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.END_ROD, sp.getX(), sp.getY() + 1.4, sp.getZ(), 14, 0.3, 0.5, 0.3, 0.06);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.TOTEM_OF_UNDYING, sp.getX(), sp.getY() + 1.0, sp.getZ(), 10, 0.4, 0.4, 0.4, 0.12);
          sl.playSound(null, sp.getX(), sp.getY(), sp.getZ(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 1.0F, 2.0F);
          sl.playSound(null, sp.getX(), sp.getY(), sp.getZ(), SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.6F, 1.8F);
       }
@@ -4321,15 +4321,15 @@ public final class DuelManager {
          stack.shrink(1);
          p.swing(InteractionHand.MAIN_HAND);
          ServerLevel sl = p.level();
-         sl.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, p.getX(), p.getY() + 1.0, p.getZ(), 40, 0.5, 0.7, 0.5, 0.6);
-         sl.sendParticles(ParticleTypes.ENCHANT, p.getX(), p.getY() + 1.2, p.getZ(), 30, 0.4, 0.6, 0.4, 1.0);
-         sl.sendParticles(ParticleTypes.HAPPY_VILLAGER, p.getX(), p.getY() + 1.5, p.getZ(), 15, 0.3, 0.4, 0.3, 0.3);
-         sl.sendParticles(ParticleTypes.FLAME, p.getX(), p.getY() + 0.2, p.getZ(), 20, 0.3, 0.3, 0.3, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.TOTEM_OF_UNDYING, p.getX(), p.getY() + 1.0, p.getZ(), 40, 0.5, 0.7, 0.5, 0.6);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, p.getX(), p.getY() + 1.2, p.getZ(), 30, 0.4, 0.6, 0.4, 1.0);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.HAPPY_VILLAGER, p.getX(), p.getY() + 1.5, p.getZ(), 15, 0.3, 0.4, 0.3, 0.3);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.FLAME, p.getX(), p.getY() + 0.2, p.getZ(), 20, 0.3, 0.3, 0.3, 0.05);
 
          for (double angle = 0.0; angle < Math.PI * 2; angle += Math.PI / 8) {
             double ox = Math.cos(angle) * 1.5;
             double oz = Math.sin(angle) * 1.5;
-            sl.sendParticles(ParticleTypes.END_ROD, p.getX() + ox, p.getY() + 0.5, p.getZ() + oz, 1, 0.0, 0.1, 0.0, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.END_ROD, p.getX() + ox, p.getY() + 0.5, p.getZ() + oz, 1, 0.0, 0.1, 0.0, 0.02);
          }
 
          p.level().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.GENERIC_EAT, SoundSource.PLAYERS, 1.0F, (float)(0.9 + Math.random() * 0.2));
@@ -4339,14 +4339,14 @@ public final class DuelManager {
          for (double angle = 0.0; angle < Math.PI * 2; angle += Math.PI / 6) {
             double ox = Math.cos(angle) * 2.5;
             double oz = Math.sin(angle) * 2.5;
-            sl.sendParticles(ParticleTypes.END_ROD, p.getX() + ox, p.getY() + 0.3, p.getZ() + oz, 2, 0.0, 0.2, 0.0, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.END_ROD, p.getX() + ox, p.getY() + 0.3, p.getZ() + oz, 2, 0.0, 0.2, 0.0, 0.02);
          }
 
          for (double y = 0.0; y < 2.0; y += 0.4) {
-            sl.sendParticles(ParticleTypes.ENCHANT, p.getX(), p.getY() + y, p.getZ(), 6, 0.6, 0.1, 0.6, 0.8);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, p.getX(), p.getY() + y, p.getZ(), 6, 0.6, 0.1, 0.6, 0.8);
          }
 
-         sl.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, p.getX(), p.getY() + 0.1, p.getZ(), 25, 0.3, 0.8, 0.3, 0.03);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SOUL_FIRE_FLAME, p.getX(), p.getY() + 0.1, p.getZ(), 25, 0.3, 0.8, 0.3, 0.03);
          long eatNow = System.currentTimeMillis();
          Long lastFlash = goldenFlashCooldown.getOrDefault(p.getUUID(), 0L);
          if (eatNow - lastFlash > 1000L && p.connection != null) {
@@ -4518,7 +4518,7 @@ public final class DuelManager {
                if (attacker != null) {
                   hitFx(realm, bot, attacker);
                } else {
-                  realm.sendParticles(ParticleTypes.CRIT, bot.getX(), bot.getY() + 1.2, bot.getZ(), 10, 0.3, 0.5, 0.3, 0.1);
+                  com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CRIT, bot.getX(), bot.getY() + 1.2, bot.getZ(), 10, 0.3, 0.5, 0.3, 0.1);
                   realm.playSound(null, bot.getX(), bot.getY(), bot.getZ(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1.0F, 0.9F);
                }
 
@@ -4550,7 +4550,7 @@ public final class DuelManager {
                if (attacker != null) {
                   hitFx(realm, bot, attacker);
                } else {
-                  realm.sendParticles(ParticleTypes.SMOKE, bot.getX(), bot.getY() + 1.1, bot.getZ(), 6, 0.2, 0.3, 0.2, 0.02);
+                  com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.SMOKE, bot.getX(), bot.getY() + 1.1, bot.getZ(), 6, 0.2, 0.3, 0.2, 0.02);
                   realm.playSound(null, bot.getX(), bot.getY(), bot.getZ(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1.0F, 0.9F);
                }
 
@@ -4706,7 +4706,7 @@ public final class DuelManager {
       bot.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, 100, 1));
       bot.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 800, 0));
       bot.invulnerableTime = 40;
-      realm.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, bot.getX(), bot.getY() + 1.0, bot.getZ(), 60, 0.5, 0.8, 0.5, 0.4);
+      com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.TOTEM_OF_UNDYING, bot.getX(), bot.getY() + 1.0, bot.getZ(), 60, 0.5, 0.8, 0.5, 0.4);
       realm.playSound(null, bot.getX(), bot.getY(), bot.getZ(), SoundEvents.TOTEM_USE, SoundSource.PLAYERS, 1.2F, 1.0F);
    }
 
@@ -4747,7 +4747,7 @@ public final class DuelManager {
       teleportTo(sl, p, new double[]{sp[0], sp[1] + 2.0, sp[2]});
       part.respawnAt = ServerClock.clock(sl) + 70L;
       Chat.msg(p, "&eYou died, but your bed still stands - respawning at your &fgenerator &ein 3.5s&e!");
-      sl.sendParticles(ParticleTypes.SMOKE, p.getX(), p.getY() + 1.2, p.getZ(), 16, 0.4, 0.5, 0.4, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SMOKE, p.getX(), p.getY() + 1.2, p.getZ(), 16, 0.4, 0.5, 0.4, 0.02);
       sl.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.GLASS_BREAK, SoundSource.PLAYERS, 1.0F, 0.7F);
    }
 
@@ -4870,7 +4870,7 @@ public final class DuelManager {
          Chat.raw(p, "§c§lFINAL LIFE§r§7 - no kit, just a §aSharp Twig§7. Make it count!");
       }
 
-      sl.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, p.getX(), p.getY() + 1.2, p.getZ(), 24, 0.5, 0.6, 0.5, 0.1);
+      com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.TOTEM_OF_UNDYING, p.getX(), p.getY() + 1.2, p.getZ(), 24, 0.5, 0.6, 0.5, 0.1);
       sl.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 1.0F, 1.2F);
    }
 
@@ -4892,8 +4892,8 @@ public final class DuelManager {
 
          double[] sp = d.arena.spawnFor(part.slot);
          teleportTo(sl, p, new double[]{sp[0], sp[1] + 2.0, sp[2]});
-         sl.sendParticles(ParticleTypes.EXPLOSION_EMITTER, p.getX(), p.getY() + 1.0, p.getZ(), 3, 0.3, 0.3, 0.3, 0.1);
-         sl.sendParticles(ParticleTypes.LAVA, p.getX(), p.getY() + 0.5, p.getZ(), 20, 0.5, 0.5, 0.5, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.EXPLOSION_EMITTER, p.getX(), p.getY() + 1.0, p.getZ(), 3, 0.3, 0.3, 0.3, 0.1);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.LAVA, p.getX(), p.getY() + 0.5, p.getZ(), 20, 0.5, 0.5, 0.5, 0.05);
          sl.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.WITHER_DEATH, SoundSource.PLAYERS, 1.2F, 1.6F);
          int alive = 0;
          Participant last = null;
@@ -4921,8 +4921,8 @@ public final class DuelManager {
                   killer.getFoodData().setFoodLevel(20);
                   killer.getFoodData().setSaturation(10.0F);
                   if (killer.level() instanceof ServerLevel healRealm) {
-                     healRealm.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, killer.getX(), killer.getY() + 1.0, killer.getZ(), 25, 0.4, 0.6, 0.4, 0.5);
-                     healRealm.sendParticles(ParticleTypes.HAPPY_VILLAGER, killer.getX(), killer.getY() + 1.5, killer.getZ(), 15, 0.3, 0.4, 0.3, 0.3);
+                     com.fortuneandfavors.net.FfVfx.particles(healRealm, ParticleTypes.TOTEM_OF_UNDYING, killer.getX(), killer.getY() + 1.0, killer.getZ(), 25, 0.4, 0.6, 0.4, 0.5);
+                     com.fortuneandfavors.net.FfVfx.particles(healRealm, ParticleTypes.HAPPY_VILLAGER, killer.getX(), killer.getY() + 1.5, killer.getZ(), 15, 0.3, 0.4, 0.3, 0.3);
                   }
 
                   killer.playSound(SoundEvents.PLAYER_LEVELUP, 0.5F, 1.5F);
@@ -5215,7 +5215,7 @@ public final class DuelManager {
             }
 
             Chat.raw(p, "&eYou respawned at your generator!");
-            realm.sendParticles(ParticleTypes.ENCHANT, p.getX(), p.getY() + 1.5, p.getZ(), 24, 0.5, 0.6, 0.5, 0.08);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.ENCHANT, p.getX(), p.getY() + 1.5, p.getZ(), 24, 0.5, 0.6, 0.5, 0.08);
             realm.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 1.0F, 1.2F);
          } catch (Throwable t) {
             FortuneFavorsMod.LOGGER.error("Fortune & Favors: bedwars respawn failed", t);
@@ -5317,8 +5317,8 @@ public final class DuelManager {
 
                Chat.raw(p, "§a⚡ FIGHT!");
                ServerLevel rl = realmOf(p);
-               rl.sendParticles(ParticleTypes.CRIT, p.getX(), p.getY() + 1.0, p.getZ(), 30, 0.5, 0.6, 0.5, 0.1);
-               rl.sendParticles(ParticleTypes.ENCHANT, p.getX(), p.getY() + 1.6, p.getZ(), 14, 0.4, 0.5, 0.4, 0.08);
+               com.fortuneandfavors.net.FfVfx.particles(rl, ParticleTypes.CRIT, p.getX(), p.getY() + 1.0, p.getZ(), 30, 0.5, 0.6, 0.5, 0.1);
+               com.fortuneandfavors.net.FfVfx.particles(rl, ParticleTypes.ENCHANT, p.getX(), p.getY() + 1.6, p.getZ(), 14, 0.4, 0.5, 0.4, 0.08);
                rl.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.PLAYERS, 0.7F, 1.6F);
             }
          }
@@ -5683,26 +5683,26 @@ public final class DuelManager {
                 com.fortuneandfavors.economy.DynamicContractsManager.onDuelWon(winner.player);
             }
 
-            realm.sendParticles(ParticleTypes.FIREWORK, x, y + 1.6, z, 40, 0.7, 1.0, 0.7, 0.15);
-            realm.sendParticles(ParticleTypes.FIREWORK, x, y + 3.0, z, 30, 0.5, 0.8, 0.5, 0.1);
-            realm.sendParticles(ParticleTypes.FIREWORK, x, y + 4.5, z, 20, 0.4, 0.6, 0.4, 0.08);
-            realm.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x, y + 0.2, z, 40, 0.4, 1.5, 0.4, 0.05);
-            realm.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x, y + 1.0, z, 30, 0.3, 1.0, 0.3, 0.04);
-            realm.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, x, y + 1.2, z, 60, 0.8, 1.2, 0.8, 0.2);
-            realm.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, x, y + 2.0, z, 40, 0.6, 0.8, 0.6, 0.15);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.FIREWORK, x, y + 1.6, z, 40, 0.7, 1.0, 0.7, 0.15);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.FIREWORK, x, y + 3.0, z, 30, 0.5, 0.8, 0.5, 0.1);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.FIREWORK, x, y + 4.5, z, 20, 0.4, 0.6, 0.4, 0.08);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.SOUL_FIRE_FLAME, x, y + 0.2, z, 40, 0.4, 1.5, 0.4, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.SOUL_FIRE_FLAME, x, y + 1.0, z, 30, 0.3, 1.0, 0.3, 0.04);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.TOTEM_OF_UNDYING, x, y + 1.2, z, 60, 0.8, 1.2, 0.8, 0.2);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.TOTEM_OF_UNDYING, x, y + 2.0, z, 40, 0.6, 0.8, 0.6, 0.15);
 
             for (double angle = 0.0; angle < Math.PI * 2; angle += Math.PI / 6) {
                double ox = Math.cos(angle) * 2.0;
                double oz = Math.sin(angle) * 2.0;
-               realm.sendParticles(ParticleTypes.END_ROD, x + ox, y + 1.0, z + oz, 3, 0.0, 0.3, 0.0, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.END_ROD, x + ox, y + 1.0, z + oz, 3, 0.0, 0.3, 0.0, 0.02);
             }
 
             for (double h = 0.0; h < 3.0; h += 0.5) {
-               realm.sendParticles(ParticleTypes.ENCHANT, x, y + h, z, 12, 0.8, 0.1, 0.8, 0.9);
+               com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.ENCHANT, x, y + h, z, 12, 0.8, 0.1, 0.8, 0.9);
             }
 
-            realm.sendParticles(ParticleTypes.GLOW, x, y + 1.5, z, 30, 0.6, 0.8, 0.6, 0.06);
-            realm.sendParticles(ParticleTypes.GLOW_SQUID_INK, x, y + 2.0, z, 20, 0.5, 0.5, 0.5, 0.03);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.GLOW, x, y + 1.5, z, 30, 0.6, 0.8, 0.6, 0.06);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.GLOW_SQUID_INK, x, y + 2.0, z, 20, 0.5, 0.5, 0.5, 0.03);
             realm.playSound(null, x, y, z, SoundEvents.FIREWORK_ROCKET_LAUNCH, SoundSource.PLAYERS, 1.5F, 0.8F);
             realm.playSound(null, x, y, z, SoundEvents.FIREWORK_ROCKET_BLAST, SoundSource.PLAYERS, 1.2F, 1.2F);
             realm.playSound(null, x, y, z, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.PLAYERS, 1.0F, 1.0F);
@@ -5718,8 +5718,8 @@ public final class DuelManager {
                for (int i = 0; i < 6; i++) {
                   double px = cx + (Math.random() - 0.5) * w * 1.6;
                   double pz = cz + (Math.random() - 0.5) * h * 1.6;
-                  realm.sendParticles(ParticleTypes.FIREWORK, px, topY + 2.0 + Math.random() * 2.0, pz, 14, 0.4, 0.5, 0.4, 0.08);
-                  realm.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, px, topY + 1.5, pz, 20, 0.6, 0.8, 0.6, 0.12);
+                  com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.FIREWORK, px, topY + 2.0 + Math.random() * 2.0, pz, 14, 0.4, 0.5, 0.4, 0.08);
+                  com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.TOTEM_OF_UNDYING, px, topY + 1.5, pz, 20, 0.6, 0.8, 0.6, 0.12);
                }
 
                realm.playSound(null, cx, topY, cz, SoundEvents.FIREWORK_ROCKET_TWINKLE, SoundSource.PLAYERS, 1.4F, 1.0F);
@@ -6306,8 +6306,8 @@ public final class DuelManager {
             }
 
             ServerLevel sl = p.level();
-            sl.sendParticles(ParticleTypes.CLOUD, p.getX(), p.getY() + 0.5, p.getZ(), 20, 0.4, 0.2, 0.4, 0.04);
-            sl.sendParticles(ParticleTypes.ENCHANT, p.getX(), p.getY() + 0.5, p.getZ(), 12, 0.4, 0.3, 0.4, 0.06);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.CLOUD, p.getX(), p.getY() + 0.5, p.getZ(), 20, 0.4, 0.2, 0.4, 0.04);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, p.getX(), p.getY() + 0.5, p.getZ(), 12, 0.4, 0.3, 0.4, 0.06);
             sl.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.PHANTOM_FLAP, SoundSource.PLAYERS, 1.0F, 1.4F);
             if (uses - 1 <= 0) {
                held.shrink(1);
@@ -6656,11 +6656,11 @@ public final class DuelManager {
             double x = p.getX();
             double y = p.getY();
             double z = p.getZ();
-            sl.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, x, y + 1.5, z, 120, 1.2, 1.6, 1.2, 0.25);
-            sl.sendParticles(ParticleTypes.END_ROD, x, y + 2.2, z, 90, 0.8, 1.4, 0.8, 0.2);
-            sl.sendParticles(ParticleTypes.ENCHANT, x, y + 1.0, z, 160, 1.0, 1.2, 1.0, 0.2);
-            sl.sendParticles(ParticleTypes.GLOW_SQUID_INK, x, y + 1.0, z, 40, 0.5, 0.8, 0.5, 0.05);
-            sl.sendParticles(ParticleTypes.CRIT, x, y + 1.2, z, 60, 0.6, 0.8, 0.6, 0.2);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.TOTEM_OF_UNDYING, x, y + 1.5, z, 120, 1.2, 1.6, 1.2, 0.25);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.END_ROD, x, y + 2.2, z, 90, 0.8, 1.4, 0.8, 0.2);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, x, y + 1.0, z, 160, 1.0, 1.2, 1.0, 0.2);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.GLOW_SQUID_INK, x, y + 1.0, z, 40, 0.5, 0.8, 0.5, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.CRIT, x, y + 1.2, z, 60, 0.6, 0.8, 0.6, 0.2);
             sl.playSound(null, x, y, z, SoundEvents.TOTEM_USE, SoundSource.PLAYERS, 2.0F, 0.5F);
             sl.playSound(null, x, y, z, SoundEvents.END_PORTAL_SPAWN, SoundSource.PLAYERS, 2.0F, 0.4F);
             sl.playSound(null, x, y, z, SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.PLAYERS, 2.0F, 0.6F);
@@ -9187,10 +9187,10 @@ public final class DuelManager {
                      double bx = bed.getX() + 0.5;
                      double by = bed.getY() + 0.5;
                      double bz = bed.getZ() + 0.5;
-                     realm.sendParticles(ParticleTypes.EXPLOSION_EMITTER, bx, by, bz, 1, 0.0, 0.0, 0.0, 0.0);
-                     realm.sendParticles(ParticleTypes.LAVA, bx, by, bz, 40, 1.0, 0.8, 1.0, 0.12);
-                     realm.sendParticles(ParticleTypes.END_ROD, bx, by + 0.5, bz, 24, 0.6, 0.8, 0.6, 0.08);
-                     realm.sendParticles(ParticleTypes.LARGE_SMOKE, bx, by, bz, 12, 0.4, 0.4, 0.4, 0.02);
+                     com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.EXPLOSION_EMITTER, bx, by, bz, 1, 0.0, 0.0, 0.0, 0.0);
+                     com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.LAVA, bx, by, bz, 40, 1.0, 0.8, 1.0, 0.12);
+                     com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.END_ROD, bx, by + 0.5, bz, 24, 0.6, 0.8, 0.6, 0.08);
+                     com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.LARGE_SMOKE, bx, by, bz, 12, 0.4, 0.4, 0.4, 0.02);
                      realm.playSound(null, bx, by, bz, (SoundEvent)SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 1.2F, 0.9F);
                      realm.playSound(null, bx, by, bz, SoundEvents.ANVIL_PLACE, SoundSource.BLOCKS, 1.0F, 0.7F);
                   }
@@ -9361,7 +9361,7 @@ public final class DuelManager {
                   BlockState st = realm.getBlockState(tile);
                   if ((st.getBlock() == Blocks.GRAVEL || st.getBlock() == Blocks.SAND) && !d.tntrunCrumble.containsKey(tile)) {
                      d.tntrunCrumble.put(tile, now + crumbleDelay);
-                     realm.sendParticles(ParticleTypes.CLOUD, tile.getX() + 0.5, tile.getY() + 0.6, tile.getZ() + 0.5, 6, 0.3, 0.1, 0.3, 0.02);
+                     com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CLOUD, tile.getX() + 0.5, tile.getY() + 0.6, tile.getZ() + 0.5, 6, 0.3, 0.1, 0.3, 0.02);
                      BlockPos[] adj = new BlockPos[]{tile.north(), tile.south(), tile.east(), tile.west()};
 
                      for (BlockPos extra : adj) {
@@ -9395,7 +9395,7 @@ public final class DuelManager {
                   realm.setBlock(tile.below(), Blocks.AIR.defaultBlockState(), 2);
                }
 
-               realm.sendParticles(ParticleTypes.CLOUD, tile.getX() + 0.5, tile.getY() + 0.5, tile.getZ() + 0.5, 8, 0.3, 0.2, 0.3, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CLOUD, tile.getX() + 0.5, tile.getY() + 0.5, tile.getZ() + 0.5, 8, 0.3, 0.2, 0.3, 0.02);
                it.remove();
             }
          }
@@ -9558,7 +9558,7 @@ public final class DuelManager {
       DuelBot bot = part.botEntity;
       if (bot != null) {
          duels.remove(bot.getUUID());
-         realm.sendParticles(ParticleTypes.POOF, bot.getX(), bot.getY() + 1.0, bot.getZ(), 24, 0.5, 0.6, 0.5, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.POOF, bot.getX(), bot.getY() + 1.0, bot.getZ(), 24, 0.5, 0.6, 0.5, 0.05);
 
          try {
             ClientboundPlayerInfoRemovePacket pkt = new ClientboundPlayerInfoRemovePacket(List.of(bot.getUUID()));
@@ -9903,8 +9903,8 @@ public final class DuelManager {
    }
 
    private static void hitFx(ServerLevel realm, DuelBot bot, ServerPlayer attacker) {
-      realm.sendParticles(ParticleTypes.CRIT, bot.getX(), bot.getY() + 1.2, bot.getZ(), 10, 0.3, 0.5, 0.3, 0.1);
-      realm.sendParticles(ParticleTypes.SMOKE, bot.getX(), bot.getY() + 1.1, bot.getZ(), 6, 0.2, 0.3, 0.2, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CRIT, bot.getX(), bot.getY() + 1.2, bot.getZ(), 10, 0.3, 0.5, 0.3, 0.1);
+      com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.SMOKE, bot.getX(), bot.getY() + 1.1, bot.getZ(), 6, 0.2, 0.3, 0.2, 0.02);
       realm.playSound(null, bot.getX(), bot.getY(), bot.getZ(), SoundEvents.PLAYER_ATTACK_STRONG, SoundSource.PLAYERS, 1.0F, 1.0F);
       realm.playSound(null, bot.getX(), bot.getY(), bot.getZ(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1.0F, 0.9F);
 
@@ -9997,7 +9997,7 @@ public final class DuelManager {
                   // is.
                   if (bot.onGround()) {
                      bot.falling = false;
-                     realm.sendParticles(ParticleTypes.CLOUD, bot.getX(), bot.getY(), bot.getZ(), 4, 0.3, 0.1, 0.3, 0.02);
+                     com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CLOUD, bot.getX(), bot.getY(), bot.getZ(), 4, 0.3, 0.1, 0.3, 0.02);
                   } else if (bot.getY() < d.arena.voidY) {
                      bot.falling = false;
                      bot.setHealth(0.0F);
@@ -10265,7 +10265,7 @@ public final class DuelManager {
       }
 
       realm.playSound(null, best.getX() + 0.5, best.getY() + 0.5, best.getZ() + 0.5, SoundEvents.STONE_BREAK, SoundSource.BLOCKS, 0.8F, 1.0F);
-      realm.sendParticles(ParticleTypes.CRIT, best.getX() + 0.5, best.getY() + 0.5, best.getZ() + 0.5, 6, 0.25, 0.25, 0.25, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CRIT, best.getX() + 0.5, best.getY() + 0.5, best.getZ() + 0.5, 6, 0.25, 0.25, 0.25, 0.02);
       d.botMineAt = now + 14L;
       return true;
    }
@@ -10488,8 +10488,8 @@ public final class DuelManager {
          }
 
          if (at != null) {
-            realm.sendParticles(ParticleTypes.FLAME, at.getX() + 0.5, at.getY() + 1.0, at.getZ() + 0.5, 8, 0.2, 0.2, 0.2, 0.01);
-            realm.sendParticles(ParticleTypes.SMOKE, at.getX() + 0.5, at.getY() + 1.1, at.getZ() + 0.5, 6, 0.15, 0.2, 0.15, 0.01);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.FLAME, at.getX() + 0.5, at.getY() + 1.0, at.getZ() + 0.5, 8, 0.2, 0.2, 0.2, 0.01);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.SMOKE, at.getX() + 0.5, at.getY() + 1.1, at.getZ() + 0.5, 6, 0.15, 0.2, 0.15, 0.01);
          }
       } else {
          int ingots = InventoryHelper.countItems(bot, Items.IRON_INGOT);
@@ -10502,7 +10502,7 @@ public final class DuelManager {
          }
 
          if (at != null) {
-            realm.sendParticles(ParticleTypes.CRIT, at.getX() + 0.5, at.getY() + 1.0, at.getZ() + 0.5, 10, 0.25, 0.25, 0.25, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CRIT, at.getX() + 0.5, at.getY() + 1.0, at.getZ() + 0.5, 10, 0.25, 0.25, 0.25, 0.02);
          }
       }
 
@@ -11608,7 +11608,7 @@ public final class DuelManager {
             InventoryHelper.removeItems(bot, Items.END_CRYSTAL, 1);
             InventoryHelper.removeItems(bot, Items.OBSIDIAN, 1);
             realm.playSound(null, crystal.getX(), crystal.getY(), crystal.getZ(), SoundEvents.GLASS_PLACE, SoundSource.PLAYERS, 1.0F, 1.0F);
-            realm.sendParticles(ParticleTypes.PORTAL, crystal.getX(), crystal.getY(), crystal.getZ(), 12, 0.4, 0.6, 0.4, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.PORTAL, crystal.getX(), crystal.getY(), crystal.getZ(), 12, 0.4, 0.6, 0.4, 0.05);
          } else {
             botMoveTo(realm, bot, target.getX(), target.getZ(), target, d, now);
          }
@@ -11659,8 +11659,8 @@ public final class DuelManager {
       if (bot.fallDistance > 1.0 && horiz < 3.4 && Math.abs(dy) <= VERTICAL_SWING_REACH) {
          float extra = (float)Math.min(9.0, bot.fallDistance * 2.0);
          applyBotHit(d, bot, realm, target, (6.0F + extra) * diff.damageMultiplier, true);
-         realm.sendParticles(ParticleTypes.EXPLOSION, target.getX(), target.getY() + 0.8, target.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
-         realm.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY() + 1.0, target.getZ(), 18, 0.4, 0.6, 0.4, 0.12);
+         com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.EXPLOSION, target.getX(), target.getY() + 0.8, target.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CRIT, target.getX(), target.getY() + 1.0, target.getZ(), 18, 0.4, 0.6, 0.4, 0.12);
          d.botMaceAt = now + 10L;
          return;
       }
@@ -11845,7 +11845,7 @@ public final class DuelManager {
       double d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
       target.push(dx / d * 1.1, 0.3, dz / d * 1.1);
       target.hurtMarked = true;
-      realm.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY() + 1.0, target.getZ(), 8, 0.3, 0.4, 0.3, 0.1);
+      com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CRIT, target.getX(), target.getY() + 1.0, target.getZ(), 8, 0.3, 0.4, 0.3, 0.1);
       realm.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_KNOCKBACK, SoundSource.PLAYERS, 1.0F, 1.0F);
    }
 
@@ -11961,7 +11961,7 @@ public final class DuelManager {
          target.invulnerableTime = 1;
       }
 
-      realm.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY() + 1.0, target.getZ(), 12, 0.4, 0.5, 0.4, 0.1);
+      com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.CRIT, target.getX(), target.getY() + 1.0, target.getZ(), 12, 0.4, 0.5, 0.4, 0.1);
       realm.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_STRONG, SoundSource.PLAYERS, 1.0F, 1.0F);
 
       try {
@@ -13042,7 +13042,7 @@ public final class DuelManager {
          syncBotHand(d, bot);
          float extra = (float)Math.min(7.0, bot.fallDistance * 1.4);
          applyBotHit(d, bot, realm, target, (6.5F + extra) * diff.damageMultiplier, true);
-         realm.sendParticles(ParticleTypes.EXPLOSION, target.getX(), target.getY() + 0.6, target.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(realm, ParticleTypes.EXPLOSION, target.getX(), target.getY() + 0.6, target.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
          d.botCritAt = now + 20L;
          return true;
       }
@@ -14040,7 +14040,7 @@ public final class DuelManager {
                         + "'s bed was destroyed"
                         + (part.player != null ? " - " + part.player.getName().getString() + " can no longer respawn!" : "!")
                   );
-                  level.sendParticles(ParticleTypes.LAVA, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 30, 0.8, 0.8, 0.8, 0.1);
+                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LAVA, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 30, 0.8, 0.8, 0.8, 0.1);
                   level.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.GLASS_BREAK, SoundSource.BLOCKS, 1.0F, 0.8F);
                }
             }

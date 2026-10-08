@@ -359,7 +359,7 @@ public final class BackpackKitchen {
       }
       ItemStack cooked = cookOnce(player, pack);
       if (!cooked.isEmpty() && player.level() instanceof ServerLevel server) {
-         server.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, player.getX(), player.getY() + 1.2, player.getZ(), 2, 0.25, 0.2, 0.25, 0.005);
+         com.fortuneandfavors.net.FfVfx.particles(server, ParticleTypes.CAMPFIRE_COSY_SMOKE, player.getX(), player.getY() + 1.2, player.getZ(), 2, 0.25, 0.2, 0.25, 0.005);
          if (server.getGameTime() % 100L == 0L) {
             server.playSound(null, player.getX(), player.getY(), player.getZ(),
                KIND_CAMPFIRE.equals(kind) ? SoundEvents.CAMPFIRE_CRACKLE : SoundEvents.FURNACE_FIRE_CRACKLE,

@@ -161,10 +161,10 @@ public class FarmMachineMenu extends ChestMenu {
       double y = this.pos.getY() + 1.1;
       int sent = 0;
       for (int i = -r; i <= r; i++) {
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, this.pos.getX() + i + 0.5, y, this.pos.getZ() - r + 0.5, 1, 0.0, 0.0, 0.0, 0.0);
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, this.pos.getX() + i + 0.5, y, this.pos.getZ() + r + 0.5, 1, 0.0, 0.0, 0.0, 0.0);
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, this.pos.getX() - r + 0.5, y, this.pos.getZ() + i + 0.5, 1, 0.0, 0.0, 0.0, 0.0);
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, this.pos.getX() + r + 0.5, y, this.pos.getZ() + i + 0.5, 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, this.pos.getX() + i + 0.5, y, this.pos.getZ() - r + 0.5, 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, this.pos.getX() + i + 0.5, y, this.pos.getZ() + r + 0.5, 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, this.pos.getX() - r + 0.5, y, this.pos.getZ() + i + 0.5, 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, this.pos.getX() + r + 0.5, y, this.pos.getZ() + i + 0.5, 1, 0.0, 0.0, 0.0, 0.0);
          sent += 4;
       }
       Chat.msg(sp, "&aThe square this machine works is drawn - §f" + r + "&a blocks out, §f" + sent + "&a marks.");

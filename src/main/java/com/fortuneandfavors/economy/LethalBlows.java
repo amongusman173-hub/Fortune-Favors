@@ -294,8 +294,8 @@ public final class LethalBlows {
          player.invulnerableTime = 40;
 
          if (player.level() instanceof ServerLevel level) {
-            level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.0, player.getZ(), 70, 0.6, 0.9, 0.6, 0.5);
-            level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 24, 0.5, 0.8, 0.5, 0.12);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.0, player.getZ(), 70, 0.6, 0.9, 0.6, 0.5);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 24, 0.5, 0.8, 0.5, 0.12);
             level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TOTEM_USE, SoundSource.PLAYERS, 1.4F, 1.0F);
          }
 

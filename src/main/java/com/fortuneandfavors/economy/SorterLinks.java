@@ -240,7 +240,7 @@ public final class SorterLinks {
       Chat.msg(player, "&7Rename the Sorter Tag in an anvil to choose its name. Sneak-right-click with it to untag.");
       SoundUtil.play(player, ModSounds.TRANSFER);
       if (level instanceof ServerLevel server) {
-         server.sendParticles(ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5, 12, 0.3, 0.2, 0.3, 0.03);
+         com.fortuneandfavors.net.FfVfx.particles(server, ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5, 12, 0.3, 0.2, 0.3, 0.03);
       }
       return id;
    }

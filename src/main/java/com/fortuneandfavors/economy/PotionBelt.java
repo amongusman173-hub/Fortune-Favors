@@ -236,7 +236,7 @@ public final class PotionBelt {
       setReadyAt(belt, flask, now + FLASK_COOLDOWN);
       setSharedReadyAt(belt, now + SHARED_COOLDOWN);
       if (player.level() instanceof ServerLevel level) {
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             ParticleTypes.ITEM_SLIME, player.getX(), player.getY() + 1.4, player.getZ(), 18, 0.35, 0.4, 0.35, 0.08
          );
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.GENERIC_DRINK, SoundSource.PLAYERS, 0.8F, 1.3F);
@@ -252,8 +252,8 @@ public final class PotionBelt {
       fill(belt, flask);
       SoundUtil.play(player, ModSounds.TRANSFER);
       if (player.level() instanceof ServerLevel level) {
-         level.sendParticles(ParticleTypes.ENCHANT, player.getX(), player.getY() + 1.2, player.getZ(), 22, 0.5, 0.6, 0.5, 0.4);
-         level.sendParticles(ParticleTypes.ITEM_SLIME, player.getX(), player.getY() + 1.4, player.getZ(), 12, 0.3, 0.3, 0.3, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, player.getX(), player.getY() + 1.2, player.getZ(), 22, 0.5, 0.6, 0.5, 0.4);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ITEM_SLIME, player.getX(), player.getY() + 1.4, player.getZ(), 12, 0.3, 0.3, 0.3, 0.05);
       }
       return null;
    }

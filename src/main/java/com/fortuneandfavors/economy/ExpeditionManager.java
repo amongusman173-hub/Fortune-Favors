@@ -1552,9 +1552,9 @@ public final class ExpeditionManager {
          held.shrink(1);
       }
       if (sp.level() instanceof ServerLevel level) {
-         level.sendParticles(ParticleTypes.END_ROD, sp.getX(), sp.getY() + 1.2, sp.getZ(), 45, 0.6, 0.8, 0.6, 0.15);
-         level.sendParticles(ParticleTypes.ENCHANT, sp.getX(), sp.getY() + 1.0, sp.getZ(), 30, 0.8, 0.6, 0.8, 0.4);
-         level.sendParticles(ParticleTypes.FIREWORK, sp.getX(), sp.getY() + 1.6, sp.getZ(), 12, 0.4, 0.4, 0.4, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, sp.getX(), sp.getY() + 1.2, sp.getZ(), 45, 0.6, 0.8, 0.6, 0.15);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, sp.getX(), sp.getY() + 1.0, sp.getZ(), 30, 0.8, 0.6, 0.8, 0.4);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.FIREWORK, sp.getX(), sp.getY() + 1.6, sp.getZ(), 12, 0.4, 0.4, 0.4, 0.05);
       }
       SoundUtil.play(sp, ModSounds.JOB_COMPLETE);
       Chat.raw(
@@ -1625,7 +1625,7 @@ public final class ExpeditionManager {
          sp.setHealth(Math.max(2.0F, sp.getMaxHealth() * 0.5F));
          sp.clearFire();
          sp.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 120, 2, false, false, true));
-         s.zoneLevel.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
             ParticleTypes.TOTEM_OF_UNDYING, sp.getX(), sp.getY() + 1.0, sp.getZ(), 60, 0.6, 0.8, 0.6, 0.25
          );
          SoundUtil.play(sp, ModSounds.JOB_COMPLETE);
@@ -1701,7 +1701,7 @@ public final class ExpeditionManager {
       sp.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, DOWNED_TICKS + 60, 6, false, false, true));
       sp.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, DOWNED_TICKS + 60, 4, false, false, true));
       sp.setGlowingTag(true);
-      s.zoneLevel.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
          ParticleTypes.DAMAGE_INDICATOR, sp.getX(), sp.getY() + 1.0, sp.getZ(), 30, 0.5, 0.6, 0.5, 0.06
       );
       SoundUtil.play(sp, ModSounds.DENY);
@@ -1738,7 +1738,7 @@ public final class ExpeditionManager {
       if (up) {
          sp.setHealth(Math.max(sp.getHealth(), sp.getMaxHealth() * 0.5F));
          sp.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 100, 1, false, false, true));
-         s.zoneLevel.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
             ParticleTypes.HEART, sp.getX(), sp.getY() + 1.2, sp.getZ(), 12, 0.4, 0.4, 0.4, 0.02
          );
       }
@@ -1816,7 +1816,7 @@ public final class ExpeditionManager {
             );
          }
          if (tick % 20L == 0L) {
-            s.zoneLevel.sendParticles(
+            com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
                ParticleTypes.DAMAGE_INDICATOR, victim.getX(), victim.getY() + 1.0, victim.getZ(), 4, 0.3, 0.4, 0.3, 0.02
             );
          }
@@ -2345,7 +2345,7 @@ public final class ExpeditionManager {
       }
       held.shrink(1);
       s.durationTicks += 20L * TIME_SHARD_SECONDS;
-      s.zoneLevel.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
          ParticleTypes.END_ROD, sp.getX(), sp.getY() + 1.2, sp.getZ(), 30, 0.5, 0.6, 0.5, 0.06
       );
       SoundUtil.play(sp, ModSounds.TRANSFER);
@@ -2377,7 +2377,7 @@ public final class ExpeditionManager {
          return "Your pack is already as big as it gets (" + LootBackpack.MAX_CAPACITY + " pieces).";
       }
       held.shrink(1);
-      sp.level().sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(sp.level(), 
          ParticleTypes.HAPPY_VILLAGER, sp.getX(), sp.getY() + 1.2, sp.getZ(), 18, 0.5, 0.4, 0.5, 0.08
       );
       SoundUtil.play(sp, ModSounds.CLAIM);
@@ -2745,7 +2745,7 @@ public final class ExpeditionManager {
          s.lootCount++;
          s.oresMined++;
          ServerLevel level = (ServerLevel)sp.level();
-         level.sendParticles(ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 6, 0.3, 0.3, 0.3, 0.04);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 6, 0.3, 0.3, 0.3, 0.04);
       } catch (Exception ignored) {
       }
    }
@@ -3020,7 +3020,7 @@ public final class ExpeditionManager {
             return "Your pack is already as big as it gets (" + LootBackpack.MAX_CAPACITY + " pieces).";
          }
          offers.remove(index);
-         s.zoneLevel.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
             ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 18, 0.5, 0.4, 0.5, 0.08
          );
          com.fortuneandfavors.util.SoundUtil.play(sp, ModSounds.CLAIM);
@@ -3046,7 +3046,7 @@ public final class ExpeditionManager {
       // first explorer looted into the second explorer's bag.
       PartyManager.addPiece(sp, piece);
       creditChest(sp.getUUID(), value);
-      s.zoneLevel.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
          ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5, 6, 0.3, 0.3, 0.3, 0.03
       );
       if (offers.isEmpty()) {
@@ -3178,7 +3178,7 @@ public final class ExpeditionManager {
          // fill the chat with arithmetic, and the number that matters is the one flashing in front
          // of the player as the body drops.
          actionBar(sp, "§a+" + Chat.moneyStr(reward) + " §7· " + victim.getName().getString());
-         s.zoneLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, victim.getX(), victim.getY() + 1.0, victim.getZ(), 8, 0.3, 0.3, 0.3, 0.04);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HAPPY_VILLAGER, victim.getX(), victim.getY() + 1.0, victim.getZ(), 8, 0.3, 0.3, 0.3, 0.04);
       } catch (Exception ignored) {
       }
    }
@@ -3325,7 +3325,7 @@ public final class ExpeditionManager {
             // chamber you leave, and one that gives a little back slowly is one you stay in and defend.
             if (sp.getHealth() < sp.getMaxHealth()) {
                sp.heal(restMend(room.chamber, sp.getUUID()));
-               s.zoneLevel.sendParticles(ParticleTypes.HEART, sp.getX(), sp.getY() + 1.2, sp.getZ(), 3, 0.3, 0.3, 0.3, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HEART, sp.getX(), sp.getY() + 1.2, sp.getZ(), 3, 0.3, 0.3, 0.3, 0.01);
             }
          }
          // The camps, said out loud once a second while one is within reach: the whole of "make them
@@ -3549,7 +3549,7 @@ public final class ExpeditionManager {
                   // minute: the clock is what starts a collapse, not what sustains it.
                   Chat.raw(sp, "§6§lMINI-BOSS SLAIN! §r§7+" + Chat.moneyStr(bonus) + " §7bonus loot. §8The site is already coming down.");
                }
-               s.zoneLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, sp.getX(), sp.getY() + 1, sp.getZ(), 20, 0.5, 0.5, 0.5, 0.1);
+               com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HAPPY_VILLAGER, sp.getX(), sp.getY() + 1, sp.getZ(), 20, 0.5, 0.5, 0.5, 0.1);
                s.miniBossId = null;
             }
          }
@@ -3858,7 +3858,7 @@ public final class ExpeditionManager {
          opened = openExits(s, room);
       }
       SoundUtil.play(sp, ModSounds.JOB_COMPLETE);
-      s.zoneLevel.sendParticles(ParticleTypes.FIREWORK, sp.getX(), sp.getY() + 1.2, sp.getZ(), 25, 0.6, 0.5, 0.6, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.FIREWORK, sp.getX(), sp.getY() + 1.2, sp.getZ(), 25, 0.6, 0.5, 0.6, 0.05);
       // The after-fight breath every dungeon crawler gives you: a cleared chamber mends
       // a little, and a fallen guardian mends everything.
       if (sp.getHealth() < sp.getMaxHealth()) {
@@ -3874,7 +3874,7 @@ public final class ExpeditionManager {
          }
          Chat.raw(sp, "§4§lTHE FLOOR GUARDIAN FALLS! §r§7Its bounty is §a" + Chat.moneyStr(bonus) + "§7.");
          Chat.raw(sp, "§6§lA DESCENT LADDER clatters to the floor. §fRight-click it §7to skip the next five chambers.");
-         s.zoneLevel.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, sp.getX(), sp.getY() + 1.0, sp.getZ(), 40, 1.0, 1.0, 1.0, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.SOUL_FIRE_FLAME, sp.getX(), sp.getY() + 1.0, sp.getZ(), 40, 1.0, 1.0, 1.0, 0.05);
       }
       if (room.chamber == Chamber.SHRINE) {
          sp.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.REGENERATION, 20 * 20, 1, false, false, true));
@@ -4020,7 +4020,7 @@ public final class ExpeditionManager {
       room.sealed = true;
       pullInStrays(s, room, bx, bz, fy, ROOM_PITCH);
       SoundUtil.play(sp, net.minecraft.sounds.SoundEvents.IRON_DOOR_CLOSE);
-      level.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(level, 
          ParticleTypes.SMOKE, sp.getX(), sp.getY() + 1.0, sp.getZ(), 12, 0.5, 0.4, 0.5, 0.02
       );
       actionBar(sp, "§c§lTHE DOORS GRIND SHUT §7· " + livingCount(s, room) + " left in here");
@@ -6476,7 +6476,7 @@ public final class ExpeditionManager {
       // eighty-four blocks, and a guardian who has walked up onto the terrace is still in the fight.
       pullInStrays(s, room, baseX(s, arena.rx - 1), baseZ(s, arena.rz - 1), fy, ARENA_SPAN);
       SoundUtil.play(sp, net.minecraft.sounds.SoundEvents.IRON_DOOR_CLOSE);
-      s.zoneLevel.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
          ParticleTypes.SMOKE, sp.getX(), sp.getY() + 1.0, sp.getZ(), 18, 0.9, 0.5, 0.9, 0.02
       );
       actionBar(sp, "§c§lTHE ARENA CLOSES §7· " + livingCount(s, room) + " left in here");
@@ -7951,7 +7951,7 @@ public final class ExpeditionManager {
          if (packBodyGone(m)) {
             continue;
          }
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             ParticleTypes.SQUID_INK,
             m.getX(), m.getY() + m.getBbHeight() * 0.5, m.getZ(),
             1, 0.24, 0.3, 0.24, 0.0
@@ -8429,7 +8429,7 @@ public final class ExpeditionManager {
       broker.setPersistenceRequired();
       broker.setPos(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
       s.zoneLevel.addFreshEntity(broker);
-      s.zoneLevel.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
          ParticleTypes.HAPPY_VILLAGER, spot.getX() + 0.5, spot.getY() + 1.2, spot.getZ() + 0.5, 20, 0.5, 0.6, 0.5, 0.05
       );
    }
@@ -8452,7 +8452,7 @@ public final class ExpeditionManager {
       trader.setPersistenceRequired();
       s.zoneLevel.addFreshEntity(trader);
       s.traderId = trader.getUUID();
-      s.zoneLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, spot.getX() + 0.5, spot.getY() + 1.0, spot.getZ() + 0.5, 15, 0.5, 0.5, 0.5, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HAPPY_VILLAGER, spot.getX() + 0.5, spot.getY() + 1.0, spot.getZ() + 0.5, 15, 0.5, 0.5, 0.5, 0.05);
       Chat.raw(sp, "&aAn &a&lExpedition Supplier&r&a has appeared nearby! Right-click to trade loot for supplies.");
       // Drop supply bundles on the ground as physical items too
       for (int i = 0; i < 3; i++) {
@@ -8497,8 +8497,8 @@ public final class ExpeditionManager {
       markPack(s, boss);
       s.zoneLevel.addFreshEntity(boss);
       s.miniBossId = boss.getUUID();
-      s.zoneLevel.sendParticles(ParticleTypes.SMOKE, spot.getX() + 0.5, spot.getY() + 1.0, spot.getZ() + 0.5, 20, 0.5, 1.0, 0.5, 0.05);
-      s.zoneLevel.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, spot.getX() + 0.5, spot.getY() + 1.5, spot.getZ() + 0.5, 15, 0.3, 0.5, 0.3, 0.03);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.SMOKE, spot.getX() + 0.5, spot.getY() + 1.0, spot.getZ() + 0.5, 20, 0.5, 1.0, 0.5, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.SOUL_FIRE_FLAME, spot.getX() + 0.5, spot.getY() + 1.5, spot.getZ() + 0.5, 15, 0.3, 0.5, 0.3, 0.03);
       Chat.raw(sp, s.type.color + "§l§lA " + miniBossName(s.type) + "§r§7 has appeared! Slay it for bonus loot!");
    }
 
@@ -8581,8 +8581,8 @@ public final class ExpeditionManager {
       Chat.raw(sp, "§4§l━━━ THE FLOOR GUARDIAN AWAKENS ━━━");
       Chat.raw(sp, "§4§l" + floorBossName(s.type) + " §r§7holds the descent.");
       SoundUtil.play(sp, ModSounds.MYSTERY);
-      s.zoneLevel.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, sp.getX(), sp.getY() + 1.0, sp.getZ(), 50, 1.2, 1.0, 1.2, 0.05);
-      s.zoneLevel.sendParticles(ParticleTypes.SMOKE, sp.getX(), sp.getY() + 1.5, sp.getZ(), 40, 1.5, 1.0, 1.5, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.SOUL_FIRE_FLAME, sp.getX(), sp.getY() + 1.0, sp.getZ(), 50, 1.2, 1.0, 1.2, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.SMOKE, sp.getX(), sp.getY() + 1.5, sp.getZ(), 40, 1.5, 1.0, 1.5, 0.02);
    }
 
    /**
@@ -8859,8 +8859,8 @@ public final class ExpeditionManager {
          boss.addEffect(new net.minecraft.world.effect.MobEffectInstance(MobEffects.SPEED, 20 * 120, 1, false, false, false));
          boss.addEffect(new net.minecraft.world.effect.MobEffectInstance(MobEffects.STRENGTH, 20 * 120, 1, false, false, false));
          boss.addEffect(new net.minecraft.world.effect.MobEffectInstance(MobEffects.RESISTANCE, 20 * 120, 1, false, false, false));
-         s.zoneLevel.sendParticles(ParticleTypes.SONIC_BOOM, boss.getX(), boss.getY() + 1.0, boss.getZ(), 3, 0.6, 0.4, 0.6, 0.0);
-         s.zoneLevel.sendParticles(guardianSpark(s.type), boss.getX(), boss.getY() + 1.0, boss.getZ(), 60, 1.4, 1.2, 1.4, 0.2);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.SONIC_BOOM, boss.getX(), boss.getY() + 1.0, boss.getZ(), 3, 0.6, 0.4, 0.6, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, guardianSpark(s.type), boss.getX(), boss.getY() + 1.0, boss.getZ(), 60, 1.4, 1.2, 1.4, 0.2);
          s.zoneLevel.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.8F, 0.55F);
       }
       // A rush that hit nothing leaves him standing in the wall he charged into. In a chamber that is
@@ -8870,7 +8870,7 @@ public final class ExpeditionManager {
          boss.setTarget(null);
          boss.setDeltaMovement(Vec3.ZERO);
          if (tick % 4L == 0L) {
-            s.zoneLevel.sendParticles(guardianHaze(s.type), boss.getX(), boss.getY() + 1.4, boss.getZ(), 6, 0.35, 0.35, 0.35, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, guardianHaze(s.type), boss.getX(), boss.getY() + 1.4, boss.getZ(), 6, 0.35, 0.35, 0.35, 0.02);
          }
          return;
       }
@@ -8903,7 +8903,7 @@ public final class ExpeditionManager {
          }
          if (!reachedAnybody) {
             s.guardianStaggerUntil = tick + STAGGER_TICKS;
-            s.zoneLevel.sendParticles(ParticleTypes.LARGE_SMOKE, boss.getX(), boss.getY() + 1.0, boss.getZ(), 22, 0.6, 0.6, 0.6, 0.04);
+            com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.LARGE_SMOKE, boss.getX(), boss.getY() + 1.0, boss.getZ(), 22, 0.6, 0.6, 0.6, 0.04);
             s.zoneLevel.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.IRON_GOLEM_HURT, SoundSource.HOSTILE, 1.4F, 0.6F);
             boss.setTarget(null);
             return;
@@ -8980,8 +8980,8 @@ public final class ExpeditionManager {
             boss.hurtMarked = true;
          }
       }
-      level.sendParticles(guardianHaze(s.type), boss.getX(), boss.getY() + 0.35, boss.getZ(), 8, 0.35, 0.2, 0.35, 0.03);
-      level.sendParticles(guardianSpark(s.type), boss.getX(), boss.getY() + 0.9, boss.getZ(), 4, 0.3, 0.3, 0.3, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, guardianHaze(s.type), boss.getX(), boss.getY() + 0.35, boss.getZ(), 8, 0.35, 0.2, 0.35, 0.03);
+      com.fortuneandfavors.net.FfVfx.particles(level, guardianSpark(s.type), boss.getX(), boss.getY() + 0.9, boss.getZ(), 4, 0.3, 0.3, 0.3, 0.05);
       // The shoulder goes through whatever is in the line, and the line is the room's: a charge that
       // only ever touched one explorer would let a party stand shoulder to shoulder and be charged
       // through as if they were one body.
@@ -9011,10 +9011,10 @@ public final class ExpeditionManager {
       boolean arenaSlam = inArena(s, s.body(sp.getUUID()).lastRoom);
       double ring = arenaSlam ? 10.0 : 4.2;
       double reach = arenaSlam ? 15.0 : 8.0;
-      level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.BLOCK, guardianDebris(s.type)), x, y + 0.15, z, 90, ring, 0.25, ring, 0.35);
-      level.sendParticles(ParticleTypes.EXPLOSION, x, y + 0.4, z, 4, 1.8, 0.2, 1.8, 0.0);
-      level.sendParticles(guardianSpark(s.type), x, y + 0.8, z, 70, ring * 0.85, 0.5, ring * 0.85, 0.12);
-      level.sendParticles(guardianHaze(s.type), x, y + 0.5, z, 40, ring * 0.75, 0.3, ring * 0.75, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.BLOCK, guardianDebris(s.type)), x, y + 0.15, z, 90, ring, 0.25, ring, 0.35);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION, x, y + 0.4, z, 4, 1.8, 0.2, 1.8, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, guardianSpark(s.type), x, y + 0.8, z, 70, ring * 0.85, 0.5, ring * 0.85, 0.12);
+      com.fortuneandfavors.net.FfVfx.particles(level, guardianHaze(s.type), x, y + 0.5, z, 40, ring * 0.75, 0.3, ring * 0.75, 0.05);
       level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.7F, 0.55F);
       level.playSound(null, x, y, z, SoundEvents.ANVIL_LAND, SoundSource.HOSTILE, 1.5F, 0.5F);
       // The ring is the pit's own floor leaving the pit, so it is judged against everybody standing
@@ -9066,12 +9066,12 @@ public final class ExpeditionManager {
          double a = Math.PI * 2.0 * i / points;
          double px = x + Math.cos(a) * r;
          double pz = z + Math.sin(a) * r;
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.BLOCK, guardianDebris(s.type)),
             px, y + 0.2, pz, 2, 0.15, 0.25, 0.15, 0.06
          );
          if (i % 4 == 0) {
-            level.sendParticles(guardianSpark(s.type), px, y + 0.7, pz, 1, 0.1, 0.3, 0.1, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, guardianSpark(s.type), px, y + 0.7, pz, 1, 0.1, 0.3, 0.1, 0.0);
          }
       }
       if (ServerClock.clock(level) % 8L == 0L) {
@@ -9095,8 +9095,8 @@ public final class ExpeditionManager {
          Vec3 dir = away.lengthSqr() < 1.0E-4 ? new Vec3(0.0, 0.0, 1.0) : away.normalize();
          victim.hurtServer(level, level.damageSources().mobAttack(boss), (float)guardianHit(s, 12.0));
          victim.push(dir.x * 1.9, 1.1, dir.z * 1.9);
-         level.sendParticles(ParticleTypes.EXPLOSION, victim.getX(), victim.getY() + 0.5, victim.getZ(), 2, 0.4, 0.2, 0.4, 0.0);
-         level.sendParticles(ParticleTypes.CRIT, victim.getX(), victim.getY() + 1.0, victim.getZ(), 18, 0.4, 0.4, 0.4, 0.15);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION, victim.getX(), victim.getY() + 0.5, victim.getZ(), 2, 0.4, 0.2, 0.4, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, victim.getX(), victim.getY() + 1.0, victim.getZ(), 18, 0.4, 0.4, 0.4, 0.15);
          level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.1F, 0.8F);
       }
    }
@@ -9126,14 +9126,14 @@ public final class ExpeditionManager {
       } catch (Throwable ignored) {
       }
       // The tear: the column he pulled out, and the lane he threw it down.
-      level.sendParticles(guardianHaze(s.type), boss.getX(), boss.getY() + 1.6, boss.getZ(), 30, 0.7, 0.7, 0.7, 0.06);
-      level.sendParticles(ParticleTypes.EXPLOSION, boss.getX(), boss.getY() + 1.2, boss.getZ(), 2, 0.5, 0.3, 0.5, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, guardianHaze(s.type), boss.getX(), boss.getY() + 1.6, boss.getZ(), 30, 0.7, 0.7, 0.7, 0.06);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION, boss.getX(), boss.getY() + 1.2, boss.getZ(), 2, 0.5, 0.3, 0.5, 0.0);
       double dx = tx - boss.getX();
       double dz = tz - boss.getZ();
       double span = Math.max(1.0, Math.sqrt(dx * dx + dz * dz));
       for (int i = 1; i <= 12; i++) {
          double t = i / 13.0;
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             guardianSpark(s.type), boss.getX() + dx * t, boss.getY() + 1.4 + Math.sin(t * Math.PI) * 3.0, boss.getZ() + dz * t, 1, 0.1, 0.1, 0.1, 0.0
          );
       }
@@ -9149,11 +9149,11 @@ public final class ExpeditionManager {
       double x = s.guardianThrowX;
       double z = s.guardianThrowZ;
       double y = boss.getY();
-      level.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(level, 
          new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.BLOCK, guardianDebris(s.type)), x, y + 0.2, z, 85, 3.0, 0.3, 3.0, 0.3
       );
-      level.sendParticles(ParticleTypes.EXPLOSION, x, y + 0.5, z, 3, 1.6, 0.2, 1.6, 0.0);
-      level.sendParticles(guardianHaze(s.type), x, y + 0.6, z, 40, 2.6, 0.4, 2.6, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION, x, y + 0.5, z, 3, 1.6, 0.2, 1.6, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, guardianHaze(s.type), x, y + 0.6, z, 40, 2.6, 0.4, 2.6, 0.05);
       level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.5F, 0.6F);
       level.playSound(null, x, y, z, SoundEvents.STONE_BREAK, SoundSource.HOSTILE, 1.3F, 0.5F);
       BlockPos at = new BlockPos((int)Math.floor(x), (int)Math.floor(y), (int)Math.floor(z));
@@ -9203,7 +9203,7 @@ public final class ExpeditionManager {
          net.minecraft.world.entity.item.FallingBlockEntity rock =
             net.minecraft.world.entity.item.FallingBlockEntity.fall(level, at, guardianDebris(s.type));
          rock.disableDrop();
-         level.sendParticles(guardianHaze(s.type), fx + 0.5, top + 0.6, fz + 0.5, 10, 0.6, 0.5, 0.6, 0.03);
+         com.fortuneandfavors.net.FfVfx.particles(level, guardianHaze(s.type), fx + 0.5, top + 0.6, fz + 0.5, 10, 0.6, 0.5, 0.6, 0.03);
       }
       level.playSound(null, sp.getX(), sp.getY(), sp.getZ(), SoundEvents.WITHER_BREAK_BLOCK, SoundSource.HOSTILE, 1.3F, 0.6F);
       level.playSound(null, sp.getX(), sp.getY(), sp.getZ(), SoundEvents.GRAVEL_BREAK, SoundSource.HOSTILE, 1.2F, 0.7F);
@@ -9228,29 +9228,29 @@ public final class ExpeditionManager {
       // move that stops working the moment the fight moves up onto the terrace.
       int fy = (int)Math.floor(sp.getY());
       BlockPos landing = new BlockPos((int)Math.floor(x), fy, (int)Math.floor(z));
-      level.sendParticles(ParticleTypes.PORTAL, boss.getX(), boss.getY() + 1.0, boss.getZ(), 30, 0.4, 0.6, 0.4, 0.3);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, boss.getX(), boss.getY() + 1.0, boss.getZ(), 30, 0.4, 0.6, 0.4, 0.3);
       level.playSound(null, boss.getX(), boss.getY() + 1.0, boss.getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 0.9F, 0.6F);
       if (!level.getBlockState(landing).isAir() || !level.getBlockState(landing.above()).isAir()
          || level.getBlockState(landing.below()).isAir()) {
-         level.sendParticles(guardianHaze(s.type), boss.getX(), boss.getY() + 1.0, boss.getZ(), 12, 0.4, 0.5, 0.4, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(level, guardianHaze(s.type), boss.getX(), boss.getY() + 1.0, boss.getZ(), 12, 0.4, 0.5, 0.4, 0.02);
          return;
       }
       boss.teleportTo(x, fy, z);
       boss.hurtMarked = true;
-      level.sendParticles(ParticleTypes.PORTAL, x, fy + 1.0, z, 45, 0.5, 0.7, 0.5, 0.35);
-      level.sendParticles(ParticleTypes.SWEEP_ATTACK, x, fy + 1.0, z, 6, 1.8, 0.4, 1.8, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, x, fy + 1.0, z, 45, 0.5, 0.7, 0.5, 0.35);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SWEEP_ATTACK, x, fy + 1.0, z, 6, 1.8, 0.4, 1.8, 0.0);
       level.playSound(null, x, fy + 1.0, z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.3F, 0.5F);
       if (horizDist2(landing, sp.blockPosition()) <= 16L) {
          sp.hurtServer(level, level.damageSources().mobAttack(boss), (float)guardianHit(s, 12.0));
          sp.push((sp.getX() - x) * 0.8, 0.55, (sp.getZ() - z) * 0.8);
-         level.sendParticles(ParticleTypes.CRIT, sp.getX(), sp.getY() + 1.0, sp.getZ(), 20, 0.4, 0.4, 0.4, 0.2);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, sp.getX(), sp.getY() + 1.0, sp.getZ(), 20, 0.4, 0.4, 0.4, 0.2);
          level.playSound(null, sp.getX(), sp.getY(), sp.getZ(), SoundEvents.IRON_GOLEM_ATTACK, SoundSource.HOSTILE, 1.0F, 1.4F);
       }
    }
 
    /** The dust a slam kicks up at the explorer's feet, so the hit is felt where it landed. */
    private static void sparkOut(ServerLevel level, double x, double y, double z, double spread) {
-      level.sendParticles(ParticleTypes.CRIT, x, y + 0.3, z, 24, spread, 0.4, spread, 0.25);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, x, y + 0.3, z, 24, spread, 0.4, spread, 0.25);
    }
 
    /** The floor guardian's drop: a ladder that skips five chambers of the maze. */
@@ -9380,7 +9380,7 @@ public final class ExpeditionManager {
          withdrawExitCompass(down);
          giveExitCompass(down, next);
          SoundUtil.play(down, ModSounds.TRANSFER);
-         zone.sendParticles(ParticleTypes.PORTAL, down.getX(), down.getY() + 1.0, down.getZ(), 90, 0.7, 1.0, 0.7, 0.09);
+         com.fortuneandfavors.net.FfVfx.particles(zone, ParticleTypes.PORTAL, down.getX(), down.getY() + 1.0, down.getZ(), 90, 0.7, 1.0, 0.7, 0.09);
          Chat.raw(down, "§6§lTHE LADDER SWALLOWS YOU WHOLE.");
          if (went > 1) {
             Chat.raw(
@@ -9573,7 +9573,7 @@ public final class ExpeditionManager {
       goblin.setPos(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
       markPack(s, goblin);
       s.zoneLevel.addFreshEntity(goblin);
-      s.zoneLevel.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, 
          ParticleTypes.HAPPY_VILLAGER, spot.getX() + 0.5, spot.getY() + 1.0, spot.getZ() + 0.5, 20, 0.5, 0.6, 0.5, 0.05
       );
       Chat.raw(sp, "§6§lA LOOT GOBLIN! §r§7Catch it before it gets away - the bounty is §a" + Chat.moneyStr(LOOT_GOBLIN_BOUNTY) + "§7.");
@@ -9618,11 +9618,11 @@ public final class ExpeditionManager {
          s.lootValue += WAGER_STAKE * 2L;
          Chat.raw(sp, "§6§lTHE COIN LANDS YOUR WAY! §r§a+" + Chat.moneyStr(WAGER_STAKE) + " §7secured.");
          SoundUtil.play(sp, ModSounds.JOB_COMPLETE);
-         s.zoneLevel.sendParticles(ParticleTypes.FIREWORK, sp.getX(), sp.getY() + 1.2, sp.getZ(), 25, 0.6, 0.5, 0.6, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.FIREWORK, sp.getX(), sp.getY() + 1.2, sp.getZ(), 25, 0.6, 0.5, 0.6, 0.05);
       } else {
          Chat.raw(sp, "§c§lTHE COIN LANDS AGAINST YOU. §r§7Stake lost - §c-" + Chat.moneyStr(WAGER_STAKE) + "§7 secured loot.");
          SoundUtil.play(sp, ModSounds.DENY);
-         s.zoneLevel.sendParticles(ParticleTypes.SMOKE, sp.getX(), sp.getY() + 1.2, sp.getZ(), 20, 0.5, 0.5, 0.5, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.SMOKE, sp.getX(), sp.getY() + 1.2, sp.getZ(), 20, 0.5, 0.5, 0.5, 0.02);
       }
       return InteractionResult.SUCCESS;
    }
@@ -9631,7 +9631,7 @@ public final class ExpeditionManager {
    private static InteractionResult useReliquary(ServerPlayer sp, State s, BlockPos pos) {
       s.props.remove(pos);
       setIfChanged(s.zoneLevel, pos, Blocks.AIR.defaultBlockState());
-      s.zoneLevel.sendParticles(ParticleTypes.LARGE_SMOKE, pos.getX() + 0.5, pos.getY() + 0.7, pos.getZ() + 0.5, 14, 0.3, 0.3, 0.3, 0.03);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.LARGE_SMOKE, pos.getX() + 0.5, pos.getY() + 0.7, pos.getZ() + 0.5, 14, 0.3, 0.3, 0.3, 0.03);
       if (RANDOM.nextInt(3) == 0) {
          // Trapped: no blast, deliberately - a reliquary that breaches a chamber's floor is a
          // dungeon that can be taken apart from the inside. The surprise is the pack it wakes.
@@ -9649,7 +9649,7 @@ public final class ExpeditionManager {
          s.lootCount++;
          Chat.raw(sp, "§e§lThe reliquary gives. §r§a+" + Chat.moneyStr(pay) + " §7secured.");
          SoundUtil.play(sp, ModSounds.JOB_COMPLETE);
-         s.zoneLevel.sendParticles(ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.7, pos.getZ() + 0.5, 16, 0.3, 0.3, 0.3, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.7, pos.getZ() + 0.5, 16, 0.3, 0.3, 0.3, 0.05);
       }
       return InteractionResult.SUCCESS;
    }
@@ -9670,7 +9670,7 @@ public final class ExpeditionManager {
       }
       room.runesLit++;
       setIfChanged(s.zoneLevel, pos, Blocks.SHROOMLIGHT.defaultBlockState());
-      s.zoneLevel.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 20, 0.3, 0.3, 0.3, 0.03);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.SOUL_FIRE_FLAME, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 20, 0.3, 0.3, 0.3, 0.03);
       SoundUtil.play(sp, ModSounds.MYSTERY);
       if (room.runesLit >= room.runesTotal) {
          room.runesOpened = true;
@@ -9678,7 +9678,7 @@ public final class ExpeditionManager {
          s.lootCount++;
          Chat.raw(sp, "§5§lTHE RUNE LOCK OPENS. §r§a+" + Chat.moneyStr(RUNE_PAYOUT) + " §7secured, and the strongbox is yours.");
          SoundUtil.play(sp, ModSounds.JOB_COMPLETE);
-         s.zoneLevel.sendParticles(ParticleTypes.FIREWORK, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 30, 0.8, 0.6, 0.8, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.FIREWORK, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 30, 0.8, 0.6, 0.8, 0.05);
       } else {
          Chat.raw(sp, "§5A rune takes the light. §7" + room.runesLit + "/" + room.runesTotal + " stones burn.");
       }
@@ -9699,9 +9699,9 @@ public final class ExpeditionManager {
       sp.heal(healed);
       com.fortuneandfavors.util.InventoryHelper.giveOrDrop(sp, new ItemStack(Items.BREAD, 8));
       com.fortuneandfavors.util.InventoryHelper.giveOrDrop(sp, new ItemStack(Items.TORCH, 16));
-      s.zoneLevel.sendParticles(ParticleTypes.HEART, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 18, 0.6, 0.6, 0.6, 0.02);
-      s.zoneLevel.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 14, 0.4, 0.5, 0.4, 0.06);
-      s.zoneLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 14, 0.5, 0.5, 0.5, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HEART, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 18, 0.6, 0.6, 0.6, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.TOTEM_OF_UNDYING, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 14, 0.4, 0.5, 0.4, 0.06);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 14, 0.5, 0.5, 0.5, 0.02);
       Chat.raw(
          sp,
          "§a§lSUPPLY CRATE OPEN. §r§7Bandages, bread and light - §f+" + (int)Math.ceil(healed) + " health§7 back."
@@ -9819,9 +9819,9 @@ public final class ExpeditionManager {
             )
          );
       }
-      s.zoneLevel.sendParticles(ParticleTypes.HEART, pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5, 16, 0.5, 0.5, 0.5, 0.02);
-      s.zoneLevel.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 12, 0.4, 0.5, 0.4, 0.06);
-      s.zoneLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 12, 0.5, 0.4, 0.5, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HEART, pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5, 16, 0.5, 0.5, 0.5, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.TOTEM_OF_UNDYING, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 12, 0.4, 0.5, 0.4, 0.06);
+      com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 12, 0.5, 0.4, 0.5, 0.02);
       Chat.raw(
          sp,
          "§c§lHEALING DRAUGHT. §r§7+" + (int)Math.ceil(healed) + " health now"
@@ -9951,9 +9951,9 @@ public final class ExpeditionManager {
          }
          double y = c.getY() + 1.1;
          for (int i = 0; i < 12; i++) {
-            s.zoneLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, c.getX() + 0.5, y + i * 0.5, c.getZ() + 0.5, 1, 0.16, 0.0, 0.16, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HAPPY_VILLAGER, c.getX() + 0.5, y + i * 0.5, c.getZ() + 0.5, 1, 0.16, 0.0, 0.16, 0.0);
          }
-         s.zoneLevel.sendParticles(ParticleTypes.HEART, c.getX() + 0.5, y + 0.4, c.getZ() + 0.5, 2, 0.5, 0.3, 0.5, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HEART, c.getX() + 0.5, y + 0.4, c.getZ() + 0.5, 2, 0.5, 0.3, 0.5, 0.01);
       }
    }
 
@@ -10016,9 +10016,9 @@ public final class ExpeditionManager {
          }
          double y = floorY(s) + 0.6;
          for (int i = 0; i < 20; i++) {
-            s.zoneLevel.sendParticles(ParticleTypes.END_ROD, c.getX() + 0.5, y + i, c.getZ() + 0.5, 1, 0.02, 0.0, 0.02, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.END_ROD, c.getX() + 0.5, y + i, c.getZ() + 0.5, 1, 0.02, 0.0, 0.02, 0.0);
          }
-         s.zoneLevel.sendParticles(ParticleTypes.HEART, c.getX() + 0.5, y + 2.4, c.getZ() + 0.5, 2, 0.7, 0.7, 0.7, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(s.zoneLevel, ParticleTypes.HEART, c.getX() + 0.5, y + 2.4, c.getZ() + 0.5, 2, 0.7, 0.7, 0.7, 0.01);
       }
    }
 
@@ -10105,7 +10105,7 @@ public final class ExpeditionManager {
       s.eventLabelUntil = elapsed + 200L;
       Chat.raw(sp, label + " §r§7- a site event is under way!");
       SoundUtil.play(sp, ModSounds.MYSTERY);
-      level.sendParticles(particle, at.getX() + 0.5, at.getY() + 1.2, at.getZ() + 0.5, 30, 0.8, 0.6, 0.8, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, particle, at.getX() + 0.5, at.getY() + 1.2, at.getZ() + 0.5, 30, 0.8, 0.6, 0.8, 0.05);
    }
 
    /** True if the block sits inside a chamber this run has actually carved. */
@@ -10312,7 +10312,7 @@ public final class ExpeditionManager {
       if (origin != null) {
          teleportPlayer(sp, origin, s.body(sp.getUUID()).originX, s.body(sp.getUUID()).originY, s.body(sp.getUUID()).originZ);
       }
-      sp.level().sendParticles(ParticleTypes.PORTAL, sp.getX(), sp.getY() + 1.0, sp.getZ(), 30, 0.5, 0.5, 0.5, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(sp.level(), ParticleTypes.PORTAL, sp.getX(), sp.getY() + 1.0, sp.getZ(), 30, 0.5, 0.5, 0.5, 0.05);
       // The purse closes when the last member of the party is out of the site. While somebody is
       // still underground the pot stands, because they are still owed it.
       PartyManager.runEndedIfIdle(sp);
@@ -10442,8 +10442,8 @@ public final class ExpeditionManager {
       for (int i = 0; i < 40; i++) {
          double x = bx + lo + RANDOM.nextDouble() * (hi - lo);
          double z = bz + lo + RANDOM.nextDouble() * (hi - lo);
-         level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.FALLING_DUST, Blocks.GRAVEL.defaultBlockState()), x, top - 1.2, z, 3, 0.35, 0.5, 0.35, 0.06);
-         level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, x, fy + 1.6, z, 1, 0.5, 0.5, 0.5, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.FALLING_DUST, Blocks.GRAVEL.defaultBlockState()), x, top - 1.2, z, 3, 0.35, 0.5, 0.35, 0.06);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CAMPFIRE_COSY_SMOKE, x, fy + 1.6, z, 1, 0.5, 0.5, 0.5, 0.01);
       }
       double p = collapsePressure(s.collapseFelled, s.collapseTotal);
       double cx = bx + ROOM_PITCH / 2.0 + 0.5;
@@ -10532,12 +10532,12 @@ public final class ExpeditionManager {
          for (int n = 0; n < 7; n++) {
             double x = bx + lo + RANDOM.nextDouble() * span;
             double z = bz + lo + RANDOM.nextDouble() * span;
-            level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.FALLING_DUST, Blocks.GRAVEL.defaultBlockState()), x, top - 1.3, z, 1, 0.25, 0.4, 0.25, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(level, new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.FALLING_DUST, Blocks.GRAVEL.defaultBlockState()), x, top - 1.3, z, 1, 0.25, 0.4, 0.25, 0.05);
             if (RANDOM.nextInt(3) == 0) {
-               level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, x, fy + 1.5, z, 1, 0.4, 0.3, 0.4, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CAMPFIRE_COSY_SMOKE, x, fy + 1.5, z, 1, 0.4, 0.3, 0.4, 0.01);
             }
             if (RANDOM.nextInt(6) == 0) {
-               level.sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(level, 
                   new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.BLOCK, Blocks.GRAVEL.defaultBlockState()),
                   x, fy + 1.2, z, 2, 0.3, 0.2, 0.3, 0.02
                );
@@ -10615,7 +10615,7 @@ public final class ExpeditionManager {
          BlockPos roof = new BlockPos(bx + lx, top, bz + lz);
          if (!level.getBlockState(roof).isAir()) {
             setIfChanged(level, roof, gravel);
-            level.sendParticles(
+            com.fortuneandfavors.net.FfVfx.particles(level, 
                new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.FALLING_DUST, gravel),
                bx + lx + 0.5, top - 0.6, bz + lz + 0.5, 4, 0.3, 0.2, 0.3, 0.03
             );
@@ -10753,7 +10753,7 @@ public final class ExpeditionManager {
       }
       if (horizDist2(new BlockPos(bx + mid, fy, bz + mid), sp.blockPosition()) <= 48 * 48) {
          double p = collapsePressure(s.collapseFelled, s.collapseTotal);
-         level.sendParticles(ParticleTypes.LARGE_SMOKE, cx, fy + 2.0, cz, 40, 5.0, 2.0, 5.0, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, cx, fy + 2.0, cz, 40, 5.0, 2.0, 5.0, 0.05);
          level.playSound(null, cx, fy + 1, cz, SoundEvents.STONE_BREAK, SoundSource.BLOCKS, 1.4F, 0.6F);
          // A chamber leaving the world is the loudest thing in the fall, and it gets louder: a shock
          // ring of sparks across the floor of the chamber and a rising column of dust out of it, both
@@ -10929,7 +10929,7 @@ public final class ExpeditionManager {
       if (origin != null) {
          teleportPlayer(sp, origin, s.body(sp.getUUID()).originX, s.body(sp.getUUID()).originY, s.body(sp.getUUID()).originZ);
       }
-      sp.level().sendParticles(ParticleTypes.PORTAL, sp.getX(), sp.getY() + 1.0, sp.getZ(), 30, 0.5, 0.5, 0.5, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(sp.level(), ParticleTypes.PORTAL, sp.getX(), sp.getY() + 1.0, sp.getZ(), 30, 0.5, 0.5, 0.5, 0.05);
       // An ejection ends a run as surely as an extraction does, so a party whose last member was
       // thrown out of the site must have its purse closed here too - the pot is only for a run that
       // is still going. See PartyManager#runEndedIfIdle.
@@ -10993,7 +10993,7 @@ public final class ExpeditionManager {
                return;
             }
             int y = floorY(s) + ROOM_HEIGHT - 2;
-            level.sendParticles(ParticleTypes.LARGE_SMOKE, at.getX() + 0.5, y, at.getZ() + 0.5, 12, 0.6, 0.4, 0.6, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, at.getX() + 0.5, y, at.getZ() + 0.5, 12, 0.6, 0.4, 0.6, 0.02);
             if (tick % 40L == 0L) {
                // A body-sized lump of the roof, dropped where it stands. It falls, it hits, and it
                // does not care whose head it lands on. Its drop is switched off in the same breath:
@@ -11015,8 +11015,8 @@ public final class ExpeditionManager {
             for (int i = 0; i < 6; i++) {
                double x = sp.getX() + (RANDOM.nextDouble() - 0.5) * 16.0;
                double z = sp.getZ() + (RANDOM.nextDouble() - 0.5) * 16.0;
-               level.sendParticles(ParticleTypes.FLAME, x, floorY(s) + 1.2, z, 1, 0.2, 0.3, 0.2, 0.01);
-               level.sendParticles(ParticleTypes.SMOKE, x, floorY(s) + 2.2, z, 1, 0.3, 0.4, 0.3, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.FLAME, x, floorY(s) + 1.2, z, 1, 0.2, 0.3, 0.2, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMOKE, x, floorY(s) + 2.2, z, 1, 0.3, 0.4, 0.3, 0.01);
             }
          }
          case FLOODED -> {
@@ -11025,19 +11025,19 @@ public final class ExpeditionManager {
             for (int i = 0; i < 5; i++) {
                double x = sp.getX() + (RANDOM.nextDouble() - 0.5) * 14.0;
                double z = sp.getZ() + (RANDOM.nextDouble() - 0.5) * 14.0;
-               level.sendParticles(ParticleTypes.SPLASH, x, floorY(s) + 0.4, z, 1, 0.2, 0.2, 0.2, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SPLASH, x, floorY(s) + 0.4, z, 1, 0.2, 0.2, 0.2, 0.01);
             }
          }
          case DARK -> {
             double x = sp.getX() + (RANDOM.nextDouble() - 0.5) * 14.0;
             double z = sp.getZ() + (RANDOM.nextDouble() - 0.5) * 14.0;
-            level.sendParticles(ParticleTypes.SQUID_INK, x, floorY(s) + 1.5, z, 1, 0.2, 0.4, 0.2, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SQUID_INK, x, floorY(s) + 1.5, z, 1, 0.2, 0.4, 0.2, 0.0);
          }
          case OVERGROWN -> {
             for (int i = 0; i < 4; i++) {
                double x = sp.getX() + (RANDOM.nextDouble() - 0.5) * 14.0;
                double z = sp.getZ() + (RANDOM.nextDouble() - 0.5) * 14.0;
-               level.sendParticles(ParticleTypes.HAPPY_VILLAGER, x, floorY(s) + 1.4, z, 1, 0.3, 0.4, 0.3, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, x, floorY(s) + 1.4, z, 1, 0.3, 0.4, 0.3, 0.01);
             }
          }
       }
@@ -11216,8 +11216,8 @@ public final class ExpeditionManager {
       for (int i = 0; i < 8; i++) {
          double x = sp.getX() + (RANDOM.nextDouble() - 0.5) * 6.0;
          double z = sp.getZ() + (RANDOM.nextDouble() - 0.5) * 6.0;
-         level.sendParticles(ParticleTypes.LARGE_SMOKE, x, sp.getY() + 0.5, z, 1, 0.2, 0.4, 0.2, 0.01);
-         level.sendParticles(ParticleTypes.CRIT, x, sp.getY() + 1.2, z, 2, 0.3, 0.3, 0.3, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, x, sp.getY() + 0.5, z, 1, 0.2, 0.4, 0.2, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, x, sp.getY() + 1.2, z, 2, 0.3, 0.3, 0.3, 0.05);
       }
       if (ServerClock.clock(level) % 20L == 0L) {
          sp.hurt(sp.damageSources().generic(), 2.0F);
@@ -11845,7 +11845,7 @@ public final class ExpeditionManager {
          int x = center.getX() + (int)Math.round(Math.cos(a) * radius);
          int z = center.getZ() + (int)Math.round(Math.sin(a) * radius);
          int y = center.getY() + 2 + (i % 3);
-         level.sendParticles(ParticleTypes.SOUL, x + 0.5, y + 0.5, z + 0.5, 1, 0.1, 0.1, 0.1, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, x + 0.5, y + 0.5, z + 0.5, 1, 0.1, 0.1, 0.1, 0.01);
       }
    }
 

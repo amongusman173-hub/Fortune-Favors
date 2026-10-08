@@ -124,13 +124,13 @@ public final class SonicBoom {
       double y = p.getY();
       double z = p.getZ();
       level.playSound(null, x, y, z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.PLAYERS, 30.0F, 1.4F);
-      level.sendParticles(ParticleTypes.SONIC_BOOM, x, y + 1.0, z, 1, 0.0, 0.0, 0.0, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, x, y + 1.0, z, 1, 0.0, 0.0, 0.0, 0.0);
       for (int i = 0; i < 24; i++) {
          double a = Math.PI * 2.0 * i / 24.0;
-         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, x + Math.cos(a), y + 0.3, z + Math.sin(a), 1, 0.0, 0.05, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ELECTRIC_SPARK, x + Math.cos(a), y + 0.3, z + Math.sin(a), 1, 0.0, 0.05, 0.0, 0.0);
       }
-      level.sendParticles(ParticleTypes.CLOUD, x, y + 0.8, z, 10, 0.4, 0.3, 0.4, 0.02);
-      level.sendParticles(ParticleTypes.GUST, x, y + 0.8, z, 4, 0.4, 0.3, 0.4, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CLOUD, x, y + 0.8, z, 10, 0.4, 0.3, 0.4, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.GUST, x, y + 0.8, z, 4, 0.4, 0.3, 0.4, 0.02);
 
       bar(p, "§b§lSONIC BOOM! §r§7Land, or fold your wings, to charge another.");
 

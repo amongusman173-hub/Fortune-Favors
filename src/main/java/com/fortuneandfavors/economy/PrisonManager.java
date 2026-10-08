@@ -1653,7 +1653,7 @@ public final class PrisonManager {
          }
          // It glints, so a prisoner looking up from the wall they are working can see it.
          BlockPos first = face.get(0);
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             ParticleTypes.END_ROD,
             first.getX() + 0.5,
             first.getY() + 1.2,

@@ -1449,14 +1449,14 @@ public final class SkillManager {
       float big = bigCatchChance(uuid);
       if (big > 0.0F && RANDOM.nextFloat() < big) {
          player.drop(caught.copy(), false);
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             ParticleTypes.BUBBLE_POP, player.getX(), player.getY() + 1.2, player.getZ(), 10, 0.4, 0.4, 0.4, 0.05
          );
       }
       float treasure = treasureChance(uuid);
       if (treasure > 0.0F && RANDOM.nextFloat() < treasure) {
          player.drop(treasureRoll(), false);
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 12, 0.4, 0.4, 0.4, 0.04
          );
          Chat.raw(player, "&bTreasure Hunter:&r &7something else came up with it.");
@@ -1582,7 +1582,7 @@ public final class SkillManager {
          };
          BlockPos pos = player.blockPosition();
          level.addFreshEntity(new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, gem));
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5, 8, 0.3, 0.3, 0.3, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5, 8, 0.3, 0.3, 0.3, 0.05);
       } catch (Exception var4) {
       }
    }
@@ -1656,7 +1656,7 @@ public final class SkillManager {
          }
 
          level.setBlock(pos, crop.defaultBlockState(), 3);
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 0.4, pos.getZ() + 0.5, 6, 0.3, 0.2, 0.3, 0.02
          );
       } catch (Exception var6) {
@@ -1798,14 +1798,14 @@ public final class SkillManager {
     * it, sparks off it, a fleck of white flash, and one soft crackle.
     */
    private static void forgeBurst(ServerLevel level, double x, double y, double z) {
-      level.sendParticles(net.minecraft.core.particles.ParticleTypes.LAVA, x, y, z, 3, 0.18, 0.1, 0.18, 0.0);
-      level.sendParticles(net.minecraft.core.particles.ParticleTypes.FLAME, x, y + 0.1, z, 6, 0.2, 0.15, 0.2, 0.01);
-      level.sendParticles(net.minecraft.core.particles.ParticleTypes.SMOKE, x, y + 0.15, z, 5, 0.2, 0.15, 0.2, 0.01);
-      level.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.LAVA, x, y, z, 3, 0.18, 0.1, 0.18, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.FLAME, x, y + 0.1, z, 6, 0.2, 0.15, 0.2, 0.01);
+      com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.SMOKE, x, y + 0.15, z, 5, 0.2, 0.15, 0.2, 0.01);
+      com.fortuneandfavors.net.FfVfx.particles(level, 
          net.minecraft.core.particles.ColorParticleOption.create(net.minecraft.core.particles.ParticleTypes.FLASH, 0xFFB347),
          x, y + 0.1, z, 1, 0.0, 0.0, 0.0, 0.0
       );
-      level.sendParticles(net.minecraft.core.particles.ParticleTypes.ELECTRIC_SPARK, x, y + 0.2, z, 4, 0.25, 0.2, 0.25, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.ELECTRIC_SPARK, x, y + 0.2, z, 4, 0.25, 0.2, 0.25, 0.02);
       level.playSound(null, x, y, z, net.minecraft.sounds.SoundEvents.FURNACE_FIRE_CRACKLE, net.minecraft.sounds.SoundSource.BLOCKS, 0.6F, 1.35F);
    }
 

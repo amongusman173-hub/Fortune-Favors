@@ -125,7 +125,7 @@ public final class ChunkAnchor {
          // the ground is loaded, and a player who places an anchor and walks away must not be able
          // to catch the chunk it is protecting unloading first.
          loadHeld(server, pos);
-         server.sendParticles(ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 30, 0.6, 0.6, 0.6, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(server, ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 30, 0.6, 0.6, 0.6, 0.05);
          server.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.2F, 1.4F);
       }
    }
@@ -148,7 +148,7 @@ public final class ChunkAnchor {
    public static void release(Level level, BlockPos pos) {
       if (level instanceof ServerLevel server) {
          force(server, pos, false);
-         server.sendParticles(ParticleTypes.SMOKE, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 18, 0.4, 0.4, 0.4, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(server, ParticleTypes.SMOKE, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 18, 0.4, 0.4, 0.4, 0.02);
       }
    }
 
@@ -193,18 +193,18 @@ public final class ChunkAnchor {
       }
       // The corners, and the anchor's own column, so the shape has a centre as well as an edge.
       for (int[] corner : new int[][]{{loX, loZ}, {loX, hiZ}, {hiX, loZ}, {hiX, hiZ}}) {
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             ParticleTypes.ELECTRIC_SPARK, corner[0] + 0.5, y, corner[1] + 0.5, 3, 0.15, 0.3, 0.15, 0.0
          );
          sent += 3;
       }
-      level.sendParticles(ParticleTypes.END_ROD, pos.getX() + 0.5, y + 0.4, pos.getZ() + 0.5, 2, 0.2, 0.3, 0.2, 0.01);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, pos.getX() + 0.5, y + 0.4, pos.getZ() + 0.5, 2, 0.2, 0.3, 0.2, 0.01);
       return sent + 2;
    }
 
    /** One dash of the outline: a single still spark, so the edge reads as a drawn line. */
    private static int edge(ServerLevel level, double x, double y, double z) {
-      level.sendParticles(ParticleTypes.END_ROD, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
       return 1;
    }
 

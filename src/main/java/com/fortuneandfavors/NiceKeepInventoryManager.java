@@ -770,7 +770,7 @@ public final class NiceKeepInventoryManager {
                         snowball.setDeltaMovement(dx / dist * 1.5, dy / dist * 1.5 + 0.3, dz / dist * 1.5);
                         dl.addFreshEntity(snowball);
                         deliverySnowballs.put(snowball.getUUID(), entry.getKey());
-                        dl.sendParticles(ParticleTypes.SNOWFLAKE, death[0], death[1] + 1.0, death[2], 20, 1.0, 0.5, 1.0, 0.06);
+                        com.fortuneandfavors.net.FfVfx.particles(dl, ParticleTypes.SNOWFLAKE, death[0], death[1] + 1.0, death[2], 20, 1.0, 0.5, 1.0, 0.06);
                         dl.playSound(null, death[0], death[1], death[2], SoundEvents.SNOWBALL_THROW, SoundSource.PLAYERS, 1.0F, 1.2F);
                      }
                   } catch (Exception var19) {

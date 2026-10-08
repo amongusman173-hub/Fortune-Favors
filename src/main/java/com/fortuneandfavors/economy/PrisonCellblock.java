@@ -649,7 +649,7 @@ public final class PrisonCellblock {
             title(player, "§c§lDIG. FAST.", "§7he is already walking");
          }
          execLevel.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.GRAVEL_BREAK, SoundSource.BLOCKS, 1.4F, 0.6F);
-         execLevel.sendParticles(ParticleTypes.CRIT, pos.getX() + 0.5, pos.getY() + 0.4, pos.getZ() + 0.5, 12, 0.4, 0.3, 0.4, 0.03);
+         com.fortuneandfavors.net.FfVfx.particles(execLevel, ParticleTypes.CRIT, pos.getX() + 0.5, pos.getY() + 0.4, pos.getZ() + 0.5, 12, 0.4, 0.3, 0.4, 0.03);
          Chat.raw(player, "§7Gravel comes away. §f" + exec.ventGravel.size() + "§7 left over the duct.");
          if (exec.ventGravel.isEmpty()) {
             openVent(exec, execLevel);
@@ -743,8 +743,8 @@ public final class PrisonCellblock {
          restoreLooseBricks(level, uuid);
          level.setBlock(p, Blocks.CRACKED_STONE_BRICKS.defaultBlockState(), 3);
          looseBricks.put(p, new LooseBrick(uuid, s));
-         level.sendParticles(ParticleTypes.CRIT, p.getX() + 0.5, p.getY() + 1.1, p.getZ() + 0.5, 14, 0.35, 0.35, 0.35, 0.03);
-         level.sendParticles(ParticleTypes.LAVA, p.getX() + 0.5, p.getY() + 0.6, p.getZ() + 0.5, 4, 0.2, 0.2, 0.2, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, p.getX() + 0.5, p.getY() + 1.1, p.getZ() + 0.5, 14, 0.35, 0.35, 0.35, 0.03);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LAVA, p.getX() + 0.5, p.getY() + 0.6, p.getZ() + 0.5, 4, 0.2, 0.2, 0.2, 0.0);
          level.playSound(null, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, SoundEvents.STONE_BREAK, SoundSource.BLOCKS, 1.0F, 0.7F);
          if (announce) {
             Chat.raw(player, "§7A §f• loose brick §7has worked free of the wall nearby...");
@@ -935,7 +935,7 @@ public final class PrisonCellblock {
    private static void barBroken(ServerLevel level, Escape esc, BlockPos pos) {
       esc.gate.remove(pos);
       gateBars.remove(pos);
-      level.sendParticles(ParticleTypes.CRIT, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 8, 0.3, 0.3, 0.3, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 8, 0.3, 0.3, 0.3, 0.02);
       if (esc.gate.isEmpty() && !esc.gateOpen) {
          openGate(level, esc);
       }
@@ -1215,14 +1215,14 @@ public final class PrisonCellblock {
                level.getServer(), p.getName().getString() + " broke out of the prison cell block."
             );
             level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 1.2F, 1.4F);
-            level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, p.getX(), p.getY() + 1.0, p.getZ(), 60, 0.8, 0.8, 0.8, 0.3);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.TOTEM_OF_UNDYING, p.getX(), p.getY() + 1.0, p.getZ(), 60, 0.8, 0.8, 0.8, 0.3);
          } else if (expired || recaptured) {
             escapes.remove(uuid);
             endEscape(p, level, esc, "§c§lRECAPTURED!§r §7The guards dragged you back. Heat §c+25§7.");
          } else {
             // Trail markers so you can't lose the corridor.
             BlockPos here = p.blockPosition();
-            level.sendParticles(ParticleTypes.END_ROD, here.getX() + 0.5, here.getY() + 1.2, here.getZ() + 0.5, 3, 0.3, 0.3, 0.3, 0.01);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, here.getX() + 0.5, here.getY() + 1.2, here.getZ() + 0.5, 3, 0.3, 0.3, 0.3, 0.01);
             long left = Math.max(0L, (esc.endTick - clock(level)) / 20L);
             p.sendSystemMessage(
                Component.literal("§4§lESCAPE §8| §7Exit §f" + (int)Math.sqrt(here.distSqr(esc.end)) + "m §8| §7Time §f" + left + "s"), true
@@ -1260,7 +1260,7 @@ public final class PrisonCellblock {
       esc.gateOpen = true;
       level.playSound(null, esc.end, SoundEvents.IRON_DOOR_OPEN, SoundSource.BLOCKS, 1.4F, 0.8F);
       level.playSound(null, esc.end, SoundEvents.IRON_TRAPDOOR_OPEN, SoundSource.BLOCKS, 1.2F, 1.1F);
-      level.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(level, 
          ParticleTypes.ELECTRIC_SPARK, esc.end.getX() + 0.5, esc.end.getY() + 1.0, esc.end.getZ() + 0.5, 40, 1.2, 1.0, 1.2, 0.05
       );
    }
@@ -1318,7 +1318,7 @@ public final class PrisonCellblock {
       }
       guards.computeIfAbsent(player.getUUID(), k -> new HashSet<>()).add(guard.getUUID());
       guardRewardCarry.put(guard.getUUID(), 120 + 18 * rank);
-      level.sendParticles(ParticleTypes.ANGRY_VILLAGER, at.getX() + 0.5, at.getY() + 2.0, at.getZ() + 0.5, 4, 0.3, 0.3, 0.3, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ANGRY_VILLAGER, at.getX() + 0.5, at.getY() + 2.0, at.getZ() + 0.5, 4, 0.3, 0.3, 0.3, 0.0);
       return guard;
    }
 
@@ -1424,7 +1424,7 @@ public final class PrisonCellblock {
       // down the moment he arrives, so the manhunt is one man and one fight rather than a crowd with
       // a boss in it.
       clearCellGuards(level, player.getUUID(), warden.getUUID());
-      level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, spot.getX() + 0.5, spot.getY() + 1.0, spot.getZ() + 0.5, 30, 0.5, 0.8, 0.5, 0.03);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, spot.getX() + 0.5, spot.getY() + 1.0, spot.getZ() + 0.5, 30, 0.5, 0.8, 0.5, 0.03);
       level.playSound(null, spot, SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.2F, 0.7F);
       broadcast(player, "§4§lTHE WARDEN§r §7is on your trail. Put him down and your record is §fclean§7.");
       return warden;
@@ -2650,7 +2650,7 @@ public final class PrisonCellblock {
       player.addEffect(new MobEffectInstance(MobEffects.SPEED, 100, 1, false, false, false));
       player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 100, 0, false, false, false));
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ARMOR_EQUIP_CHAIN.value(), SoundSource.PLAYERS, 1.2F, 1.4F);
-      level.sendParticles(ParticleTypes.ELECTRIC_SPARK, player.getX(), player.getY() + 1.0, player.getZ(), 24, 0.5, 0.6, 0.5, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ELECTRIC_SPARK, player.getX(), player.getY() + 1.0, player.getZ(), 24, 0.5, 0.6, 0.5, 0.05);
       player.closeContainer();
       Chat.raw(player, "§a§lYOU ARE OUT OF THE CUFFS§r §7- " + struggle.slips + " slip" + (struggle.slips == 1 ? "" : "s") + " on the way.");
       enterSecondPhase(player);
@@ -2700,7 +2700,7 @@ public final class PrisonCellblock {
       heat.put(uuid, Math.min(HEAT_MAX, heatOf(uuid) + (struggle.hard ? 10 : 5)));
       player.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 60, 1, false, false, false));
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ANVIL_LAND, SoundSource.HOSTILE, 0.9F, 0.6F);
-      level.sendParticles(ParticleTypes.CRIT, player.getX(), player.getY() + 1.0, player.getZ(), 20, 0.4, 0.5, 0.4, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, player.getX(), player.getY() + 1.0, player.getZ(), 20, 0.4, 0.5, 0.4, 0.05);
       title(player, struggle.hard ? "§4§lTHE SHACKLE HOLDS" : "§4§lTHE CUFFS HOLD", "§7they take what you carry - §fgo");
       Chat.raw(
          player,
@@ -3867,7 +3867,7 @@ public final class PrisonCellblock {
          }
       }
       level.playSound(null, EXEC_X + 0.5, EXEC_Y, EXEC_Z, SoundEvents.IRON_DOOR_OPEN, SoundSource.BLOCKS, 1.0F, 0.6F);
-      level.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(level, 
          new net.minecraft.core.particles.DustParticleOptions(0x7FFFD4, 1.0F),
          EXEC_X + 0.5, EXEC_Y + 1.0, EXEC_Z + 0.5, 14, 0.4, 0.5, 0.4, 0.04
       );
@@ -4470,7 +4470,7 @@ public final class PrisonCellblock {
          // The alarm: the block gets redder and louder as the clock runs down, so the countdown is
          // something the prisoner can see without reading the action bar mid-crawl.
          double urgency = Math.max(0.0, Math.min(1.0, 1.0 - (double)(exec.endTick - now) / (double)EXECUTION_TICKS));
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             new net.minecraft.core.particles.DustParticleOptions(0xFF2A2A, 0.9F + (float)urgency),
             EXEC_X + 0.5, EXEC_Y + 1.0, EXEC_Z + 0.5, 2 + (int)(urgency * 16.0), 1.5, 0.8, 1.5, 0.02
          );
@@ -4529,12 +4529,12 @@ public final class PrisonCellblock {
          // the whole point of it is that the clock is real.
          p.setHealth(Math.max(0.0F, p.getHealth() - amount));
       }
-      level.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(level, 
          new net.minecraft.core.particles.DustParticleOptions(0xFF2A2A, 1.4F),
          p.getX(), p.getY() + 1.0, p.getZ(), 18, 0.4, 0.6, 0.4, 0.05
       );
-      level.sendParticles(ParticleTypes.DAMAGE_INDICATOR, p.getX(), p.getY() + 1.0, p.getZ(), 3, 0.3, 0.4, 0.3, 0.05);
-      level.sendParticles(ParticleTypes.CRIT, exec.chair.getX() + 0.5, exec.chair.getY() + 1.0, exec.chair.getZ() + 0.5, 8, 0.3, 0.4, 0.3, 0.08);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.DAMAGE_INDICATOR, p.getX(), p.getY() + 1.0, p.getZ(), 3, 0.3, 0.4, 0.3, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, exec.chair.getX() + 0.5, exec.chair.getY() + 1.0, exec.chair.getZ() + 0.5, 8, 0.3, 0.4, 0.3, 0.08);
       level.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 0.9F, 0.7F);
       level.playSound(null, exec.chair.getX() + 0.5, exec.chair.getY(), exec.chair.getZ() + 0.5, SoundEvents.BEACON_DEACTIVATE, SoundSource.BLOCKS, 0.8F, 1.5F);
       p.addEffect(new MobEffectInstance(MobEffects.DARKNESS, 30, 0, false, false, false));

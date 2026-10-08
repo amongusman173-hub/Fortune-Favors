@@ -67,7 +67,7 @@ public class FishingRodMixin {
                le.hurtServer(sl, src, 1.1E-5F);
             }
 
-            sl.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY() + 1.0, target.getZ(), 8, 0.3, 0.4, 0.3, 0.1);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.CRIT, target.getX(), target.getY() + 1.0, target.getZ(), 8, 0.3, 0.4, 0.3, 0.1);
             sl.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_STRONG, SoundSource.PLAYERS, 1.0F, 1.2F);
          }
       }

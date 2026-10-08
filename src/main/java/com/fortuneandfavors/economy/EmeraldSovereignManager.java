@@ -1532,6 +1532,9 @@ public final class EmeraldSovereignManager {
 
    private static void enterPhase(ServerLevel level, Mob boss, Fight fight, int phase) {
       fight.phase = phase;
+      // The treasury opens over the throne: emeralds rain on the hall.
+      Fx.gemRain(level, ParticleTypes.HAPPY_VILLAGER, boss.position(), 9.0, 60, EMERALD);
+      Fx.crimsonSigil(level, ParticleTypes.HAPPY_VILLAGER, boss.position().add(0.0, 0.05, 0.0), 4.0, 60, CROWN_GOLD);
       summonGuards(level, boss, fight, 4);
       announce(level, SAY + "\"§fFine. §aThrone room.\"");
       announceNear(level, boss, ARENA_RADIUS, "&8PHASE II &7- more guards, and they hit harder.");

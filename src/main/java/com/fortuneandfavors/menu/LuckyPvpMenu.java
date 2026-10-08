@@ -157,8 +157,8 @@ public class LuckyPvpMenu extends ChestMenu {
          this.closeAfter = 35;
          ServerLevel sl = this.owner.level();
          sl.playSound(null, this.owner.getX(), this.owner.getY(), this.owner.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.PLAYERS, 1.0F, 1.2F);
-         sl.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, this.owner.getX(), this.owner.getY() + 1.2, this.owner.getZ(), 30, 0.5, 0.6, 0.5, 0.12);
-         sl.sendParticles(ParticleTypes.ENCHANT, this.owner.getX(), this.owner.getY() + 1.0, this.owner.getZ(), 16, 0.4, 0.5, 0.4, 0.1);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.TOTEM_OF_UNDYING, this.owner.getX(), this.owner.getY() + 1.2, this.owner.getZ(), 30, 0.5, 0.6, 0.5, 0.12);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, this.owner.getX(), this.owner.getY() + 1.0, this.owner.getZ(), 16, 0.4, 0.5, 0.4, 0.1);
       }
    }
 

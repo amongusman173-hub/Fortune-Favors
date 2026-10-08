@@ -122,7 +122,7 @@ public class MysteryBoxMenu extends ChestMenu {
                   double a = i / (double)n * Math.PI * 2.0 + m.spinTicks * 0.18;
                   float hue = (float)((i / (double)n + m.spinTicks * 0.005) % 1.0);
                   int color = Color.HSBtoRGB(hue, 0.85F, 1.0F) & 16777215;
-                  sl.sendParticles(
+                  com.fortuneandfavors.net.FfVfx.particles(sl, 
                      new DustParticleOptions(color, 0.9F),
                      x + Math.cos(a) * 1.1,
                      y + Math.sin(m.spinTicks * 0.15) * 0.4,
@@ -135,8 +135,8 @@ public class MysteryBoxMenu extends ChestMenu {
                   );
                }
 
-               sl.sendParticles(ParticleTypes.ENCHANT, x, y + 0.4, z, 3, 0.5, 0.7, 0.5, 0.06);
-               sl.sendParticles(ParticleTypes.END_ROD, x, y + 0.2, z, 1, 0.3, 0.4, 0.3, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, x, y + 0.4, z, 3, 0.5, 0.7, 0.5, 0.06);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.END_ROD, x, y + 0.2, z, 1, 0.3, 0.4, 0.3, 0.02);
             }
 
             if (m.spinTicks >= SPIN_TICKS) {
@@ -306,14 +306,14 @@ public class MysteryBoxMenu extends ChestMenu {
          double x = player.getX();
          double y = player.getY() + 1.5;
          double z = player.getZ();
-         sl.sendParticles(ColorParticleOption.create(ParticleTypes.FLASH, legendary ? 16777215 : 16769216), x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ColorParticleOption.create(ParticleTypes.FLASH, legendary ? 16777215 : 16769216), x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
          int ring = legendary ? 36 : 24;
 
          for (int i = 0; i < ring; i++) {
             double a = i / (double)ring * Math.PI * 2.0;
             float hue = i / (float)ring;
             int color = Color.HSBtoRGB(hue, 0.9F, 1.0F) & 16777215;
-            sl.sendParticles(
+            com.fortuneandfavors.net.FfVfx.particles(sl, 
                new DustParticleOptions(color, legendary ? 1.5F : 1.1F),
                x + Math.cos(a) * (legendary ? 2.0 : 1.5),
                y + Math.sin(a * 2.0) * 0.5,
@@ -326,10 +326,10 @@ public class MysteryBoxMenu extends ChestMenu {
             );
          }
 
-         sl.sendParticles(ParticleTypes.ENCHANT, x, y, z, legendary ? 90 : 60, 1.1, 1.1, 1.1, 0.12);
-         sl.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x, y, z, legendary ? 40 : 28, 0.75, 0.75, 0.75, 0.04);
-         sl.sendParticles(ParticleTypes.END_ROD, x, y, z, legendary ? 36 : 24, 0.65, 0.95, 0.65, 0.06);
-         sl.sendParticles(ParticleTypes.FIREWORK, x, y, z, legendary ? 18 : 12, 0.5, 0.8, 0.5, 0.08);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, x, y, z, legendary ? 90 : 60, 1.1, 1.1, 1.1, 0.12);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SOUL_FIRE_FLAME, x, y, z, legendary ? 40 : 28, 0.75, 0.75, 0.75, 0.04);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.END_ROD, x, y, z, legendary ? 36 : 24, 0.65, 0.95, 0.65, 0.06);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.FIREWORK, x, y, z, legendary ? 18 : 12, 0.5, 0.8, 0.5, 0.08);
       }
 
       if (legendary) {

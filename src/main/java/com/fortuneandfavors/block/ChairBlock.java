@@ -108,7 +108,7 @@ public final class ChairBlock {
 
       seats.put(id, stand);
       level.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.WOOD_PLACE, SoundSource.BLOCKS, 0.5F, 1.4F);
-      level.sendParticles(ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5, 3, 0.15, 0.1, 0.15, 0.01);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5, 3, 0.15, 0.1, 0.15, 0.01);
       com.fortuneandfavors.economy.Advancements.grant(player, "chair_sitter");
       return true;
    }
@@ -190,7 +190,7 @@ public final class ChairBlock {
       }
       level.setBlock(pos, next, 3);
       level.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.WOOD_PLACE, SoundSource.BLOCKS, 0.9F, 1.1F);
-      level.sendParticles(ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 0.9, pos.getZ() + 0.5, 8, 0.25, 0.15, 0.25, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 0.9, pos.getZ() + 0.5, 8, 0.25, 0.15, 0.25, 0.02);
       return true;
    }
 

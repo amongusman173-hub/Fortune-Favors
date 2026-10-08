@@ -104,7 +104,7 @@ public final class RepairStation {
       stack.setDamageValue(0);
       bought.merge(player.getUUID(), 1, Integer::sum);
       if (player.level() instanceof ServerLevel level) {
-         level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.0, player.getZ(), 24, 0.4, 0.5, 0.4, 0.06);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, player.getX(), player.getY() + 1.0, player.getZ(), 24, 0.4, 0.5, 0.4, 0.06);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ANVIL_LAND, SoundSource.BLOCKS, 0.8F, 1.4F);
       }
       SoundUtil.play(player, ModSounds.JOB_COMPLETE);

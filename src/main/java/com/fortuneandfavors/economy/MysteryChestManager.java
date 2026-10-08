@@ -119,10 +119,10 @@ public final class MysteryChestManager {
          }
       }
       Advancements.grant(player, "keymaster");
-      level.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(level, 
          ParticleTypes.END_ROD, player.getX(), player.getY() + 1.4, player.getZ(), 40, 0.6, 0.8, 0.6, 0.05
       );
-      level.sendParticles(
+      com.fortuneandfavors.net.FfVfx.particles(level, 
          ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.4, player.getZ(), 16, 0.4, 0.6, 0.4, 0.05
       );
       SoundUtil.play(player, ModSounds.TRANSFER);

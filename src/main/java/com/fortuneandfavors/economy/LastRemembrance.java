@@ -115,9 +115,9 @@ public final class LastRemembrance {
       if (player.level() instanceof ServerLevel level) {
          // Where they were, before the jump: a column of the castle's own light left standing in
          // the spot they vanished from, so the place they left is readable to whoever is chasing.
-         level.sendParticles(ParticleTypes.REVERSE_PORTAL, player.getX(), player.getY() + 1.0, player.getZ(), 80, 0.5, 1.0, 0.5, -0.25);
-         level.sendParticles(ParticleTypes.PORTAL, player.getX(), player.getY() + 1.0, player.getZ(), 120, 0.6, 1.1, 0.6, 0.5);
-         level.sendParticles(ParticleTypes.SCULK_SOUL, player.getX(), player.getY() + 1.0, player.getZ(), 20, 0.5, 0.8, 0.5, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, player.getX(), player.getY() + 1.0, player.getZ(), 80, 0.5, 1.0, 0.5, -0.25);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, player.getX(), player.getY() + 1.0, player.getZ(), 120, 0.6, 1.1, 0.6, 0.5);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, player.getX(), player.getY() + 1.0, player.getZ(), 20, 0.5, 0.8, 0.5, 0.05);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.2F, 0.7F);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.6F);
       }
@@ -125,8 +125,8 @@ public final class LastRemembrance {
       MirageCastleManager.sendToSpawn(player);
 
       if (player.level() instanceof ServerLevel arrived) {
-         arrived.sendParticles(ParticleTypes.PORTAL, player.getX(), player.getY() + 1.0, player.getZ(), 120, 0.6, 1.1, 0.6, 0.5);
-         arrived.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 30, 0.4, 0.8, 0.4, 0.08);
+         com.fortuneandfavors.net.FfVfx.particles(arrived, ParticleTypes.PORTAL, player.getX(), player.getY() + 1.0, player.getZ(), 120, 0.6, 1.1, 0.6, 0.5);
+         com.fortuneandfavors.net.FfVfx.particles(arrived, ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 30, 0.4, 0.8, 0.4, 0.08);
          arrived.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PLAYER_TELEPORT, SoundSource.PLAYERS, 1.0F, 0.8F);
       }
 
@@ -190,9 +190,9 @@ public final class LastRemembrance {
       // light along it, and the dust the hall used to make.
       double px = origin.x + forward.x * 1.6;
       double pz = origin.z + forward.z * 1.6;
-      level.sendParticles(ParticleTypes.SWEEP_ATTACK, px, player.getY() + 1.0, pz, 1, 0.0, 0.0, 0.0, 0.0);
-      level.sendParticles(ParticleTypes.ENCHANT, px, player.getY() + 1.2, pz, 24, 1.6, 0.6, 1.6, 0.35);
-      level.sendParticles(ParticleTypes.SMOKE, px, player.getY() + 1.0, pz, 12, 1.4, 0.4, 1.4, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SWEEP_ATTACK, px, player.getY() + 1.0, pz, 1, 0.0, 0.0, 0.0, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, px, player.getY() + 1.2, pz, 24, 1.6, 0.6, 1.6, 0.35);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMOKE, px, player.getY() + 1.0, pz, 12, 1.4, 0.4, 1.4, 0.02);
       level.playSound(null, px, player.getY(), pz, SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 1.4F, 0.9F);
       if (struck > 0) {
          level.playSound(null, px, player.getY(), pz, SoundEvents.PLAYER_ATTACK_KNOCKBACK, SoundSource.PLAYERS, 1.2F, 0.8F);

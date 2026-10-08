@@ -29,8 +29,8 @@ public final class SculkFoodManager {
       if (player.level() instanceof ServerLevel sl) {
          sl.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.GENERIC_EAT, SoundSource.PLAYERS, 0.8F, 1.1F);
          sl.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.SCULK_CATALYST_BLOOM, SoundSource.PLAYERS, 0.5F, 1.4F);
-         sl.sendParticles(ParticleTypes.SCULK_SOUL, player.getX(), player.getY() + 1.0, player.getZ(), 12, 0.4, 0.5, 0.4, 0.03);
-         sl.sendParticles(ParticleTypes.ENCHANT, player.getX(), player.getY() + 0.8, player.getZ(), 10, 0.4, 0.4, 0.4, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SCULK_SOUL, player.getX(), player.getY() + 1.0, player.getZ(), 12, 0.4, 0.5, 0.4, 0.03);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, player.getX(), player.getY() + 0.8, player.getZ(), 10, 0.4, 0.4, 0.4, 0.02);
       }
       SoundUtil.play(player, ModSounds.BUY);
    }

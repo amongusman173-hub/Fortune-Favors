@@ -55,7 +55,7 @@ public final class VfxManager {
       for (int i = 0; i < rings; i++) {
          double a = (double)i / rings * Math.PI * 2.0;
          int color = java.awt.Color.HSBtoRGB((float)i / rings, 0.9F, 1.0F) & 16777215;
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             new net.minecraft.core.particles.DustParticleOptions(color, 1.0F),
             x + Math.cos(a) * 1.8,
             y + 0.25 + Math.sin(a * 2.0) * 0.4,
@@ -66,7 +66,7 @@ public final class VfxManager {
             0.05,
             0.0
          );
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             new net.minecraft.core.particles.DustParticleOptions(color, 0.8F),
             x + Math.cos(a) * 2.6,
             y + 0.4 + Math.sin(a * 3.0) * 0.5,
@@ -79,8 +79,8 @@ public final class VfxManager {
          );
       }
 
-      level.sendParticles(ParticleTypes.END_ROD, x, y + 0.3, z, 14, 0.5, 0.7, 0.5, 0.05);
-      level.sendParticles(ParticleTypes.FIREWORK, x, y + 0.5, z, 8, 0.4, 0.6, 0.4, 0.08);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x, y + 0.3, z, 14, 0.5, 0.7, 0.5, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.FIREWORK, x, y + 0.5, z, 8, 0.4, 0.6, 0.4, 0.08);
    }
 
    public static void tick(MinecraftServer server) {
@@ -140,25 +140,25 @@ public final class VfxManager {
          double z = p.getZ();
          double a = left * 0.5;
          // Golden sparkle orbit.
-         level.sendParticles(ParticleTypes.END_ROD, x + Math.cos(a) * 0.9, y + 0.4 + Math.sin(a * 0.7) * 0.25, z + Math.sin(a) * 0.9, 2, 0.1, 0.1, 0.1, 0.02);
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, x, y + 0.2, z, 1, 0.4, 0.3, 0.4, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x + Math.cos(a) * 0.9, y + 0.4 + Math.sin(a * 0.7) * 0.25, z + Math.sin(a) * 0.9, 2, 0.1, 0.1, 0.1, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, x, y + 0.2, z, 1, 0.4, 0.3, 0.4, 0.0);
          // Expanding shockwave ring on the first ticks.
          if (left > CELEBRATION_TICKS - 10) {
             double r = (CELEBRATION_TICKS - left) * 0.35 + 0.5;
             for (int i = 0; i < 12; i++) {
                double ang = i / 12.0 * Math.PI * 2.0;
-               level.sendParticles(ParticleTypes.END_ROD, x + Math.cos(ang) * r, y + 0.2, z + Math.sin(ang) * r, 1, 0.02, 0.3, 0.02, 0.0);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x + Math.cos(ang) * r, y + 0.2, z + Math.sin(ang) * r, 1, 0.02, 0.3, 0.02, 0.0);
             }
          }
          if (left % 6 == 0) {
-            level.sendParticles(ParticleTypes.NOTE, x, y + 1.3, z, 4, 0.35, 0.35, 0.35, 1.0);
-            level.sendParticles(ParticleTypes.ENCHANT, x, y + 1.5, z, 8, 0.5, 0.6, 0.5, 0.08);
-            level.sendParticles(ParticleTypes.FIREWORK, x, y + 1.2, z, 1, 0.4, 0.5, 0.4, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.NOTE, x, y + 1.3, z, 4, 0.35, 0.35, 0.35, 1.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, x, y + 1.5, z, 8, 0.5, 0.6, 0.5, 0.08);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.FIREWORK, x, y + 1.2, z, 1, 0.4, 0.5, 0.4, 0.05);
          }
          if (left == CELEBRATION_TICKS / 2) {
             // Mid-burst: golden rain.
             for (int i = 0; i < 20; i++) {
-               level.sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(level, 
                   ParticleTypes.END_ROD, x + (RANDOM.nextDouble() - 0.5) * 2.2, y + 1.2 + RANDOM.nextDouble() * 1.2, z + (RANDOM.nextDouble() - 0.5) * 2.2, 1, 0.0, -0.06, 0.0, 0.02
                );
             }
@@ -189,10 +189,10 @@ public final class VfxManager {
                      int dz = Math.abs(player.getBlockZ() - pos.getZ());
                      if (dx <= 48 && dz <= 48 && level.isLoaded(pos)) {
                         if (forge) {
-                           level.sendParticles(ParticleTypes.SMALL_FLAME, pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5, 2, 0.25, 0.15, 0.25, 0.008);
-                           level.sendParticles(ParticleTypes.SMOKE, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 1, 0.15, 0.2, 0.15, 0.005);
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMALL_FLAME, pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5, 2, 0.25, 0.15, 0.25, 0.008);
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMOKE, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, 1, 0.15, 0.2, 0.15, 0.005);
                         } else {
-                           level.sendParticles(
+                           com.fortuneandfavors.net.FfVfx.particles(level, 
                               redeemer ? ParticleTypes.END_ROD : (infuser ? ParticleTypes.ENCHANT : ParticleTypes.ELECTRIC_SPARK),
                               pos.getX() + 0.5,
                               pos.getY() + 1.15,
@@ -233,10 +233,10 @@ public final class VfxManager {
                      drawn++;
                      int levelNo = Math.max(1, e.getValue().level());
                      if (levelNo > 1) {
-                        level.sendParticles(ParticleTypes.PORTAL, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 3, 0.3, 0.3, 0.3, 0.02);
-                        level.sendParticles(ParticleTypes.ENCHANT, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 2, 0.25, 0.25, 0.25, 0.05);
+                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 3, 0.3, 0.3, 0.3, 0.02);
+                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, 2, 0.25, 0.25, 0.25, 0.05);
                      } else {
-                        level.sendParticles(ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5, 1, 0.2, 0.3, 0.2, 0.03);
+                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5, 1, 0.2, 0.3, 0.2, 0.03);
                      }
                   }
                }
@@ -271,7 +271,7 @@ public final class VfxManager {
                   if (anyNear && !closed) {
                      ServerLevel level = server.getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.parse(dim)));
                      if (level != null) {
-                        level.sendParticles(
+                        com.fortuneandfavors.net.FfVfx.particles(level, 
                            buy ? ParticleTypes.HAPPY_VILLAGER : ParticleTypes.FLAME,
                            pos.getX() + 0.5,
                            pos.getY() + 1.1,
@@ -315,14 +315,14 @@ public final class VfxManager {
             ItemStack main = player.getMainHandItem();
             ItemStack off = player.getOffhandItem();
             if (ModItems.isDistantMemoryShard(main)) {
-               sl.sendParticles(ParticleTypes.PORTAL, particleX(player, 0.0), player.getY() + 0.9, particleZ(player, 0.0), 1, 0.12, 0.15, 0.12, 0.015);
-               sl.sendParticles(ParticleTypes.ENCHANT, particleX(player, 0.0), player.getY() + 1.1, particleZ(player, 0.0), 2, 0.18, 0.22, 0.18, 0.04);
-               sl.sendParticles(ParticleTypes.END_ROD, particleX(player, 0.0), player.getY() + 0.8, particleZ(player, 0.0), 1, 0.08, 0.1, 0.08, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.PORTAL, particleX(player, 0.0), player.getY() + 0.9, particleZ(player, 0.0), 1, 0.12, 0.15, 0.12, 0.015);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, particleX(player, 0.0), player.getY() + 1.1, particleZ(player, 0.0), 2, 0.18, 0.22, 0.18, 0.04);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.END_ROD, particleX(player, 0.0), player.getY() + 0.8, particleZ(player, 0.0), 1, 0.08, 0.1, 0.08, 0.02);
             }
 
             if (ModItems.isDistantMemorySword(main)) {
-               sl.sendParticles(ParticleTypes.ELECTRIC_SPARK, particleX(player, 0.0), player.getY() + 0.85, particleZ(player, 0.0), 2, 0.15, 0.12, 0.15, 0.025);
-               sl.sendParticles(ParticleTypes.PORTAL, particleX(player, 0.0), player.getY() + 1.0, particleZ(player, 0.0), 1, 0.1, 0.15, 0.1, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ELECTRIC_SPARK, particleX(player, 0.0), player.getY() + 0.85, particleZ(player, 0.0), 2, 0.15, 0.12, 0.15, 0.025);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.PORTAL, particleX(player, 0.0), player.getY() + 1.0, particleZ(player, 0.0), 1, 0.1, 0.15, 0.1, 0.01);
                // Only rewrite the lore when durability actually changed - the lore
                // embeds current durability, and rebroadcasting the whole slot
                // every few ticks is needless client churn.

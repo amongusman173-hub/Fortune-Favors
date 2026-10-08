@@ -737,7 +737,7 @@ public final class MachineManager {
          machines.remove(keyFor(level, pos));
          save(level.getServer());
          if (level instanceof ServerLevel serverLevel) {
-            serverLevel.sendParticles(ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 18, 0.4, 0.4, 0.4, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(serverLevel, ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 18, 0.4, 0.4, 0.4, 0.05);
          }
 
          level.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1.0F, 1.4F);
@@ -1070,9 +1070,9 @@ public final class MachineManager {
                      double x = pos.getX() + 0.5;
                      double y = pos.getY() + 0.7;
                      double z = pos.getZ() + 0.5;
-                     serverLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, x, y, z, 5, 0.35, 0.4, 0.35, 0.02);
-                     serverLevel.sendParticles(ParticleTypes.END_ROD, x, y, z, 6, 0.3, 0.3, 0.3, 0.05);
-                     serverLevel.sendParticles(ParticleTypes.ITEM_SLIME, x, y + 0.3, z, 3, 0.2, 0.3, 0.2, 0.02);
+                     com.fortuneandfavors.net.FfVfx.particles(serverLevel, ParticleTypes.HAPPY_VILLAGER, x, y, z, 5, 0.35, 0.4, 0.35, 0.02);
+                     com.fortuneandfavors.net.FfVfx.particles(serverLevel, ParticleTypes.END_ROD, x, y, z, 6, 0.3, 0.3, 0.3, 0.05);
+                     com.fortuneandfavors.net.FfVfx.particles(serverLevel, ParticleTypes.ITEM_SLIME, x, y + 0.3, z, 3, 0.2, 0.3, 0.2, 0.02);
                      String key = keyFor(level, pos);
                      long now = level.getGameTime();
                      Long last = lastSellSound.get(key);

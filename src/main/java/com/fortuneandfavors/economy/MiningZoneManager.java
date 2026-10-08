@@ -306,7 +306,7 @@ public final class MiningZoneManager {
          // Small mining XP kicker on top of the normal ore XP.
          long xpKick = Math.max(2L, Math.min(15L, value / 40L));
          SkillManager.addXp(sp, "mining", xpKick);
-         level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 10, 0.4, 0.4, 0.4, 0.04);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5, 10, 0.4, 0.4, 0.4, 0.04);
          sp.sendSystemMessage(Component.literal("§c⚠§7 Dangerous zone bonus: §a$" + bonus), true);
       } catch (Exception ignored) {
       }
@@ -431,7 +431,7 @@ public final class MiningZoneManager {
          int x = z.center.getX() + (int)Math.round(Math.cos(a) * r);
          int zz = z.center.getZ() + (int)Math.round(Math.sin(a) * r);
          int y = z.center.getY() + (i % 4) * 2;
-         level.sendParticles(ParticleTypes.SMOKE, x + 0.5, y + 0.5, zz + 0.5, 1, 0.1, 0.1, 0.1, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMOKE, x + 0.5, y + 0.5, zz + 0.5, 1, 0.1, 0.1, 0.1, 0.01);
       }
    }
 }

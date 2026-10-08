@@ -90,6 +90,27 @@ public final class FxKinds {
    public static final int RIFT_PORTAL = 126;
    /** The last id that fits in a signed byte: the template set is full at 127. */
    public static final int SONIC_RING = 127;
+   // Kinds are a VarInt on the wire, so there is no ceiling at 127.
+   /** A crimson halo overhead dripping blood: (x,y,z) under it, a = radius, b = ticks, color. */
+   public static final int BLOOD_MOON = 128;
+   /** A turning ring of runes on the ground: a = radius, b = ticks, color. */
+   public static final int CRIMSON_SIGIL = 129;
+   /** Water spiralling in and down: a = radius, b = ticks, color. */
+   public static final int WHIRLPOOL = 130;
+   /** A curling arm rising out of the ground and slapping down: a = height, b = ticks, color. */
+   public static final int TENTACLE = 131;
+   /** A dark cloud over a spot with bolts striking down: a = radius, b = ticks, color. */
+   public static final int STORM_CELL = 132;
+   /** Feathers whirled up in a widening spiral: a = radius, b = ticks, color. */
+   public static final int FEATHER_STORM = 133;
+   /** Cogs flung out of a point: a = size. One-shot. */
+   public static final int COG_BURST = 134;
+   /** Gems falling over a circle: a = radius, b = ticks, color. */
+   public static final int GEM_RAIN = 135;
+   /** A constellation drawn star by star over a spot: a = radius, b = ticks, color. */
+   public static final int STAR_TRAIL = 136;
+   /** Souls climbing a column: a = height, b = ticks, color. */
+   public static final int SOUL_PILLAR = 137;
 
    private FxKinds() {
    }

@@ -8,6 +8,10 @@
 - **Players with the client mod see only the custom effects** on the reworked bosses and their gear: the vanilla particles those files still send are now vanilla-client only (`Fx.vanilla`).
 - **The Gale Warden and the Drowned Sovereign no longer paint their attacks on the floor** before they land - the ground markers ahead of a hit are gone (spawn circles, death rings and the hazards that *are* the attack, like Black Tide and Dead Air, stay).
 - **43 item icons redrawn**: the marionette, sculk staff, raid banner, and every Clockwork, Magister, Void Shaper, Sovereign King, Gale and Drowned item.
+- **Ten more effect templates** (ids 128-137 - the id is a VarInt on the wire, there was never a 127 ceiling): Blood Moon, Crimson Sigil, Whirlpool, Tentacle, Storm Cell, Feather Storm, Cog Burst, Gem Rain, Star Trail and Soul Pillar, in use across the Scarlet Devil, Clockwork King, Emerald Sovereign, Starbound Magister, Elder Warden, Drowned Sovereign and Gale Warden.
+- **New attacks: the Drowned Sovereign's Whirlpool** (the floor under each of you turns and drags you to its eye, which crushes) **and the Gale Warden's Storm Cell** (a thunderhead parks over each of you and strikes the spot three times). Both are cooldown specials with no floor markers.
+- **The Scarlet Devil has her own effects**: a crimson sigil under her brands and her pacts, a chain of blood to the pact's victim, a blood moon over her blood rain.
+- **No vanilla particles reach a modded client anywhere in the mod**: 418 direct particle sends across expeditions, duels, disasters, menus and machines now go through the VFX router, so players with the client mod see them drawn in the mod's own sprites.
 - **Gale and Drowned gear has real effects**: the Tidecaller rolls a tide, the vortex is a maelstrom, the Chakram flies as a crescent of wind, and the Skybreaker lands in a shockwave.
 
 ### 🌟 Spells that land every hit

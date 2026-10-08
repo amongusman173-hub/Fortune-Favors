@@ -551,9 +551,9 @@ public final class AdvancedEnchantments {
       double y = player.getY() + 0.15;
       for (int i = 0; i < 4; i++) {
          double a = i / 4.0 * Math.PI * 2.0;
-         level.sendParticles(net.minecraft.core.particles.ParticleTypes.END_ROD, player.getX() + Math.cos(a) * 0.5, y, player.getZ() + Math.sin(a) * 0.5, 1, 0.0, 0.0, 0.0, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.END_ROD, player.getX() + Math.cos(a) * 0.5, y, player.getZ() + Math.sin(a) * 0.5, 1, 0.0, 0.0, 0.0, 0.01);
       }
-      level.sendParticles(net.minecraft.core.particles.ParticleTypes.ENCHANT, player.getX(), player.getEyeY() + 0.4, player.getZ(), 1, 0.1, 0.1, 0.1, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.ENCHANT, player.getX(), player.getEyeY() + 0.4, player.getZ(), 1, 0.1, 0.1, 0.1, 0.02);
    }
 
    private static void applyEquipmentAttributes(ServerPlayer player) {
@@ -806,7 +806,7 @@ public final class AdvancedEnchantments {
       player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, 100, 1));
       player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 800, 0));
       if (player.level() instanceof ServerLevel level) {
-         level.sendParticles(net.minecraft.core.particles.ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.0, player.getZ(), 40, 0.6, 0.9, 0.6, 0.15);
+         com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.0, player.getZ(), 40, 0.6, 0.9, 0.6, 0.15);
          level.playSound(null, player.blockPosition(), SoundEvents.TOTEM_USE, SoundSource.PLAYERS, 1.0F, 1.0F);
       }
       return true;
@@ -848,7 +848,7 @@ public final class AdvancedEnchantments {
       projectile.setComponent(DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
       if (projectile.level() instanceof ServerLevel level) {
          level.explode(projectile, x, y, z, 1.8F, Level.ExplosionInteraction.NONE);
-         level.sendParticles(net.minecraft.core.particles.ParticleTypes.FIREWORK, x, y, z, 28, 0.35, 0.35, 0.35, 0.12);
+         com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.FIREWORK, x, y, z, 28, 0.35, 0.35, 0.35, 0.12);
          projectile.discard();
       }
    }

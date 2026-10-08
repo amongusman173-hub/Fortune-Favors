@@ -1323,18 +1323,18 @@ public final class ClaimManager {
       int count = detail == 0 ? 1 + (int)(level.getGameTime() / 4L % 3L) : (detail == 1 ? 1 + (int)(level.getGameTime() / 8L % 2L) : 1);
       double along = horizontal ? 0.4 : 0.06;
       double across = horizontal ? 0.06 : 0.4;
-      level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y + 0.15, z + 0.5, count, along, 0.12, across, 0.01);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x + 0.5, y + 0.15, z + 0.5, count, along, 0.12, across, 0.01);
       if (detail == 0 && (x + z) % 6 == 0) {
-         level.sendParticles(ParticleTypes.PORTAL, x + 0.5, y + 0.3, z + 0.5, 1, along * 0.5, 0.18, across * 0.5, 0.005);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, x + 0.5, y + 0.3, z + 0.5, 1, along * 0.5, 0.18, across * 0.5, 0.005);
       }
    }
 
    private static void corner(ServerLevel level, int x, int z) {
       int y = level.getHeight(Types.MOTION_BLOCKING, x, z) + 1;
-      level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y, z + 0.5, 6, 0.12, 0.4, 0.12, 0.02);
-      level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y + 0.8, z + 0.5, 5, 0.1, 0.3, 0.1, 0.02);
-      level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y + 1.6, z + 0.5, 4, 0.08, 0.2, 0.08, 0.01);
-      level.sendParticles(ParticleTypes.PORTAL, x + 0.5, y + 1.2, z + 0.5, 2, 0.1, 0.3, 0.1, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x + 0.5, y, z + 0.5, 6, 0.12, 0.4, 0.12, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x + 0.5, y + 0.8, z + 0.5, 5, 0.1, 0.3, 0.1, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x + 0.5, y + 1.6, z + 0.5, 4, 0.08, 0.2, 0.08, 0.01);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, x + 0.5, y + 1.2, z + 0.5, 2, 0.1, 0.3, 0.1, 0.02);
    }
 
 

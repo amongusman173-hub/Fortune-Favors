@@ -116,7 +116,7 @@ public final class ElevatorBlock {
       player.teleportTo(x, y, z);
       player.fallDistance = 0.0;
       if (!quiet) {
-         level.sendParticles(ParticleTypes.PORTAL, x, y + 0.2, z, 24, 0.3, 0.3, 0.3, 0.1);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, x, y + 0.2, z, 24, 0.3, 0.3, 0.3, 0.1);
          level.playSound(null, x, y, z, ModSounds.ELEVATOR, SoundSource.BLOCKS, 1.0F, 1.0F);
       }
    }

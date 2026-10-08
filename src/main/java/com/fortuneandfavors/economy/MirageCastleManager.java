@@ -917,8 +917,8 @@ public final class MirageCastleManager {
          drop.setDefaultPickUpDelay();
          level.addFreshEntity(drop);
 
-         level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, x, y + 1.0, z, 90, 1.1, 1.2, 1.1, 0.07);
-         level.sendParticles(ParticleTypes.END_ROD, x, y + 1.2, z, 30, 0.4, 0.8, 0.4, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, x, y + 1.0, z, 90, 1.1, 1.2, 1.1, 0.07);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x, y + 1.2, z, 30, 0.4, 0.8, 0.4, 0.05);
          level.playSound(null, x, y, z, SoundEvents.ANVIL_LAND, SoundSource.PLAYERS, 1.2F, 0.5F);
       } catch (Throwable ignored) {
       }
@@ -982,7 +982,7 @@ public final class MirageCastleManager {
             named.add(stack.getHoverName().getString());
          }
 
-         level.sendParticles(ParticleTypes.ENCHANT, x, y + 1.2, z, 70, 0.7, 0.9, 0.7, 0.5);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, x, y + 1.2, z, 70, 0.7, 0.9, 0.7, 0.5);
          level.playSound(null, x, y, z, SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.9F, 1.3F);
 
          String what = String.join("§7 and §f", named);
@@ -1273,7 +1273,7 @@ public final class MirageCastleManager {
       }
 
       for (ServerPlayer p : level.getPlayers(pl -> pl.isAlive() && pl.blockPosition().distToCenterSqr(middle.getX() + 0.5, middle.getY(), middle.getZ() + 0.5) < (double)((half + 40) * (half + 40)))) {
-         level.sendParticles(ParticleTypes.PORTAL, p.getX(), p.getY() + 1.0, p.getZ(), 20, 0.6, 0.8, 0.6, 0.08);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, p.getX(), p.getY() + 1.0, p.getZ(), 20, 0.6, 0.8, 0.6, 0.08);
       }
    }
 
@@ -2840,8 +2840,8 @@ public final class MirageCastleManager {
          level.addFreshEntity(drop);
       }
 
-      level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, x, y + 1.0, z, 80, 0.8, 1.0, 0.8, 0.4);
-      level.sendParticles(ParticleTypes.FIREWORK, x, y + 1.2, z, 40, 0.6, 0.8, 0.6, 0.2);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.TOTEM_OF_UNDYING, x, y + 1.0, z, 80, 0.8, 1.0, 0.8, 0.4);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.FIREWORK, x, y + 1.2, z, 40, 0.6, 0.8, 0.6, 0.2);
       level.playSound(null, x, y, z, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.PLAYERS, 1.4F, 1.0F);
    }
 
@@ -2875,10 +2875,10 @@ public final class MirageCastleManager {
       double y = victim.getY() + victim.getBbHeight() * 0.5;
       double z = victim.getZ();
 
-      level.sendParticles(ParticleTypes.POOF, x, y, z, 30, 0.5, 0.6, 0.5, 0.06);
-      level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, x, y, z, 18, 0.4, 0.5, 0.4, 0.02);
-      level.sendParticles(ParticleTypes.WHITE_ASH, x, y, z, 40, 0.6, 0.7, 0.6, 0.04);
-      level.sendParticles(ParticleTypes.SCULK_SOUL, x, y, z, 8, 0.3, 0.4, 0.3, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.POOF, x, y, z, 30, 0.5, 0.6, 0.5, 0.06);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CAMPFIRE_COSY_SMOKE, x, y, z, 18, 0.4, 0.5, 0.4, 0.02);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.WHITE_ASH, x, y, z, 40, 0.6, 0.7, 0.6, 0.04);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, x, y, z, 8, 0.3, 0.4, 0.3, 0.02);
       level.playSound(null, x, y, z, SoundEvents.SAND_BREAK, SoundSource.HOSTILE, 1.2F, 0.7F);
 
       // The Captain is the one body in here that was never a mirage.
@@ -2988,7 +2988,7 @@ public final class MirageCastleManager {
       player.setHealth(Math.max(1.0F, Math.min(player.getMaxHealth(), 6.0F)));
       player.hurtMarked = true;
       com.fortuneandfavors.anticheat.AntiCheat.onServerTeleport(player, "the mirage letting go");
-      target.sendParticles(ParticleTypes.REVERSE_PORTAL, x, y + 1.0, z, 60, 0.6, 1.0, 0.6, 0.2);
+      com.fortuneandfavors.net.FfVfx.particles(target, ParticleTypes.REVERSE_PORTAL, x, y + 1.0, z, 60, 0.6, 1.0, 0.6, 0.2);
       target.playSound(null, x, y, z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.4F);
    }
 
@@ -3044,7 +3044,7 @@ public final class MirageCastleManager {
                continue;
             }
 
-            level.sendParticles(ParticleTypes.POOF, e.getX(), e.getY() + 0.2, e.getZ(), 6, 0.2, 0.2, 0.2, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.POOF, e.getX(), e.getY() + 0.2, e.getZ(), 6, 0.2, 0.2, 0.2, 0.02);
             e.discard();
             removed++;
          }

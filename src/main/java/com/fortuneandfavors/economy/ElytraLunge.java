@@ -71,18 +71,18 @@ public final class ElytraLunge {
          for (int i = 0; i < 24; i++) {
             double a = Math.PI * 2.0 * i / 24.0;
             double r = 0.9;
-            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, px + Math.cos(a) * r, py + 0.3, pz + Math.sin(a) * r, 1, 0.0, 0.05, 0.0, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ELECTRIC_SPARK, px + Math.cos(a) * r, py + 0.3, pz + Math.sin(a) * r, 1, 0.0, 0.05, 0.0, 0.0);
          }
          for (int i = 1; i <= 6; i++) {
             Vec3 trail = p.position().subtract(look.scale(i * 0.55)).add(0.0, 0.9, 0.0);
-            level.sendParticles(ParticleTypes.CLOUD, trail.x, trail.y, trail.z, 2, 0.08, 0.08, 0.08, 0.01);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CLOUD, trail.x, trail.y, trail.z, 2, 0.08, 0.08, 0.08, 0.01);
          }
          for (int i = 0; i < 8; i++) {
             Vec3 tip = p.position().add(look.scale(0.8 + i * 0.35)).add(0.0, 1.2, 0.0);
-            level.sendParticles(ParticleTypes.END_ROD, tip.x, tip.y, tip.z, 1, 0.02, 0.02, 0.02, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, tip.x, tip.y, tip.z, 1, 0.02, 0.02, 0.02, 0.0);
          }
-         level.sendParticles(ParticleTypes.SONIC_BOOM, px + look.x, py + 1.1 + look.y, pz + look.z, 1, 0.0, 0.0, 0.0, 0.0);
-         level.sendParticles(ParticleTypes.GUST, px, py + 0.8, pz, 6, 0.4, 0.3, 0.4, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SONIC_BOOM, px + look.x, py + 1.1 + look.y, pz + look.z, 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.GUST, px, py + 0.8, pz, 6, 0.4, 0.3, 0.4, 0.02);
          return true;
       } catch (Exception ignored) {
          return false;

@@ -93,7 +93,7 @@ public final class RuneManager {
       SoundUtil.play(sp, ModSounds.TRANSFER);
       Chat.raw(sp, "§d§lRune socketed!§r §7" + runeName(runeType) + " is now fused into your " + (isWeaponRune(runeType) ? "weapon" : "armor") + ".");
       ServerLevel level = sp.level();
-      level.sendParticles(ParticleTypes.ENCHANT, sp.getX(), sp.getY() + 1.2, sp.getZ(), 30, 0.4, 0.5, 0.4, 0.8);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, sp.getX(), sp.getY() + 1.2, sp.getZ(), 30, 0.4, 0.5, 0.4, 0.8);
       Advancements.grant(sp, "rune_forger");
       return null;
    }
@@ -121,17 +121,17 @@ public final class RuneManager {
          ServerLevel level = attacker.level();
          if (ModItems.hasRune(weapon, "flame") && RANDOM.nextInt(100) < 25) {
             target.igniteForSeconds(3);
-            level.sendParticles(ParticleTypes.FLAME, target.getX(), target.getY() + 1.0, target.getZ(), 8, 0.3, 0.4, 0.3, 0.03);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.FLAME, target.getX(), target.getY() + 1.0, target.getZ(), 8, 0.3, 0.4, 0.3, 0.03);
          }
          if (ModItems.hasRune(weapon, "frost") && RANDOM.nextInt(100) < 25) {
             target.addEffect(new net.minecraft.world.effect.MobEffectInstance(
                net.minecraft.world.effect.MobEffects.SLOWNESS, 60, 0, false, false, true
             ));
-            level.sendParticles(ParticleTypes.SNOWFLAKE, target.getX(), target.getY() + 1.0, target.getZ(), 8, 0.3, 0.4, 0.3, 0.03);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SNOWFLAKE, target.getX(), target.getY() + 1.0, target.getZ(), 8, 0.3, 0.4, 0.3, 0.03);
          }
          if (ModItems.hasRune(weapon, "lifesteal") && attacker.isAlive() && attacker.getHealth() < attacker.getMaxHealth()) {
             attacker.heal(1.0F);
-            level.sendParticles(ParticleTypes.HEART, attacker.getX(), attacker.getY() + 1.6, attacker.getZ(), 2, 0.3, 0.3, 0.3, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HEART, attacker.getX(), attacker.getY() + 1.6, attacker.getZ(), 2, 0.3, 0.3, 0.3, 0.0);
          }
       } catch (Exception ignored) {
       }
@@ -146,7 +146,7 @@ public final class RuneManager {
             killer.giveExperiencePoints(10 + RANDOM.nextInt(11));
             Chat.raw(killer, "§a§lRune of Fortune!§r §7The hunt pays double - §a$" + bonus + "§7 and bonus XP.");
             ServerLevel level = killer.level();
-            level.sendParticles(ParticleTypes.END_ROD, killer.getX(), killer.getY() + 1.4, killer.getZ(), 14, 0.4, 0.5, 0.4, 0.04);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, killer.getX(), killer.getY() + 1.4, killer.getZ(), 14, 0.4, 0.5, 0.4, 0.04);
          }
       } catch (Exception ignored) {
       }

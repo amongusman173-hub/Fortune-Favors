@@ -100,10 +100,10 @@ public final class Advancements {
                double px = player.getX();
                double py = player.getY() + 1.2;
                double pz = player.getZ();
-               sl.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, px, py, pz, 24, 0.5, 0.8, 0.5, 0.15);
-               sl.sendParticles(ParticleTypes.HAPPY_VILLAGER, px, py + 0.4, pz, 12, 0.4, 0.5, 0.4, 0.08);
-               sl.sendParticles(ParticleTypes.ENCHANT, px, py + 0.5, pz, 18, 0.5, 0.6, 0.5, 0.1);
-               sl.sendParticles(ParticleTypes.GLOW, px, py, pz, 10, 0.6, 0.6, 0.6, 0.04);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.TOTEM_OF_UNDYING, px, py, pz, 24, 0.5, 0.8, 0.5, 0.15);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.HAPPY_VILLAGER, px, py + 0.4, pz, 12, 0.4, 0.5, 0.4, 0.08);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, px, py + 0.5, pz, 18, 0.5, 0.6, 0.5, 0.1);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.GLOW, px, py, pz, 10, 0.6, 0.6, 0.6, 0.04);
                sl.playSound(null, px, py, pz, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.PLAYERS, 1.0F, 1.2F);
                sl.playSound(null, px, py, pz, SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.5F, 1.6F);
             }

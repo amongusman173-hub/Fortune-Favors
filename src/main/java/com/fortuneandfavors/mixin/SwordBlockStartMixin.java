@@ -20,7 +20,7 @@ public abstract class SwordBlockStartMixin {
    private void fortuneandfavors$distantBlockVfx(InteractionHand hand, CallbackInfo ci) {
       LivingEntity self = (LivingEntity)(Object)this;
       if (self instanceof Player p && self.level() instanceof ServerLevel sl && ModItems.isDistantMemorySword(p.getItemInHand(hand))) {
-         sl.sendParticles(ParticleTypes.ENCHANT, self.getX(), self.getY() + 1.2, self.getZ(), 10, 0.3, 0.4, 0.3, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, self.getX(), self.getY() + 1.2, self.getZ(), 10, 0.3, 0.4, 0.3, 0.05);
       }
    }
 }

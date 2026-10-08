@@ -113,7 +113,7 @@ public final class MachineVfx {
       spawned++;
       try {
          net.minecraft.util.RandomSource rng = level.getRandom();
-         server.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(server, 
             particle,
             pos.getX() + 0.5 + (rng.nextDouble() - 0.5) * 0.6,
             pos.getY() + 1.02,

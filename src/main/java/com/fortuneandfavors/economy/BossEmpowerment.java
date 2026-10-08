@@ -315,7 +315,7 @@ public final class BossEmpowerment {
       int color = colorOf(theme);
       for (int i = 0; i < 10; i++) {
          double angle = spin + i / 10.0 * Math.PI * 2.0;
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             new DustParticleOptions(color, 1.1F),
             x + Math.cos(angle) * radius,
             y + 0.15 + 0.13 * i,
@@ -327,7 +327,7 @@ public final class BossEmpowerment {
             0.0
          );
       }
-      level.sendParticles(particleOf(theme), x, y + 1.1, z, 3, radius * 0.6, 0.5, radius * 0.6, 0.01);
+      com.fortuneandfavors.net.FfVfx.particles(level, particleOf(theme), x, y + 1.1, z, 3, radius * 0.6, 0.5, radius * 0.6, 0.01);
       if (level.getGameTime() % 100 < 2) {
          level.playSound(null, x, y + 1.0, z, SoundEvents.BEACON_AMBIENT, SoundSource.HOSTILE, 0.7F, 0.6F);
       }
@@ -339,7 +339,7 @@ public final class BossEmpowerment {
       double y = boss.getY();
       double z = boss.getZ();
       level.playSound(null, x, y, z, SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.4F, 0.7F);
-      level.sendParticles(ParticleTypes.END_ROD, x, y + 1.0, z, 6, 0.5, 0.7, 0.5, 0.06);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x, y + 1.0, z, 6, 0.5, 0.7, 0.5, 0.06);
       for (ServerPlayer p : level.players()) {
          if (p.distanceToSqr(boss) <= SURGE_TRIGGER_RANGE * SURGE_TRIGGER_RANGE && !p.isSpectator()) {
             p.sendSystemMessage(Component.literal("§8§l» §7It is winding up - §fget clear!"), true);
@@ -357,7 +357,7 @@ public final class BossEmpowerment {
       double z = boss.getZ();
       ring(level, x, y + 0.1, z, radius, theme, 10);
       if (ticksLeft % 4 == 0) {
-         level.sendParticles(particleOf(theme), x, y + 1.0, z, 2, 0.4, 0.6, 0.4, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(level, particleOf(theme), x, y + 1.0, z, 2, 0.4, 0.6, 0.4, 0.02);
       }
    }
 
@@ -408,8 +408,8 @@ public final class BossEmpowerment {
       double y = boss.getY() + 0.15;
       double z = boss.getZ();
       ring(level, x, y, z, SURGE_RADIUS, theme, 30);
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
-      level.sendParticles(ParticleTypes.GUST, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.GUST, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
       level.playSound(null, x, y, z, SoundEvents.DRAGON_FIREBALL_EXPLODE, SoundSource.HOSTILE, 1.5F, 0.85F);
       for (ServerPlayer p : level.players()) {
          if (p.isCreative() || p.isSpectator()) {
@@ -431,7 +431,7 @@ public final class BossEmpowerment {
       int color = colorOf(theme);
       for (int i = 0; i < points; i++) {
          double angle = i / (double)points * Math.PI * 2.0;
-         level.sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(level, 
             new DustParticleOptions(color, 1.0F),
             x + Math.cos(angle) * radius,
             y,

@@ -282,6 +282,7 @@ public final class DrownedSovereignManager {
       long nextTaunt;
       long nextBreaker;
       long nextGlare;
+      long nextWhirlpool;
       String lastMove = "";
       /** Ticks left climbing out of the floor; nothing else runs until this is zero. */
       int riseTicks;
@@ -470,6 +471,7 @@ public final class DrownedSovereignManager {
       fight.nextMove = now + RISE_TICKS + 40L;
       fight.nextTaunt = now + 120L;
       fight.nextBreaker = now + RISE_TICKS + 220L;
+      fight.nextWhirlpool = now + RISE_TICKS + 300L;
       fight.nextGlare = now + RISE_TICKS;
       FIGHTS.put(boss.getUUID(), fight);
 
@@ -968,6 +970,20 @@ public final class DrownedSovereignManager {
          fight.lastMove = "The Deep Looks";
          tell(level, boss, fight.lastMove);
          return true;
+      }
+      if (fight.now >= fight.nextWhirlpool && RANDOM.nextInt(3) == 0) {
+         // WHIRLPOOL: the floor under each of you starts to turn and drags you to its eye. Walk out.
+         List<ServerPlayer> marked = playersNear(level, boss.position(), 28.0);
+         if (!marked.isEmpty()) {
+            for (ServerPlayer p : marked) {
+               Hazards.whirlpool(level, boss, floorAt(level, p.position()), 3.5, fight.phase >= 3 ? 40 : 55, fight.phase >= 2 ? 10.0F : 8.0F, TIDE);
+            }
+            Fx.tentacle(level, ParticleTypes.SQUID_INK, floorAt(level, boss.position()), 5.0, 24, ABYSS);
+            fight.nextWhirlpool = fight.now + 420L - (fight.phase - 1) * 60L;
+            fight.lastMove = "Whirlpool";
+            tell(level, boss, fight.lastMove);
+            return true;
+         }
       }
       if (fight.now >= fight.nextBreaker && RANDOM.nextInt(3) == 0 && breakerRing(level, boss, fight)) {
          fight.lastMove = "Breaker Ring";

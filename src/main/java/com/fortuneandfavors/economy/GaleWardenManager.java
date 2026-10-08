@@ -374,6 +374,7 @@ public final class GaleWardenManager {
       final List<Strike> strikes = new ArrayList<>();
       long nextShear;
       long nextEye;
+      long nextStorm;
       /** Ticks he stands planted for a wind-up, taking no other turn. */
       int hold;
       /** Ticks left of the arrival; the fight proper starts at zero. */
@@ -548,6 +549,7 @@ public final class GaleWardenManager {
       fight.nextMove = now + RISE_TICKS + 40L;
       fight.nextShear = now + RISE_TICKS + 140L;
       fight.nextEye = now + RISE_TICKS + 200L;
+      fight.nextStorm = now + RISE_TICKS + 260L;
       fight.bar.setProgress(0.0F);
       FIGHTS.put(boss.getUUID(), fight);
 
@@ -879,6 +881,19 @@ public final class GaleWardenManager {
       // The marked blows run on their own clocks beside the rotation, never during a hurricane
       // (one arena-wide event at a time), and never stacked on another marked blow.
       if (fight.strikes.isEmpty() && !hurricaneUp(fight)) {
+         if (now >= fight.nextStorm && RANDOM.nextInt(2) == 0) {
+            // STORM CELL: a thunderhead parks over each of you and strikes the spot three times.
+            List<ServerPlayer> marked = playersNear(level, boss.position(), 30.0);
+            if (!marked.isEmpty()) {
+               for (ServerPlayer p : marked) {
+                  Hazards.stormCell(level, boss, floorUnder(level, p.position()), 3.0, fight.phase >= 3 ? 7.0F : 5.0F, SKY);
+               }
+               Fx.featherStorm(level, ParticleTypes.CLOUD, boss.position(), 4.0, 30, GALE_WHITE);
+               fight.nextStorm = now + 360L - (fight.phase - 1) * 50L;
+               tell(level, boss, "Storm Cell");
+               return;
+            }
+         }
          if (fight.phase >= 2 && now >= fight.nextEye) {
             if (eyeOfTheStorm(level, boss, fight, now)) {
                return;
@@ -1219,6 +1234,7 @@ public final class GaleWardenManager {
          case "Reversal" -> "Knockback pulls now. \u00a77Don't trade hits.";
          case "Windstep" -> "Blasts where he stood. \u00a77Clear his trail.";
          case "Dead Air" -> "The air thickens. \u00a77Get out before it snaps.";
+         case "Storm Cell" -> "A thunderhead over you. \u00a77Keep moving.";
          case "Pressure Point" -> "The ground under you is his. \u00a77Keep moving.";
          case "Gale Counter" -> "He's braced. \u00a77Don't hit him.";
          case "Tornado" -> "It wanders. \u00a77Walk around it.";

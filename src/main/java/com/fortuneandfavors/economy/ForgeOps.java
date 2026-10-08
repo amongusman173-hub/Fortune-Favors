@@ -1229,18 +1229,18 @@ public final class ForgeOps {
 
             for (int ix = 0; ix < 12; ix++) {
                double a = ix / 12.0 * Math.PI * 2.0;
-               sl.sendParticles(ParticleTypes.END_ROD, var16 + Math.cos(a) * r, ry, z + Math.sin(a) * r, 1, 0.04, 0.08, 0.04, 0.02);
+               com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.END_ROD, var16 + Math.cos(a) * r, ry, z + Math.sin(a) * r, 1, 0.04, 0.08, 0.04, 0.02);
             }
          }
 
          for (int i = 0; i < 5; i++) {
-            sl.sendParticles(ParticleTypes.FLAME, var16, y + i * 0.35, z, 6, 0.25, 0.15, 0.25, 0.05);
-            sl.sendParticles(ParticleTypes.SMOKE, var16, y + i * 0.35, z, 3, 0.3, 0.2, 0.3, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.FLAME, var16, y + i * 0.35, z, 6, 0.25, 0.15, 0.25, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SMOKE, var16, y + i * 0.35, z, 3, 0.3, 0.2, 0.3, 0.02);
          }
 
-         sl.sendParticles(ParticleTypes.SMALL_FLAME, var16, y, z, 14, 0.45, 0.5, 0.45, 0.05);
-         sl.sendParticles(ParticleTypes.LAVA, var16, y + 0.2, z, 6, 0.3, 0.3, 0.3, 0.06);
-         sl.sendParticles(ParticleTypes.ENCHANT, var16, y + 0.6, z, 24, 0.5, 0.6, 0.5, 0.18);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SMALL_FLAME, var16, y, z, 14, 0.45, 0.5, 0.45, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.LAVA, var16, y + 0.2, z, 6, 0.3, 0.3, 0.3, 0.06);
+         com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, var16, y + 0.6, z, 24, 0.5, 0.6, 0.5, 0.18);
          SoundUtil.play(player, ModSounds.FORGE_ANVIL, 0.85F);
          SoundUtil.play(player, ModSounds.FORGE_SUCCESS, 1.35F);
       }

@@ -80,12 +80,12 @@ public final class DeathCompassManager {
          }
          drawThread(level, from, to, Math.min(32, Math.max(6, (int)(from.distanceTo(to) / 2.0))), ParticleTypes.SOUL);
          // A tiny spark off the compass itself so the held hand reads as \"live\".
-         level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.3, player.getZ(), 1, 0.15, 0.25, 0.15, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, player.getX(), player.getY() + 1.3, player.getZ(), 1, 0.15, 0.25, 0.15, 0.01);
       }
 
       // Faint grave-side pulse so the destination itself breathes.
       if (now % 80L == 0L) {
-         level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, death.pos().getX() + 0.5, death.pos().getY() + 0.5, death.pos().getZ() + 0.5, 3, 0.4, 0.6, 0.4, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, death.pos().getX() + 0.5, death.pos().getY() + 0.5, death.pos().getZ() + 0.5, 3, 0.4, 0.6, 0.4, 0.02);
       }
    }
 
@@ -125,10 +125,10 @@ public final class DeathCompassManager {
          drawThread(level, from, to, Math.min(64, Math.max(6, (int)(from.distanceTo(to) / 2.0))), ParticleTypes.SOUL_FIRE_FLAME);
          // Beacon column straight up from the grave - visible across the map.
          for (int i = 0; i < 30; i++) {
-            level.sendParticles(ParticleTypes.END_ROD, gx, gy + i * 0.4, gz, 1, 0.0, 0.0, 0.0, 0.0);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, gx, gy + i * 0.4, gz, 1, 0.0, 0.0, 0.0, 0.0);
          }
-         level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, gx, gy, gz, 16, 0.8, 0.8, 0.8, 0.05);
-         level.sendParticles(ParticleTypes.SCULK_SOUL, gx, gy + 0.3, gz, 20, 0.6, 0.5, 0.6, 0.06);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, gx, gy, gz, 16, 0.8, 0.8, 0.8, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SCULK_SOUL, gx, gy + 0.3, gz, 20, 0.6, 0.5, 0.6, 0.06);
          level.playSound(null, gx, gy, gz, SoundEvents.RESPAWN_ANCHOR_SET_SPAWN, SoundSource.PLAYERS, 0.8F, 0.9F);
       }
 
@@ -178,7 +178,7 @@ public final class DeathCompassManager {
    private static void drawThread(ServerLevel level, Vec3 from, Vec3 to, int steps, ParticleOptions particle) {
       for (int i = 0; i < steps; i++) {
          double t = (i + 1) / (double)steps;
-         level.sendParticles(particle, from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, from.z + (to.z - from.z) * t, 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, particle, from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, from.z + (to.z - from.z) * t, 1, 0.0, 0.0, 0.0, 0.0);
       }
    }
 }

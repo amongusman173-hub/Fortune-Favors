@@ -445,7 +445,7 @@ public final class ItemSorter {
       save(player.level().getServer());
       SoundUtil.play(player, ModSounds.TRANSFER);
       if (level instanceof ServerLevel server) {
-         server.sendParticles(ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5, 10, 0.3, 0.3, 0.3, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(server, ParticleTypes.END_ROD, pos.getX() + 0.5, pos.getY() + 0.8, pos.getZ() + 0.5, 10, 0.3, 0.3, 0.3, 0.05);
       }
    }
 

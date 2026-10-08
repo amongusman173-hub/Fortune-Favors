@@ -987,6 +987,7 @@ public final class StarboundMagisterManager {
     * One hit per player per cast, however many lines meet where they stand.
     */
    private static void constellation(ServerLevel level, Mob boss, Fight fight, ServerPlayer target, long now) {
+      Fx.starTrail(level, ParticleTypes.END_ROD, boss.position(), 4.0, 24, NEBULA);
       int nodes = 4 + Math.min(2, fight.energy / 2) + (fight.phase >= 3 ? 1 : 0);
       Vec3[] stars = new Vec3[nodes];
       int mid = nodes / 2;
@@ -1424,6 +1425,8 @@ public final class StarboundMagisterManager {
    // --------------------------------------------------------------------- phases
 
    private static void enterPhase(ServerLevel level, Mob boss, Fight fight, int phase) {
+      Fx.starTrail(level, ParticleTypes.END_ROD, boss.position(), 7.0, 30, STARLIGHT);
+      Fx.starfall(level, ParticleTypes.END_ROD, boss.position(), 10.0, 40, SOLAR);
       fight.phase = phase;
       long now = ServerClock.clock(level);
       Vec3 core = boss.position().add(0.0, 1.4, 0.0);

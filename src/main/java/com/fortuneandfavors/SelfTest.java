@@ -7387,7 +7387,7 @@ public final class SelfTest {
             );
          }
          long before = com.fortuneandfavors.util.PerfMonitor.particlesThisTick();
-         server.overworld().sendParticles(
+         com.fortuneandfavors.net.FfVfx.particles(server.overworld(), 
             net.minecraft.core.particles.ParticleTypes.CRIT, 0.5, 80.0, 0.5, 64, 0.1, 0.1, 0.1, 0.0
          );
          require(

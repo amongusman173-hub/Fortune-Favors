@@ -1286,7 +1286,7 @@ public final class ClockworkKingManager {
                // everyone (one particle every other tick): no template can ride a moving entity,
                // and a modded player with no cue would only see a bare trapdoor gliding past.
                if (now % 2L == 0L) {
-                  level.sendParticles(ParticleTypes.SWEEP_ATTACK, mob.getX(), mob.getY() + 0.4, mob.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SWEEP_ATTACK, mob.getX(), mob.getY() + 0.4, mob.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
                }
                if (now >= machine.nextAction) {
                   boolean cut = false;
@@ -2027,6 +2027,9 @@ public final class ClockworkKingManager {
    private static void enterPhase(MinecraftServer server, Mob boss, Fight fight, int phase) {
       fight.phase = phase;
       ServerLevel level = (ServerLevel) boss.level();
+      // The casing blows: cogs everywhere and a gear wheel turning over him.
+      Fx.cogBurst(level, ParticleTypes.ELECTRIC_SPARK, boss.position().add(0.0, 1.6, 0.0), 2.5, BRASS);
+      Fx.gearSpin(level, ParticleTypes.ELECTRIC_SPARK, boss.position().add(0.0, 3.2, 0.0), new Vec3(0.0, 1.0, 0.0), 2.5, 40, phase >= 3 ? EMBER : BRASS);
       long now = ServerClock.clock(level);
       if (phase == 2) {
          announceNear(level, boss, 72.0, "\u00a76\u00a7l\u2699 OVERDRIVE \u00a78- \u00a77drones and rams join in.");
@@ -2392,6 +2395,7 @@ public final class ClockworkKingManager {
       }
       if (fx && machine.level() instanceof ServerLevel level) {
          Fx.shatter(level, ParticleTypes.ELECTRIC_SPARK, machine.position().add(0.0, 0.4, 0.0), 0.7, BRASS);
+         Fx.cogBurst(level, ParticleTypes.ELECTRIC_SPARK, machine.position().add(0.0, 0.6, 0.0), 1.2, BRASS);
          Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, machine.getX(), machine.getY() + 0.4, machine.getZ(), 16, 0.3, 0.3, 0.3, 0.08);
          level.playSound(null, machine.getX(), machine.getY(), machine.getZ(), SoundEvents.ITEM_BREAK, SoundSource.HOSTILE, 0.8F, 0.7F);
       }

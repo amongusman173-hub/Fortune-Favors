@@ -119,10 +119,10 @@ public final class BountyManager {
          net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel)wanted.level();
          long t = level.getGameTime();
          double y = wanted.getY() + 0.4;
-         level.sendParticles(net.minecraft.core.particles.ParticleTypes.SOUL_FIRE_FLAME, wanted.getX(), y, wanted.getZ(), 6, 1.1, 0.6, 1.1, 0.0);
-         level.sendParticles(net.minecraft.core.particles.ParticleTypes.SOUL, wanted.getX(), y, wanted.getZ(), 3, 1.4, 0.8, 1.4, 0.01);
+         com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.SOUL_FIRE_FLAME, wanted.getX(), y, wanted.getZ(), 6, 1.1, 0.6, 1.1, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ParticleTypes.SOUL, wanted.getX(), y, wanted.getZ(), 3, 1.4, 0.8, 1.4, 0.01);
          if (t % 60L == 0L) {
-            level.sendParticles(new net.minecraft.core.particles.DustParticleOptions(16719904, 1.4F), wanted.getX(), y + 0.2, wanted.getZ(), 12, 1.3, 0.5, 1.3, 0.02);
+            com.fortuneandfavors.net.FfVfx.particles(level, new net.minecraft.core.particles.DustParticleOptions(16719904, 1.4F), wanted.getX(), y + 0.2, wanted.getZ(), 12, 1.3, 0.5, 1.3, 0.02);
          }
       } catch (Exception ignored) {
       }

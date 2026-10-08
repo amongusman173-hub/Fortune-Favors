@@ -1065,7 +1065,7 @@ public final class GuildManager {
                double dz = (other.getZ() - viewer.getZ()) * 0.5;
                // Server broadcast centred between the pair so every client in
                // range sees the marker over their own screen.
-               level.sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(level, 
                   net.minecraft.core.particles.ParticleTypes.ANGRY_VILLAGER,
                   viewer.getX() + dx,
                   viewer.getY() + 2.0 + dy,

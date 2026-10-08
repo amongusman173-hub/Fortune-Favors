@@ -453,7 +453,7 @@ public final class WitherReworkManager {
             w.heal(heal);
             for (int i = 0; i < 4; i++) {
                double t = i / 4.0;
-               victim.level().sendParticles(
+               com.fortuneandfavors.net.FfVfx.particles(victim.level(), 
                   ParticleTypes.SCULK_SOUL,
                   Mth.lerp(t, victim.getX(), w.getX()),
                   Mth.lerp(t, victim.getEyeY(), w.getEyeY()),

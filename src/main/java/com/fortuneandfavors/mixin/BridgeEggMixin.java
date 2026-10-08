@@ -59,7 +59,7 @@ public class BridgeEggMixin {
                   BlockPos floor = new BlockPos(egg.blockPosition().getX(), y, egg.blockPosition().getZ());
                   if (sl.getBlockState(floor).isAir()) {
                      sl.setBlock(floor, ((Block)Blocks.WOOL.white()).defaultBlockState(), 3);
-                     sl.sendParticles(ParticleTypes.CLOUD, floor.getX() + 0.5, floor.getY() + 0.9, floor.getZ() + 0.5, 4, 0.3, 0.05, 0.3, 0.01);
+                     com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.CLOUD, floor.getX() + 0.5, floor.getY() + 0.9, floor.getZ() + 0.5, 4, 0.3, 0.05, 0.3, 0.01);
                      if (laid % 6 == 0) {
                         sl.playSound(
                            null, floor.getX() + 0.5, floor.getY() + 0.5, floor.getZ() + 0.5, SoundEvents.WOOL_PLACE, SoundSource.BLOCKS, 0.7F, 1.0F
