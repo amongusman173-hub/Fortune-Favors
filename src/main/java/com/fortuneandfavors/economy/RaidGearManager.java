@@ -106,7 +106,7 @@ public final class RaidGearManager {
    public static String useCaptainHorn(ServerPlayer owner) {
       try {
          ServerLevel level = (ServerLevel)owner.level();
-         long now = level.getGameTime();
+         long now = ServerClock.clock(level);
          if (now < captainHornCd.getOrDefault(owner.getUUID(), 0L)) {
             return "The horn is still recovering.";
          }
@@ -150,7 +150,7 @@ public final class RaidGearManager {
             tagFriendly(raider, owner.getUUID());
             level.addFreshEntity(raider);
             allyOwner.put(raider.getUUID(), owner.getUUID());
-            allyBorn.put(raider.getUUID(), level.getGameTime());
+            allyBorn.put(raider.getUUID(), ServerClock.clock(level));
             com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.FLAME, raider.position(), net.minecraft.world.phys.Vec3.ZERO, 1.8, 30, 0xFFD24A);
             com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.FLAME, raider.position(), net.minecraft.world.phys.Vec3.ZERO, 4.0, 0.0, 0xFF4A2A);
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CAMPFIRE_COSY_SMOKE, raider.getX(), raider.getY() + 1.0, raider.getZ(), 14, 0.6, 0.8, 0.6, 0.04);
@@ -161,7 +161,7 @@ public final class RaidGearManager {
          com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.FLAME, owner.position().add(0.0, 1.2, 0.0), net.minecraft.world.phys.Vec3.ZERO, 3.0, 0.0, 0xFF4A2A);
          Chat.raw(owner, "§6§lThe horn blares - §f" + toSpawn + " raider" + (toSpawn == 1 ? "" : "s") + " answer your call! §7(60s ally)");
          int tier = ModItems.tierOf(owner.getMainHandItem());
-         captainHornCd.put(owner.getUUID(), level.getGameTime() + Math.max(1, 5 - (tier - 1)) * 400L); // I=100s, II=80s, III=60s
+         captainHornCd.put(owner.getUUID(), ServerClock.clock(level) + Math.max(1, 5 - (tier - 1)) * 400L); // I=100s, II=80s, III=60s
          return null;
       } catch (Exception e) {
          return "The horn fizzles.";
@@ -185,7 +185,7 @@ public final class RaidGearManager {
     *  a vex ally (two with the Evoker's Cloak). Server-side cooldown enforced
     *  here on top of the item cooldown tracker. */
    public static String useEvokerSpellbook(ServerPlayer owner) {
-      long now = owner.level().getGameTime();
+      long now = ServerClock.clock(owner.level());
       if (now < evokerBookCd.getOrDefault(owner.getUUID(), 0L)) {
          return "The spellbook is still recharging.";
       }
@@ -193,7 +193,7 @@ public final class RaidGearManager {
       if (err != null) {
          return err;
       }
-      evokerBookCd.put(owner.getUUID(), owner.level().getGameTime() + (owner.isShiftKeyDown() ? 500L : 120L));
+      evokerBookCd.put(owner.getUUID(), ServerClock.clock(owner.level()) + (owner.isShiftKeyDown() ? 500L : 120L));
       return null;
    }
 
@@ -201,18 +201,23 @@ public final class RaidGearManager {
       try {
          ServerLevel level = (ServerLevel)owner.level();
          boolean cloak = ModItems.isEvokerCloak(owner.getItemBySlot(EquipmentSlot.CHEST));
-         Vec3 from = owner.position().add(0.0, 0.4, 0.0);
-         Vec3 look = owner.getLookAngle();
-         Vec3 to = from.add(look.scale(7.0));
-         Vec3 dir = to.subtract(from).normalize();
-         float yRot = (float)Math.toDegrees(Math.atan2(dir.z, dir.x)) - 90.0F;
+         Vec3 from = owner.position();
+         // Flat, not the look vector: a caster looking at the floor used to have every fang
+         // land at their own feet, because the pitch ate the horizontal reach.
+         Vec3 dir = horizontal(owner.getLookAngle(), owner.getYRot());
+         // EvokerFangs takes its yaw in radians, the way vanilla's evoker passes it.
+         float yRot = (float)Math.atan2(dir.z, dir.x);
          double len = 7.0;
          int rows = cloak ? 9 : 6;
          for (int step = 0; step < rows; step++) {
             double f = (step + 1) / (double)rows * len;
             double fx = from.x + dir.x * f;
             double fz = from.z + dir.z * f;
-            int gy = groundY(level, (int)Math.floor(fx), (int)Math.floor(fz), owner.getBlockY());
+            double gy = fangFloor(level, fx, fz, owner.getY() + 2.0, owner.getY() - 4.0);
+            if (Double.isNaN(gy)) {
+               // A gap or a wall: vanilla's evoker skips the fang rather than hanging it in the air.
+               continue;
+            }
             EvokerFangs fang = new EvokerFangs(level, fx, gy, fz, yRot, step * 2, owner);
             com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.ENCHANT, new net.minecraft.world.phys.Vec3(fx, gy + 0.1, fz), net.minecraft.world.phys.Vec3.ZERO, 0.8, 0.0, 0xC8F08A);
             level.addFreshEntity(fang);
@@ -233,16 +238,20 @@ public final class RaidGearManager {
          if (!(evoker.level() instanceof ServerLevel level) || target == null || !target.isAlive()) {
             return;
          }
-         Vec3 from = evoker.position().add(0.0, 0.3, 0.0);
-         Vec3 to = target.position().add(0.0, target.getBbHeight() * 0.5, 0.0);
-         Vec3 dir = to.subtract(from).normalize();
-         float yRot = (float)Math.toDegrees(Math.atan2(dir.z, dir.x)) - 90.0F;
+         Vec3 from = evoker.position();
+         Vec3 dir = horizontal(target.position().subtract(from), evoker.getYRot());
+         float yRot = (float)Math.atan2(dir.z, dir.x);
          double reach = Math.min(6.0, evoker.distanceTo(target));
+         double top = Math.max(evoker.getY(), target.getY()) + 1.0;
+         double bottom = Math.min(evoker.getY(), target.getY()) - 1.0;
          for (int step = 0; step < 5; step++) {
             double f = (step + 1) / 5.0 * reach;
             double fx = from.x + dir.x * f;
             double fz = from.z + dir.z * f;
-            int gy = groundY(level, (int)Math.floor(fx), (int)Math.floor(fz), evoker.getBlockY());
+            double gy = fangFloor(level, fx, fz, top, bottom);
+            if (Double.isNaN(gy)) {
+               continue;
+            }
             EvokerFangs fang = new EvokerFangs(level, fx, gy, fz, yRot, step * 2, evoker);
             level.addFreshEntity(fang);
          }
@@ -283,8 +292,8 @@ public final class RaidGearManager {
             tagFriendly(vex, owner.getUUID());
             level.addFreshEntity(vex);
             illusionOwner.put(vex.getUUID(), owner.getUUID());
-            illusionBorn.put(vex.getUUID(), level.getGameTime());
-            illusionStrike.put(vex.getUUID(), level.getGameTime() + 30L);
+            illusionBorn.put(vex.getUUID(), ServerClock.clock(level));
+            illusionStrike.put(vex.getUUID(), ServerClock.clock(level) + 30L);
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, vex.getX(), vex.getY(), vex.getZ(), 16, 0.4, 0.6, 0.4, 0.25);
             com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, vex.position(), new net.minecraft.world.phys.Vec3(1.0, 0.0, 0.0), 0.8, 18, 0x9BB8FF);
          }
@@ -320,8 +329,8 @@ public final class RaidGearManager {
          tagFriendly(vex, owner.getUUID());
          level.addFreshEntity(vex);
          illusionOwner.put(vex.getUUID(), owner.getUUID());
-         illusionBorn.put(vex.getUUID(), level.getGameTime());
-         illusionStrike.put(vex.getUUID(), level.getGameTime() + 30L);
+         illusionBorn.put(vex.getUUID(), ServerClock.clock(level));
+         illusionStrike.put(vex.getUUID(), ServerClock.clock(level) + 30L);
          com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, vex.getX(), vex.getY(), vex.getZ(), 16, 0.4, 0.6, 0.4, 0.25);
          com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, vex.position(), new net.minecraft.world.phys.Vec3(1.0, 0.0, 0.0), 0.8, 18, 0x9BB8FF);
          return null;
@@ -337,7 +346,7 @@ public final class RaidGearManager {
    public static String useIllusionerSpellbook(ServerPlayer owner) {
       try {
          ServerLevel level = (ServerLevel)owner.level();
-         long now = level.getGameTime();
+         long now = ServerClock.clock(level);
          if (now < illusionBookCd.getOrDefault(owner.getUUID(), 0L)) {
             return "The illusion is still settling.";
          }
@@ -369,23 +378,15 @@ public final class RaidGearManager {
          }
 
          for (int i = 0; i < illusionCount; i++) {
-            Player copy = spawnIllusionCopy(owner, level);
+            double a = i / (double)illusionCount * Math.PI * 2.0;
+            Vec3 at = new Vec3(owner.getX() + Math.cos(a) * 2.2, owner.getY() + 0.5, owner.getZ() + Math.sin(a) * 2.2);
+            Player copy = spawnIllusionCopy(owner, level, at);
             if (copy == null) {
                continue;
             }
-            double a = i / (double)illusionCount * Math.PI * 2.0;
-            copy.setPos(owner.getX() + Math.cos(a) * 2.2, owner.getY() + 1.6, owner.getZ() + Math.sin(a) * 2.2);
             copyOwner.put(copy.getUUID(), owner.getUUID());
-            copyBorn.put(copy.getUUID(), level.getGameTime());
-            copyStrike.put(copy.getUUID(), level.getGameTime() + 20L + i * 10L);
-            for (ServerPlayer viewer : level.getServer().getPlayerList().getPlayers()) {
-         try {
-            viewer.connection.send(
-               new ClientboundPlayerInfoUpdatePacket(EnumSet.of(Action.ADD_PLAYER), List.of((ServerPlayer)copy))
-            );
-         } catch (Exception ignored) {
-         }
-      }
+            copyBorn.put(copy.getUUID(), ServerClock.clock(level));
+            copyStrike.put(copy.getUUID(), ServerClock.clock(level) + 20L + i * 10L);
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, copy.getX(), copy.getY(), copy.getZ(), 14, 0.5, 0.5, 0.5, 0.2);
             com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.PORTAL, owner.position().add(0.0, 1.0, 0.0), copy.position().add(0.0, 1.0, 0.0), 0.0, 0.0, 0x8C6BFF);
             com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.PORTAL, copy.position().add(0.0, 1.0, 0.0), net.minecraft.world.phys.Vec3.ZERO, 0.8, 0.0, 0x8C6BFF);
@@ -396,7 +397,7 @@ public final class RaidGearManager {
          level.playSound(null, owner.blockPosition(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.0F, 0.8F);
          // The caster turns TRULY invisible for the whole illusion window (copies
          // fight in their place) - a hit shatters it (see onPlayerHit).
-         illusionActiveUntil.put(owner.getUUID(), level.getGameTime() + ILLUSION_COPY_TICKS);
+         illusionActiveUntil.put(owner.getUUID(), ServerClock.clock(level) + ILLUSION_COPY_TICKS);
          applyTrueInvisibility(owner);
          illusionBookCd.put(owner.getUUID(), now + 600L);
          Chat.raw(owner, "§d§lIllusion burst! §7Blinded §f" + blindedPlayers + " player" + (blindedPlayers == 1 ? "" : "s")
@@ -440,7 +441,7 @@ public final class RaidGearManager {
          }
       }
       clearTrueInvisibility(owner);
-      long now = owner.level().getGameTime();
+      long now = ServerClock.clock(owner.level());
       illusionBookCd.put(id, now + 600L);
       ItemStack book = owner.getMainHandItem();
       if (!ModItems.isIllusionerSpellbook(book)) {
@@ -582,7 +583,7 @@ public final class RaidGearManager {
    /** Spawns a 1-HP illusion copy of the owner: exact skin, armor and tools
     *  copied, glowing magenta. They are separate entities with no leash to you -
     *  they attack anything that moves. */
-   private static Player spawnIllusionCopy(ServerPlayer owner, ServerLevel level) {
+   private static Player spawnIllusionCopy(ServerPlayer owner, ServerLevel level, Vec3 at) {
       try {
          UUID fakeId = UUID.randomUUID();
          GameProfile profile;
@@ -607,6 +608,20 @@ public final class RaidGearManager {
          copy.setItemSlot(EquipmentSlot.FEET, owner.getItemBySlot(EquipmentSlot.FEET).copy());
          copy.setItemSlot(EquipmentSlot.MAINHAND, owner.getMainHandItem().copy());
          copy.setItemSlot(EquipmentSlot.OFFHAND, owner.getOffhandItem().copy());
+         copy.setPos(at.x, at.y, at.z);
+         // The player-info entry has to reach every client BEFORE the entity does. A vanilla
+         // client drops a player entity it has no info for ("added prior to sending player
+         // info"), and addFreshEntity sends the spawn straight away - so the copies were sent in
+         // the wrong order and could simply never appear. They were also added at 0,0,0 and
+         // moved afterwards, so the spawn they did get was in the wrong place.
+         ClientboundPlayerInfoUpdatePacket info =
+            new ClientboundPlayerInfoUpdatePacket(EnumSet.of(Action.ADD_PLAYER), List.of((ServerPlayer)copy));
+         for (ServerPlayer viewer : level.getServer().getPlayerList().getPlayers()) {
+            try {
+               viewer.connection.send(info);
+            } catch (Exception ignored) {
+            }
+         }
          level.addFreshEntity(copy);
          return copy;
       } catch (Exception e) {
@@ -661,7 +676,7 @@ public final class RaidGearManager {
    /** Runs every tick: keeps horn raiders and spellbook illusions fighting. */
    public static void tick(MinecraftServer server) {
       try {
-         long now = server.getTickCount();
+         long now = ServerClock.clock(server);
          // Illusioner Spellbook active window: the caster is invisible and
          // shimmers with enchant particles; when the window ends they reappear.
          for (UUID id : new java.util.ArrayList<>(illusionActiveUntil.keySet())) {
@@ -733,8 +748,8 @@ public final class RaidGearManager {
                vex.setCustomNameVisible(false);
                vex.setPersistenceRequired();
                illusionOwner.put(vex.getUUID(), ownerId);
-               illusionBorn.put(vex.getUUID(), ally.level().getGameTime());
-               illusionStrike.put(vex.getUUID(), ally.level().getGameTime() + 30L);
+               illusionBorn.put(vex.getUUID(), ServerClock.clock(ally.level()));
+               illusionStrike.put(vex.getUUID(), ServerClock.clock(ally.level()) + 30L);
                vexKind.put(vex.getUUID(), "spellbook");
             }
             // The friendly evoker also fights: it blasts fangs at whatever it's
@@ -807,22 +822,26 @@ public final class RaidGearManager {
                   vex.setDeltaMovement(0.0, 0.0, 0.0);
                }
                long strike = illusionStrike.getOrDefault(id, 0L);
-               if (target != null && now >= strike && vex.distanceToSqr(target) < 169.0) {
+               // Never strike the owner (the drift-home target above) or another of their summons.
+               // Checked before the blink, which used to teleport the vex into its own owner first
+               // and only then decide not to hit them.
+               boolean friendly = target != null && (BossManager.isFriendlySkeleton(target)
+                  || copyOwner.containsKey(target.getUUID())
+                  || illusionOwner.containsKey(target.getUUID())
+                  || (owner != null && target.getUUID().equals(owner.getUUID())));
+               if (target != null && !friendly && now >= strike && vex.distanceToSqr(target) < 169.0) {
                   illusionStrike.put(id, now + 50L);
                   vex.setPos(target.getX(), target.getY() + 0.7, target.getZ());
                   vex.setDeltaMovement(0.0, 0.0, 0.0);
                   vex.hurtMarked = true;
                   ServerLevel lv = (ServerLevel)vex.level();
                   com.fortuneandfavors.net.FfVfx.particles(lv, ParticleTypes.SWEEP_ATTACK, target.getX(), target.getY() + 0.6, target.getZ(), 8, 0.3, 0.3, 0.3, 0.05);
-                  lv.playSound(null, target.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.8F, 1.2F);               boolean cloakBoost = "spellbook".equals(vexKind.get(id)) && owner != null && ModItems.isEvokerCloak(owner.getItemBySlot(EquipmentSlot.CHEST));
-               float strikeDmg = "spellbook".equals(vexKind.get(id)) ? (cloakBoost ? 12.0F : 8.0F) : 2.5F;
-               // Never let a friendly vex strike its own owner (or another summon).
-               if (BossManager.isFriendlySkeleton(target) || copyOwner.containsKey(target.getUUID())
-                     || (owner != null && target.getUUID().equals(owner.getUUID()))) {
+                  lv.playSound(null, target.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.8F, 1.2F);
+                  boolean cloakBoost = "spellbook".equals(vexKind.get(id)) && owner != null && ModItems.isEvokerCloak(owner.getItemBySlot(EquipmentSlot.CHEST));
+                  float strikeDmg = "spellbook".equals(vexKind.get(id)) ? (cloakBoost ? 12.0F : 8.0F) : 2.5F;
+                  target.hurtServer(lv, vex.damageSources().mobAttack(vex), strikeDmg);
+               } else if (friendly) {
                   vex.setTarget(null);
-               } else {
-                  target.hurt(vex.damageSources().mobAttack(vex), strikeDmg);
-               }
                }
             }
          }
@@ -931,7 +950,7 @@ public final class RaidGearManager {
    private static void updateCooldownTooltips(MinecraftServer server) {
       try {
          for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            long now = p.level().getGameTime();
+            long now = ServerClock.clock(p.level());
             updateCooldownTooltip(p, p.getMainHandItem(), now);
             updateCooldownTooltip(p, p.getOffhandItem(), now);
             for (int i = 0; i < 9; i++) {
@@ -1067,6 +1086,44 @@ public final class RaidGearManager {
       CompoundTag tag = data.copyTag();
       tag.putString("ff_friendly_owner", ownerId.toString());
       mob.setComponent(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+   }
+
+   /** A direction on the ground plane, falling back to the body's yaw when the vector is vertical. */
+   private static Vec3 horizontal(Vec3 v, float yawDegrees) {
+      Vec3 flat = new Vec3(v.x, 0.0, v.z);
+      if (flat.lengthSqr() < 1.0E-6) {
+         double yaw = Math.toRadians(yawDegrees);
+         return new Vec3(-Math.sin(yaw), 0.0, Math.cos(yaw));
+      }
+      return flat.normalize();
+   }
+
+   /**
+    * Where a fang stands in this column, searched downward from {@code top} to {@code bottom} -
+    * the same search vanilla's evoker uses: the first block whose top face is solid, raised onto
+    * whatever partial block (a slab, a carpet) sits on it. {@code NaN} when there is no floor in
+    * range, so the caller skips the fang instead of hanging it in the air or burying it in a wall.
+    * The old heightmap lookup answered "the top of the world here", which under a roof or in a
+    * cave was the roof.
+    */
+   private static double fangFloor(ServerLevel level, double x, double z, double top, double bottom) {
+      BlockPos pos = BlockPos.containing(x, top, z);
+      int floorY = net.minecraft.util.Mth.floor(bottom) - 1;
+      while (pos.getY() >= floorY) {
+         BlockPos below = pos.below();
+         if (level.getBlockState(below).isFaceSturdy(level, below, net.minecraft.core.Direction.UP)) {
+            double offset = 0.0;
+            if (!level.getBlockState(pos).isAir()) {
+               net.minecraft.world.phys.shapes.VoxelShape shape = level.getBlockState(pos).getCollisionShape(level, pos);
+               if (!shape.isEmpty()) {
+                  offset = shape.max(net.minecraft.core.Direction.Axis.Y);
+               }
+            }
+            return pos.getY() + offset;
+         }
+         pos = below;
+      }
+      return Double.NaN;
    }
 
    private static int groundY(ServerLevel level, int x, int z, int fallback) {
