@@ -287,6 +287,29 @@ public final class VoidShaperManager {
          Safe.run("void shaper shutdown", () -> shutDown(server, fight));
       }
       FIGHTS.clear();
+      // Players' gripped and thrown blocks are display entities, and a display is saved with its
+      // chunk: one left in the world at shutdown hung in mid-air there for good, a ghost block
+      // nothing would ever tick or discard again.
+      List<UUID> loose = new ArrayList<>(LIFTED.keySet());
+      for (Loose l : LOOSE) {
+         loose.add(l.displayId);
+      }
+      for (UUID id : loose) {
+         Safe.run("void shaper loose block", () -> {
+            Entity e = findEntity(server, id);
+            if (e != null) {
+               e.discard();
+            }
+         });
+      }
+      LIFTED.clear();
+      LOOSE.clear();
+   }
+
+   /** A player's throw or grip: a tear in the world where the block came loose. */
+   private static void playerTearFx(ServerLevel level, Vec3 at, Vec3 dir) {
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, at, Vec3.ZERO, 0.8, 0.0, 0x7A2BD9);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.REVERSE_PORTAL, at, dir.normalize(), 0.0, 0.0, 0xB06BFF);
    }
 
    /** Void Anchor right-click: throw the hook and he follows it up. */
@@ -1295,7 +1318,7 @@ public final class VoidShaperManager {
       level.addFreshEntity(display);
       Kind kind = kindOf(state);
       Vec3 vel = dir.normalize().scale(kind.speed);
-      level.sendParticles(ParticleTypes.PORTAL, from.x, from.y, from.z, 14, 0.3, 0.3, 0.3, 0.06);
+      playerTearFx(level, from, dir);
       level.playSound(null, from.x, from.y, from.z, SoundEvents.DEEPSLATE_BREAK, SoundSource.PLAYERS, 1.0F, 0.9F);
       // Player throws are ticked on their own, short-lived list.
       LOOSE.add(new Loose(display.getUUID(), from, vel, kind, thrower, 90));
@@ -1326,24 +1349,31 @@ public final class VoidShaperManager {
       display.setPos(owner.getX(), owner.getY() + 1.6, owner.getZ());
       level.addFreshEntity(display);
       LIFTED.put(display.getUUID(), new Lift(owner.getUUID(), kindOf(state), ServerClock.clock(level) + LIFT_LIFETIME));
-      level.sendParticles(ParticleTypes.PORTAL, display.getX(), display.getY(), display.getZ(), 12, 0.3, 0.3, 0.3, 0.05);
+      // The block is pulled out of its socket and up into the hand along a thread of void.
+      Vec3 socket = Vec3.atCenterOf(pos);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, socket, Vec3.ZERO, 0.6, 0.0, 0x7A2BD9);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.REVERSE_PORTAL, socket, display.position(), 0.0, 0.0, 0xB06BFF);
       level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.DEEPSLATE_BREAK, SoundSource.PLAYERS, 0.8F, 0.7F);
       return display.getUUID();
    }
 
    /** Throws a block that is currently held by the Sigil. */
    public static boolean hurlLifted(ServerLevel level, ServerPlayer owner, UUID displayId, Vec3 dir) {
-      Lift lift = LIFTED.remove(displayId);
+      // Checked before it is taken off the list: removing it first and then refusing the throw
+      // left a gripped block that nothing tracked, hovering where it was for good.
+      Lift lift = LIFTED.get(displayId);
       if (lift == null || !lift.owner.equals(owner.getUUID())) {
          return false;
       }
       Entity raw = findEntity(level.getServer(), displayId);
       if (raw == null) {
+         LIFTED.remove(displayId);
          return false;
       }
+      LIFTED.remove(displayId);
       Vec3 from = raw.position();
       Vec3 vel = dir.normalize().scale(lift.kind.speed);
-      level.sendParticles(ParticleTypes.PORTAL, from.x, from.y, from.z, 14, 0.3, 0.3, 0.3, 0.06);
+      playerTearFx(level, from, dir);
       level.playSound(null, from.x, from.y, from.z, SoundEvents.DEEPSLATE_BREAK, SoundSource.PLAYERS, 1.0F, 1.1F);
       LOOSE.add(new Loose(displayId, from, vel, lift.kind, owner, 90));
       return true;
@@ -1473,22 +1503,26 @@ public final class VoidShaperManager {
             loose.pos = loose.pos.add(loose.vel.scale(1.0 / steps));
             display.setPos(loose.pos.x, loose.pos.y, loose.pos.z);
             display.hurtMarked = true;
-            level.sendParticles(ParticleTypes.PORTAL, loose.pos.x, loose.pos.y, loose.pos.z, 1, 0.05, 0.05, 0.05, 0.0);
+            if (s == 0) {
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, loose.pos.x, loose.pos.y, loose.pos.z, 2, 0.08, 0.08, 0.08, 0.0);
+            }
             if (!level.getBlockState(BlockPos.containing(loose.pos)).isAir()) {
                done = true;
                break;
             }
             LivingEntity victim = livingNear(level, loose.thrower, loose.pos, 1.3, loose.kind);
             if (victim != null) {
-               level.sendParticles(ParticleTypes.CRIT, victim.getX(), victim.getY() + 1.0, victim.getZ(), 14, 0.3, 0.3, 0.3, 0.08);
+               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, victim.getBbHeight() * 0.6, 0.0), loose.vel.normalize(), 0.0, 0.0, 0xB06BFF);
                done = true;
                break;
             }
          }
          loose.life--;
          if (done || loose.life <= 0) {
-            level.sendParticles(ParticleTypes.EXPLOSION, loose.pos.x, loose.pos.y + 0.2, loose.pos.z, 1, 0.0, 0.0, 0.0, 0.0);
-            level.sendParticles(ParticleTypes.LARGE_SMOKE, loose.pos.x, loose.pos.y + 0.3, loose.pos.z, 10, 0.4, 0.3, 0.4, 0.05);
+            // The block shatters back into the void it was borrowed from.
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, loose.pos.add(0.0, 0.2, 0.0), Vec3.ZERO, 1.8, 0.0, 0x9C8AB8);
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.REVERSE_PORTAL, loose.pos.add(0.0, 0.2, 0.0), Vec3.ZERO, 1.4, 0.0, 0x7A2BD9);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, loose.pos.x, loose.pos.y + 0.3, loose.pos.z, 10, 0.4, 0.3, 0.4, 0.05);
             level.playSound(null, loose.pos.x, loose.pos.y, loose.pos.z, SoundEvents.STONE_HIT, SoundSource.PLAYERS, 1.0F, 1.0F);
             if (display != null) {
                display.discard();
@@ -1504,7 +1538,10 @@ public final class VoidShaperManager {
     * the display is showing, so the effect always matches the visible block.
     */
    private static LivingEntity livingNear(ServerLevel level, ServerPlayer thrower, Vec3 at, double range, Kind kind) {
-      for (Entity e : level.getEntities(thrower, thrower.getBoundingBox().inflate(48.0))) {
+      // Searched round the block, not round the thrower. A throw outlives 48 blocks of flight, and
+      // past that the old box around the thrower simply had nothing in it, so a long throw passed
+      // through whoever it reached.
+      for (Entity e : level.getEntities(thrower, new net.minecraft.world.phys.AABB(at, at).inflate(range + 2.0))) {
          if (!(e instanceof LivingEntity living) || living == thrower || !living.isAlive()) {
             continue;
          }

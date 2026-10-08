@@ -115,6 +115,8 @@ public final class VoidShaperGear {
          if (!VoidShaperManager.hurlBlock(level, attacker, ammo, dir)) {
             return;
          }
+         // The blade tears the ground open beside them.
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.REVERSE_PORTAL, victim.getEyePosition().add(0.0, -0.4, 0.0), attacker.getLookAngle(), 0.0, 0.0, 0xB06BFF);
       }
       NEXT_THROW.put(attacker.getUUID(), now + THROW_COOLDOWN_TICKS);
       attacker.sendOverlayMessage(Component.literal(Chat.colorize("&5Void Reaver &7- &fblock hurled")));
@@ -264,6 +266,13 @@ public final class VoidShaperGear {
             if (dot < AIM_CONE) {
                continue;
             }
+            // Only a body the thrower can see is led; a mark behind a wall bent the throw into it.
+            net.minecraft.world.phys.HitResult wall = level.clip(new net.minecraft.world.level.ClipContext(
+               eye, eye.add(to), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, player
+            ));
+            if (wall.getType() != net.minecraft.world.phys.HitResult.Type.MISS) {
+               continue;
+            }
             // Closest to the crosshair wins, then closest overall.
             double score = (1.0 - dot) * 20.0 + distance;
             if (score < bestScore) {
@@ -311,8 +320,11 @@ public final class VoidShaperGear {
          if (state.isAir() || !state.getFluidState().isEmpty()) {
             continue;
          }
+         // The first thing the ray touches is the answer. This used to skip anything that was not a
+         // full solid block and keep going, so a window, a hedge or a slab was looked straight through
+         // and the block behind it gripped.
          if (!state.isSolidRender() || state.hasBlockEntity()) {
-            continue;
+            return null;
          }
          return pos;
       }
@@ -344,7 +356,11 @@ public final class VoidShaperGear {
       boolean has = attr != null && attr.getModifier(PLATE_KB_ID) != null;
 
       if (worn) {
-         player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 60, 0, false, false, true));
+         // Topped up, not re-sent: re-adding the effect every tick sent an effect packet every tick.
+         MobEffectInstance current = player.getEffect(MobEffects.RESISTANCE);
+         if (current == null || current.getDuration() < 20) {
+            player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 60, 0, false, false, true));
+         }
          if (attr != null && !has) {
             attr.addTransientModifier(PLATE_KB);
             PLATED.put(player.getUUID(), true);
