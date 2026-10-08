@@ -55,6 +55,13 @@ public final class SovereignGear {
    private static final String GUARD_TAG = "ff_contract_guard";
    private static final String GUARD_OWNER_KEY = "ff_contract_owner";
 
+   /** Emerald: the colour every Sovereign effect is drawn in. */
+   private static final int EMERALD = 0x3FD86A;
+   /** The crown's gold, for the moments the village answers. */
+   private static final int CROWN = 0xF2C445;
+   /** How far a Royal Guard looks for something to fight. */
+   private static final double GUARD_RANGE = 16.0;
+
    private static final Map<UUID, Long> BELL_UNTIL = new HashMap<>();
    private static final Map<UUID, Long> SEAL_UNTIL = new HashMap<>();
 
@@ -108,16 +115,25 @@ public final class SovereignGear {
       guard.setCustomNameVisible(true);
       guard.addTag(GUARD_TAG);
       guard.addTag(GUARD_OWNER_KEY + ":" + player.getUUID());
+      // Armed: a mob made with create() skips the spawn that hands a vindicator its axe, so the
+      // guard used to answer the contract empty-handed.
+      guard.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
       // The guard is your sword arm, not your loot: what it carries is its own.
       guard.setDropChance(net.minecraft.world.entity.EquipmentSlot.MAINHAND, 0.0F);
       guard.setDropChance(net.minecraft.world.entity.EquipmentSlot.OFFHAND, 0.0F);
+      // Sworn to its owner through the same tag every other friendly summon uses, which is what
+      // stops it turning on them: a vindicator is hostile, and nothing told this one otherwise.
+      tagFriendly(guard, player.getUUID());
       level.addFreshEntity(guard);
 
       var list = new java.util.ArrayList<>(GUARDS.getOrDefault(player.getUUID(), List.of()));
       list.add(new Guard(guard.getUUID(), GUARD_TICKS));
       GUARDS.put(player.getUUID(), list);
 
-      level.sendParticles(ParticleTypes.HAPPY_VILLAGER, guard.getX(), guard.getY() + 1.0, guard.getZ(), 30, 0.5, 0.8, 0.5, 0.08);
+      // The contract's seal is pressed into the ground and the guard steps up out of it.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.HAPPY_VILLAGER, guard.position().add(0.0, 0.05, 0.0), Vec3.ZERO, 1.6, 30.0, EMERALD);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.HAPPY_VILLAGER, guard.position(), Vec3.ZERO, 4.0, 0.0, CROWN);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, guard.getX(), guard.getY() + 1.0, guard.getZ(), 30, 0.5, 0.8, 0.5, 0.08);
       level.playSound(null, guard.getX(), guard.getY(), guard.getZ(), SoundEvents.VINDICATOR_CELEBRATE, SoundSource.PLAYERS, 1.2F, 1.0F);
       bar(player, "&aRoyal Guard &7- his contract runs for &f60s");
       return null;
@@ -143,12 +159,12 @@ public final class SovereignGear {
       double z = player.getZ();
       level.playSound(null, x, y, z, SoundEvents.BELL_BLOCK, SoundSource.PLAYERS, 2.0F, 0.8F);
       level.playSound(null, x, y, z, SoundEvents.BELL_RESONATE, SoundSource.PLAYERS, 1.4F, 0.7F);
+      // The toll rolls outward in three rings to the edge of its reach. Three shape cues where the
+      // old version sent ninety separate particle packets.
+      Vec3 bell = new Vec3(x, y, z);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.NOTE, bell.add(0.0, -0.8, 0.0), Vec3.ZERO, BELL_RADIUS, 0.0, EMERALD);
       for (int ring = 1; ring <= 3; ring++) {
-         double r = ring * 5.0;
-         for (int i = 0; i < 30; i++) {
-            double a = i * (Math.PI * 2.0 / 30.0);
-            level.sendParticles(ParticleTypes.NOTE, x + Math.cos(a) * r, y, z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
-         }
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.NOTE, bell, Vec3.ZERO, ring * 5.0, 0.0, ring == 2 ? CROWN : EMERALD);
       }
 
       int staggered = 0;
@@ -158,8 +174,7 @@ public final class SovereignGear {
             hostile.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 120, 2, false, true, true));
             hostile.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 120, 1, false, true, true));
             hostile.addEffect(new MobEffectInstance(MobEffects.GLOWING, 120, 0, false, true, true));
-            hostile.hurtMarked = true;
-            level.sendParticles(ParticleTypes.NOTE, hostile.getX(), hostile.getY() + 2.0, hostile.getZ(), 8, 0.4, 0.3, 0.4, 0.08);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.NOTE, hostile.getX(), hostile.getY() + 2.0, hostile.getZ(), 8, 0.4, 0.3, 0.4, 0.08);
             staggered++;
          } else if (e instanceof Villager villager && villager.isAlive()) {
             // Royal subjects: the village answers its own bell - and it answers
@@ -273,7 +288,9 @@ public final class SovereignGear {
       player.addEffect(new MobEffectInstance(MobEffects.STRENGTH, 200, 1, false, true, true));
       player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 200, 1, false, true, true));
       SEAL_UNTIL.put(player.getUUID(), now + SEAL_COOLDOWN_TICKS);
-      level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.2, player.getZ(), 30, 0.6, 0.8, 0.6, 0.12);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.2, player.getZ(), 30, 0.6, 0.8, 0.6, 0.12);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 2.2, 0.0, CROWN);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.4, 0.0, EMERALD);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BELL_RESONATE, SoundSource.PLAYERS, 1.4F, 1.3F);
       bar(player, "&a&lROYAL TRIBUTE &7- Strength + Resistance for 10s");
       return null;
@@ -326,7 +343,11 @@ public final class SovereignGear {
       // Hero of the Village is the vanilla trade-discount mechanism; using it
       // instead of rewriting trade costs means the discount behaves exactly like
       // the game's own and stacks with nothing it should not.
-      player.addEffect(new MobEffectInstance(MobEffects.HERO_OF_THE_VILLAGE, 80, 0, false, false, true));
+      // Topped up rather than re-applied every tick, which sent an effect packet every tick.
+      MobEffectInstance hero = player.getEffect(MobEffects.HERO_OF_THE_VILLAGE);
+      if (hero == null || hero.getDuration() < 30) {
+         player.addEffect(new MobEffectInstance(MobEffects.HERO_OF_THE_VILLAGE, 80, 0, false, false, true));
+      }
    }
 
    private static boolean carriesSeal(ServerPlayer player) {
@@ -374,11 +395,15 @@ public final class SovereignGear {
                continue;
             }
             if (mob.level() instanceof ServerLevel level) {
+               if (guard.ticks % 10 == 0) {
+                  steerGuard(level, mob, owner);
+               }
                if (guard.ticks % 20 == 0) {
-                  level.sendParticles(ParticleTypes.HAPPY_VILLAGER, mob.getX(), mob.getY() + 1.4, mob.getZ(), 3, 0.3, 0.3, 0.3, 0.0);
+                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, mob.getX(), mob.getY() + 1.4, mob.getZ(), 3, 0.3, 0.3, 0.3, 0.0);
                }
                if (guard.ticks == 0) {
-                  level.sendParticles(ParticleTypes.LARGE_SMOKE, mob.getX(), mob.getY() + 0.8, mob.getZ(), 14, 0.4, 0.4, 0.4, 0.05);
+                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, mob.getX(), mob.getY() + 0.8, mob.getZ(), 14, 0.4, 0.4, 0.4, 0.05);
+                  com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, mob.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.2, 0.0, EMERALD);
                   level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.VINDICATOR_CELEBRATE, SoundSource.PLAYERS, 1.0F, 0.7F);
                   if (owner != null) {
                      bar(owner, "&7A Royal Guard's contract has expired.");
@@ -414,14 +439,57 @@ public final class SovereignGear {
       SUBJECT_STRIKE.entrySet().removeIf(e -> e.getKey().equals(id));
       BELL_UNTIL.remove(id);
       SEAL_UNTIL.remove(id);
-      List<Guard> guards = GUARDS.remove(id);
-      if (guards != null) {
-         // The guards go with the contract holder: a guard left standing would
-         // outlive the paper that called it.
-         for (Guard guard : guards) {
-            guard.ticks = 0;
+      // Their guards are left on the list with their time intact, so tickGuards still owns them
+      // and dismisses each when its contract runs out. Removing the list here - which this used
+      // to do - meant nothing tracked the guards any more and they stood in the world for good.
+   }
+
+   /**
+    * Keeps a Royal Guard fighting for its owner. A vindicator's own targeting goes after
+    * villagers, golems and players; the friendly tag stops the players, and this points it at
+    * monsters instead - the owner's attacker first - and walks it back to the owner when idle.
+    */
+   private static void steerGuard(ServerLevel level, Mob guard, ServerPlayer owner) {
+      LivingEntity current = guard.getTarget();
+      boolean wrong = current != null && (!current.isAlive() || !(current instanceof net.minecraft.world.entity.monster.Enemy)
+         || current instanceof Mob m && BossManager.isFriendlySkeleton(m));
+      if (wrong) {
+         guard.setTarget(null);
+         current = null;
+      }
+      if (current != null) {
+         return;
+      }
+      LivingEntity foe = null;
+      if (owner != null && owner.getLastHurtByMob() instanceof net.minecraft.world.entity.monster.Enemy attacker
+         && attacker instanceof LivingEntity a && a.isAlive() && a.distanceToSqr(guard) < GUARD_RANGE * GUARD_RANGE * 2.0) {
+         foe = a;
+      }
+      if (foe == null) {
+         double best = GUARD_RANGE * GUARD_RANGE;
+         for (Mob m : level.getEntitiesOfClass(Mob.class, guard.getBoundingBox().inflate(GUARD_RANGE),
+            m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && !BossManager.isFriendlySkeleton(m))) {
+            double d = m.distanceToSqr(guard);
+            if (d < best) {
+               best = d;
+               foe = m;
+            }
          }
       }
+      if (foe != null) {
+         guard.setTarget(foe);
+      } else if (owner != null && owner.level() == level && guard.distanceToSqr(owner) > 64.0) {
+         guard.getNavigation().moveTo(owner, 1.1);
+      }
+   }
+
+   private static void tagFriendly(Mob mob, UUID owner) {
+      net.minecraft.world.item.component.CustomData data = mob.getOrDefault(
+         net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.EMPTY
+      );
+      net.minecraft.nbt.CompoundTag tag = data.copyTag();
+      tag.putString("ff_friendly_owner", owner.toString());
+      mob.setComponent(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
    }
 
    public static void clear() {
