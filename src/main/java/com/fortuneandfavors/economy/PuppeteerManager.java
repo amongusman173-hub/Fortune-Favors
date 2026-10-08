@@ -1311,6 +1311,17 @@ public final class PuppeteerManager {
       }
 
       // 6) Abilities, in priority order, each independently gated.
+      // 6-) The Last String: phase three's signature, checked before everything else - even the thread cast, which used to
+      // return first and starve it - so a
+      // busy rotation can never starve it. It picks its own target (see knotTarget) and ties
+      // the string it pulls on if nobody is holding one, so it no longer depends on a string
+      // happening to be on somebody at the moment its clock comes round - which, with every
+      // blow on him cutting one, was almost never.
+      if (fight.phase >= 3 && now >= fight.nextKnot && beginKnot(level, boss, fight, knotTarget(level, boss, fight))) {
+         fight.nextKnot = now + KNOT_COOLDOWN;
+         return;
+      }
+
       int wantThreads = fight.phase == 1 ? THREADS_PHASE_1 : (fight.phase == 2 ? THREADS_PHASE_2 : THREADS_PHASE_3);
       if (now >= fight.nextThread) {
          // A wider cast first - it is the better show, and it is what the phase is
@@ -1325,16 +1336,6 @@ public final class PuppeteerManager {
             return;
          }
          fight.nextThread = now + 40L;
-      }
-
-      // 6-) The Last String: phase three's signature, checked before the staged attacks so a
-      // busy rotation can never starve it. It picks its own target (see knotTarget) and ties
-      // the string it pulls on if nobody is holding one, so it no longer depends on a string
-      // happening to be on somebody at the moment its clock comes round - which, with every
-      // blow on him cutting one, was almost never.
-      if (fight.phase >= 3 && now >= fight.nextKnot && beginKnot(level, boss, fight, knotTarget(level, boss, fight))) {
-         fight.nextKnot = now + KNOT_COOLDOWN;
-         return;
       }
 
       // 6a) The staged attacks: every one is marked on the floor before it lands.
@@ -3290,7 +3291,7 @@ public final class PuppeteerManager {
       SNARES.add(new Snare(boss.getUUID(), level, x, y, z, ServerClock.clock(level) + SNARE_TICKS));
       announce(level, SAY + "\"\u00a7fCareful where you step.\"");
       level.playSound(null, x, y, z, SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 0.9F, 1.4F);
-      level.sendParticles(ParticleTypes.END_ROD, x, y + 0.2, z, 18, 1.2, 0.2, 1.2, 0.02);
+      Fx.vanilla(level, ParticleTypes.END_ROD, x, y + 0.2, z, 18, 1.2, 0.2, 1.2, 0.02);
       return true;
    }
 
@@ -3309,14 +3310,14 @@ public final class PuppeteerManager {
          }
          if (now >= snare.expires) {
             it.remove();
-            snare.world.sendParticles(ParticleTypes.END_ROD, snare.x, snare.y + 0.2, snare.z, 12, 0.8, 0.2, 0.8, 0.02);
+            Fx.vanilla(snare.world, ParticleTypes.END_ROD, snare.x, snare.y + 0.2, snare.z, 12, 0.8, 0.2, 0.8, 0.02);
             continue;
          }
          // The knot, as a slowly turning ring - the tell that this patch of floor is his.
          long step = now / 3L;
          for (int i = 0; i < 8; i++) {
             double a = step * 0.25 + i * (Math.PI / 4.0);
-            snare.world.sendParticles(
+            Fx.vanilla(snare.world, 
                ParticleTypes.END_ROD,
                snare.x + Math.cos(a) * 1.4,
                snare.y + 0.15,
@@ -3338,7 +3339,7 @@ public final class PuppeteerManager {
                break;
             }
             if (threadPlayer(snare.world, boss, fight, p)) {
-               snare.world.sendParticles(ParticleTypes.CRIT, p.getX(), p.getY() + 1.0, p.getZ(), 20, 0.5, 0.6, 0.5, 0.08);
+               Fx.vanilla(snare.world, ParticleTypes.CRIT, p.getX(), p.getY() + 1.0, p.getZ(), 20, 0.5, 0.6, 0.5, 0.08);
                snare.world.playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.HOSTILE, 1.2F, 0.8F);
                // One knot, one catch: it is spent the moment it ties somebody.
                it.remove();
@@ -3370,7 +3371,7 @@ public final class PuppeteerManager {
          ServerPlayer p = level.getServer() == null ? null : level.getServer().getPlayerList().getPlayer(id);
          if (p != null && p.isAlive()) {
             p.sendOverlayMessage(Component.literal("\u00a75The string is drawn back in."));
-            level.sendParticles(ParticleTypes.END_ROD, p.getX(), p.getY() + 1.2, p.getZ(), 16, 0.4, 0.6, 0.4, 0.05);
+            Fx.vanilla(level, ParticleTypes.END_ROD, p.getX(), p.getY() + 1.2, p.getZ(), 16, 0.4, 0.6, 0.4, 0.05);
          }
       }
       if (recalled == 0) {
@@ -3517,7 +3518,7 @@ public final class PuppeteerManager {
       );
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.HOSTILE, 1.4F, 0.6F);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.VEX_CHARGE, SoundSource.HOSTILE, 1.2F, 0.8F);
-      level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, target.getX(), target.getY() + 1.0, target.getZ(), 40, 0.6, 0.9, 0.6, 0.05);
+      Fx.vanilla(level, ParticleTypes.SOUL_FIRE_FLAME, target.getX(), target.getY() + 1.0, target.getZ(), 40, 0.6, 0.9, 0.6, 0.05);
       return true;
    }
 
@@ -3606,8 +3607,8 @@ public final class PuppeteerManager {
       drawString(level, player.getX() + 0.35, player.getY() + 1.5, player.getZ(), boss.getX() - 0.4, boss.getY() + 2.1, boss.getZ(), 8);
       drawString(level, player.getX() - 0.35, player.getY() + 1.5, player.getZ(), boss.getX() + 0.4, boss.getY() + 2.1, boss.getZ(), 8);
       drawBodyStrings(level, player, ServerClock.clock(level));
-      level.sendParticles(ParticleTypes.SOUL, player.getX(), player.getY() + 0.3, player.getZ(), 8, 0.3, 0.2, 0.3, 0.02);
-      level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, player.getX(), player.getY() + 1.1, player.getZ(), 6, 0.3, 0.5, 0.3, 0.02);
+      Fx.vanilla(level, ParticleTypes.SOUL, player.getX(), player.getY() + 0.3, player.getZ(), 8, 0.3, 0.2, 0.3, 0.02);
+      Fx.vanilla(level, ParticleTypes.SOUL_FIRE_FLAME, player.getX(), player.getY() + 1.1, player.getZ(), 6, 0.3, 0.5, 0.3, 0.02);
       // He is not only walking the legs: he is swinging the arm they are attached to while
       // they try to leave, so the act of running away is itself paid for.
       LivingEntity victim = stringsTarget(level, player);
@@ -3633,7 +3634,7 @@ public final class PuppeteerManager {
          player.sendSystemMessage(
             Component.literal("\u00a75\u2726 \u00a7f" + how + " \u00a78- \u00a7d" + thread.knotsLeft + " of his hands are still in you.")
          );
-         level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 20, 0.5, 0.6, 0.5, 0.08);
+         Fx.vanilla(level, ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 20, 0.5, 0.6, 0.5, 0.08);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.PLAYERS, 1.1F, 1.4F);
          return;
       }
@@ -3647,7 +3648,7 @@ public final class PuppeteerManager {
       clearWindupBar(player.getUUID());
       player.sendOverlayMessage(Component.literal("\u00a75\u2726 THE FINAL KNOT \u00a78| \u00a7ayou kept your body"));
       player.sendSystemMessage(Component.literal("\u00a75\u2726 \u00a7fThe strings let go \u00a78- \u00a7f" + why));
-      level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 30, 0.6, 0.7, 0.6, 0.1);
+      Fx.vanilla(level, ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 30, 0.6, 0.7, 0.6, 0.1);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.HOSTILE, 1.2F, 0.8F);
    }
 
@@ -3678,8 +3679,8 @@ public final class PuppeteerManager {
       player.sendSystemMessage(Component.literal("\u00a7fHe is using it to kill the people next to you. \u00a7dThe only way out is his health bar."));
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.VEX_CHARGE, SoundSource.HOSTILE, 1.6F, 0.5F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WITHER_SPAWN, SoundSource.HOSTILE, 0.8F, 0.8F);
-      level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, player.getX(), player.getY() + 1.0, player.getZ(), 60, 0.7, 1.0, 0.7, 0.08);
-      level.sendParticles(ParticleTypes.SOUL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 40, 0.8, 1.0, 0.8, 0.05);
+      Fx.vanilla(level, ParticleTypes.SOUL_FIRE_FLAME, player.getX(), player.getY() + 1.0, player.getZ(), 60, 0.7, 1.0, 0.7, 0.08);
+      Fx.vanilla(level, ParticleTypes.SOUL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 40, 0.8, 1.0, 0.8, 0.05);
    }
 
    /**
@@ -3755,8 +3756,8 @@ public final class PuppeteerManager {
          drawBodyStrings(level, player, now);
          drawString(level, player.getX(), player.getY() + 1.6, player.getZ(), boss.getX() - 0.5, boss.getY() + 2.2, boss.getZ(), 9);
          drawString(level, player.getX(), player.getY() + 1.6, player.getZ(), boss.getX() + 0.5, boss.getY() + 2.2, boss.getZ(), 9);
-         level.sendParticles(ParticleTypes.PORTAL, player.getX(), player.getY() + 1.2, player.getZ(), 6, 0.4, 0.6, 0.4, 0.05);
-         level.sendParticles(ParticleTypes.WITCH, player.getX(), player.getY() + 0.9, player.getZ(), 4, 0.35, 0.6, 0.35, 0.02);
+         Fx.vanilla(level, ParticleTypes.PORTAL, player.getX(), player.getY() + 1.2, player.getZ(), 6, 0.4, 0.6, 0.4, 0.05);
+         Fx.vanilla(level, ParticleTypes.WITCH, player.getX(), player.getY() + 0.9, player.getZ(), 4, 0.35, 0.6, 0.35, 0.02);
       }
       ServerPlayer target = nearestFreePlayer(level, player, POSSESSION_RANGE);
       if (target == null) {
@@ -3808,7 +3809,7 @@ public final class PuppeteerManager {
       }
       // A body on his strings does not tire, and the person inside it does not get to
       // decide how much of its own life it spends.
-      level.sendParticles(ParticleTypes.SOUL, player.getX(), player.getY() + 1.6, player.getZ(), 1, 0.3, 0.3, 0.3, 0.01);
+      Fx.vanilla(level, ParticleTypes.SOUL, player.getX(), player.getY() + 1.6, player.getZ(), 1, 0.3, 0.3, 0.3, 0.01);
    }
 
    /** The nearest player he is not already wearing, which is who a worn body is aimed at. */
@@ -3841,7 +3842,7 @@ public final class PuppeteerManager {
       player.sendOverlayMessage(Component.literal("\u00a75\u2726 WORN \u00a78| \u00a7fyour body is yours again"));
       player.sendSystemMessage(Component.literal("\u00a75\u2726 \u00a7fHe lets go \u00a78- \u00a7f" + reason));
       if (player.level() instanceof ServerLevel level) {
-         level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 40, 0.7, 0.9, 0.7, 0.1);
+         Fx.vanilla(level, ParticleTypes.END_ROD, player.getX(), player.getY() + 1.2, player.getZ(), 40, 0.7, 0.9, 0.7, 0.1);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.PLAYERS, 1.4F, 1.2F);
       }
    }
@@ -3999,7 +4000,7 @@ public final class PuppeteerManager {
          for (UUID id : new ArrayList<>(fight.puppets)) {
             Entity entity = findEntity(level.getServer(), id);
             if (entity != null) {
-               level.sendParticles(ParticleTypes.SMOKE, entity.getX(), entity.getY() + 1.0, entity.getZ(), 12, 0.4, 0.7, 0.4, 0.02);
+               Fx.vanilla(level, ParticleTypes.SMOKE, entity.getX(), entity.getY() + 1.0, entity.getZ(), 12, 0.4, 0.7, 0.4, 0.02);
                Fx.ring(level, ParticleTypes.END_ROD, entity.position().add(0.0, 0.1, 0.0), 1.0, THREAD_VIOLET);
             }
          }
@@ -4019,7 +4020,7 @@ public final class PuppeteerManager {
          heart, 2.0, 0x9A6A3C);
       Fx.spiral(level, ParticleTypes.SOUL, boss.position(), 12.0, 50, THREAD_VIOLET);
       Fx.shockwave(level, ParticleTypes.SOUL, boss.position(), 9.0, THREAD_VIOLET);
-      level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, boss.getX(), boss.getY() + 1.0, boss.getZ(), 40, 1.6, 1.2, 1.6, 0.12);
+      Fx.vanilla(level, ParticleTypes.SOUL_FIRE_FLAME, boss.getX(), boss.getY() + 1.0, boss.getZ(), 40, 1.6, 1.2, 1.6, 0.12);
 
       // Paid, and marked as paid before the drops exist: the ordinary death hook fires off
       // the same removed body, and the safety net has to see this as already done.
@@ -4072,13 +4073,13 @@ public final class PuppeteerManager {
          for (UUID id : new ArrayList<>(fight.puppets)) {
             Entity puppet = findEntity(level.getServer(), id);
             if (puppet != null) {
-               level.sendParticles(ParticleTypes.SMOKE, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 12, 0.4, 0.7, 0.4, 0.02);
+               Fx.vanilla(level, ParticleTypes.SMOKE, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 12, 0.4, 0.7, 0.4, 0.02);
             }
          }
       }
 
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 1.2F, 0.6F);
-      level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, boss.getX(), boss.getY() + 1.0, boss.getZ(), 50, 1.5, 1.2, 1.5, 0.12);
+      Fx.vanilla(level, ParticleTypes.SOUL_FIRE_FLAME, boss.getX(), boss.getY() + 1.0, boss.getZ(), 50, 1.5, 1.2, 1.5, 0.12);
       dropLoot(level, boss, fight);
       release(level.getServer(), fight);
    }
@@ -4365,7 +4366,7 @@ public final class PuppeteerManager {
       double stepSize = Math.max(0.25, length / Math.max(1, count));
       for (double d = 0.0; d < length; d += stepSize) {
          Vec3 point = from.add(unit.scale(d));
-         level.sendParticles(ParticleTypes.END_ROD, point.x, point.y, point.z, 1, 0.0, 0.0, 0.0, 0.0);
+         Fx.vanilla(level, ParticleTypes.END_ROD, point.x, point.y, point.z, 1, 0.0, 0.0, 0.0, 0.0);
       }
    }
 
@@ -4397,20 +4398,20 @@ public final class PuppeteerManager {
          double z = body.getZ() + Math.sin(angle) * 0.45;
 
          for (double up = 0.2; up < 2.3; up += 0.45) {
-            level.sendParticles(
+            Fx.vanilla(level, 
                new DustParticleOptions(-1770000, 0.9F), x, body.getY() + up, z, 1, 0.02, 0.02, 0.02, 0.0
             );
          }
 
-         level.sendParticles(ParticleTypes.END_ROD, x, body.getY() + 2.3, z, 1, 0.02, 0.02, 0.02, 0.0);
+         Fx.vanilla(level, ParticleTypes.END_ROD, x, body.getY() + 2.3, z, 1, 0.02, 0.02, 0.02, 0.0);
       }
 
       // The crown of strings over the head, and one ring of sparks around the body: the two
       // shapes that say "held" rather than "standing here".
-      level.sendParticles(ParticleTypes.ELECTRIC_SPARK, body.getX(), body.getY() + 2.35, body.getZ(), 3, 0.25, 0.05, 0.25, 0.01);
+      Fx.vanilla(level, ParticleTypes.ELECTRIC_SPARK, body.getX(), body.getY() + 2.35, body.getZ(), 3, 0.25, 0.05, 0.25, 0.01);
 
       if (tick % 5L == 0L) {
-         level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, body.getX(), body.getY() + 1.2, body.getZ(), 2, 0.3, 0.5, 0.3, 0.01);
+         Fx.vanilla(level, ParticleTypes.SOUL_FIRE_FLAME, body.getX(), body.getY() + 1.2, body.getZ(), 2, 0.3, 0.5, 0.3, 0.01);
       }
    }
 
@@ -4420,7 +4421,7 @@ public final class PuppeteerManager {
          return;
       }
       drawBodyStrings(level, puppet, tick);
-      level.sendParticles(ParticleTypes.WITCH, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 2, 0.3, 0.5, 0.3, 0.01);
+      Fx.vanilla(level, ParticleTypes.WITCH, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 2, 0.3, 0.5, 0.3, 0.01);
    }
 
    /** The strings always hanging off his hands, so he reads as a marionette. */
@@ -4431,7 +4432,7 @@ public final class PuppeteerManager {
          double x = boss.getX() + (hand == 0 ? -0.45 : 0.45);
          double z = boss.getZ() + sway * 0.4;
          for (double up = 0.6; up < 4.2; up += 0.5) {
-            level.sendParticles(
+            Fx.vanilla(level, 
                new DustParticleOptions(-1770000, 0.9F),
                x + sway * 0.1 * (up / 4.0),
                boss.getY() + up,
@@ -4443,14 +4444,14 @@ public final class PuppeteerManager {
                0.0
             );
          }
-         level.sendParticles(ParticleTypes.END_ROD, x, boss.getY() + 4.2, z, 1, 0.05, 0.05, 0.05, 0.0);
+         Fx.vanilla(level, ParticleTypes.END_ROD, x, boss.getY() + 4.2, z, 1, 0.05, 0.05, 0.05, 0.0);
       }
    }
 
    private static void stringBurst(ServerLevel level, Mob boss, int count) {
-      level.sendParticles(ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.4, boss.getZ(), count, 1.2, 1.4, 1.2, 0.05);
-      level.sendParticles(ParticleTypes.END_ROD, boss.getX(), boss.getY() + 1.4, boss.getZ(), Math.max(4, count / 4), 1.0, 1.2, 1.0, 0.02);
-      level.sendParticles(ParticleTypes.SOUL, boss.getX(), boss.getY() + 1.0, boss.getZ(), Math.max(4, count / 5), 1.0, 1.0, 1.0, 0.04);
+      Fx.vanilla(level, ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.4, boss.getZ(), count, 1.2, 1.4, 1.2, 0.05);
+      Fx.vanilla(level, ParticleTypes.END_ROD, boss.getX(), boss.getY() + 1.4, boss.getZ(), Math.max(4, count / 4), 1.0, 1.2, 1.0, 0.02);
+      Fx.vanilla(level, ParticleTypes.SOUL, boss.getX(), boss.getY() + 1.0, boss.getZ(), Math.max(4, count / 5), 1.0, 1.0, 1.0, 0.04);
    }
 
    // ------------------------------------------------------------------ helpers
@@ -4878,5 +4879,25 @@ public final class PuppeteerManager {
    /** True when this damage came from the Puppeteer's own hands or strings. */
    public static boolean isPuppeteerDamage(DamageSource source, Entity boss) {
       return source != null && boss != null && source.getEntity() == boss;
+   }
+
+   /** Someone the Puppeteer can actually go after: alive and not spectating. */
+   private static boolean isRealTarget(ServerPlayer p) {
+      return p.isAlive() && !p.isSpectator();
+   }
+
+   /** A shape cue for modded clients (see Fx.shape). */
+   private static void cue(ServerLevel level, int kind, ParticleOptions particle, Vec3 at, Vec3 aux, double a, double b, int color) {
+      Fx.shape(level, kind, particle, at, aux, a, b, color);
+   }
+
+   /** A dotted line of vanilla particles from a to b, for vanilla clients only. */
+   private static void vanillaLine(ServerLevel level, ParticleOptions particle, Vec3 from, Vec3 to, int points) {
+      Fx.vanillaOnly(() -> {
+         for (int i = 0; i <= points; i++) {
+            Vec3 q = from.lerp(to, i / (double)Math.max(1, points));
+            Fx.vanilla(level, particle, q.x, q.y, q.z, 1, 0.0, 0.0, 0.0, 0.0);
+         }
+      });
    }
 }

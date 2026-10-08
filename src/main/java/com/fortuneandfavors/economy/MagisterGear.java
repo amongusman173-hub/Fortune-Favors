@@ -27,8 +27,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
-import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
@@ -259,15 +257,12 @@ public final class MagisterGear {
    }
 
    private static void fireStar(ServerLevel level, ServerPlayer owner, Vec3 from, Vec3 dir, float damage, double speed) {
-      Arrow arrow = new Arrow(level, owner, new ItemStack(Items.ARROW), new ItemStack(Items.BOW));
-      arrow.setPos(from.x, from.y, from.z);
-      arrow.setDeltaMovement(dir.scale(speed));
-      // An arrow hits for its speed times its base damage, so the base is divided back out:
-      // Starpiercer's "11" star was hitting for 23, and each Star Bolt shard for 9.
-      arrow.setBaseDamage(damage / Math.max(0.1, speed));
-      arrow.setCritArrow(false);
-      arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
-      level.addFreshEntity(arrow);
+      fireStar(level, owner, from, dir, damage, speed, false);
+   }
+
+   /** A real star, not an arrow: drawn by the client, swept by Bolts, through i-frames. */
+   private static void fireStar(ServerLevel level, ServerPlayer owner, Vec3 from, Vec3 dir, float damage, double speed, boolean pierce) {
+      Bolts.fire(level, owner, ParticleTypes.END_ROD, from, dir, speed, 32.0, damage, pierce, STARLIGHT);
       Fx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.END_ROD, from, dir, 0.0, 0.0, STARLIGHT);
    }
 
@@ -285,7 +280,7 @@ public final class MagisterGear {
       HITS.put(attacker.getUUID(), 0);
       Vec3 from = attacker.getEyePosition();
       Vec3 dir = attacker.getViewVector(1.0F).normalize();
-      fireStar(level, attacker, from, dir, STAR_DAMAGE, 2.1);
+      fireStar(level, attacker, from, dir, STAR_DAMAGE, 2.1, true);   // the piercing star goes through everything on the line
       // The star leaves a lance of light down the line it was fired along, a gold comet head
       // racing down it, and the blade's last hit bursts into starlight on the victim.
       Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, from.add(dir.scale(0.8)), from.add(dir.scale(18.0)), 0.0, 0.0, STARLIGHT);
@@ -306,6 +301,7 @@ public final class MagisterGear {
       }
       long now = ServerClock.clock(server.overworld());
       tickMeteors(server);
+      Bolts.tick();
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
          Safe.run("magister gear tick", () -> tickPlayer(p, now));
       }

@@ -1219,14 +1219,14 @@ public final class GaleWardenManager {
          case "Reversal" -> "Knockback pulls now. \u00a77Don't trade hits.";
          case "Windstep" -> "Blasts where he stood. \u00a77Clear his trail.";
          case "Dead Air" -> "The air thickens. \u00a77Get out before it snaps.";
-         case "Pressure Point" -> "Marked ground. \u00a77Off the rings.";
+         case "Pressure Point" -> "The ground under you is his. \u00a77Keep moving.";
          case "Gale Counter" -> "He's braced. \u00a77Don't hit him.";
          case "Tornado" -> "It wanders. \u00a77Walk around it.";
          case "Twin Twisters" -> "Two of them. \u00a77Stay in the gap.";
          case "Sky Launch" -> "Up you go. \u00a77Steer off the currents.";
          case "Cyclone Dash" -> "His wake still moves. \u00a77Stay off it.";
          case "Momentum Swap" -> "You move as they move. \u00a77Both stand still.";
-         case "Falling Sky" -> "Charges coming down. \u00a77Off the marks.";
+         case "Falling Sky" -> "Charges coming down. \u00a77Don't stand still.";
          case "Vacuum" -> "He's pulling. \u00a77Walk away, then brace.";
          case "No Ground" -> "No floor. \u00a77Ride the currents down.";
          case "Zero Point" -> "Everything stops. \u00a77Stop first.";
@@ -1251,7 +1251,6 @@ public final class GaleWardenManager {
       fight.theftLeft.put(target.getUUID(), THEFT_TICKS);
       fight.theft.put(target.getUUID(), 0.0);
       Fx.chains(level, ParticleTypes.END_ROD, boss.position().add(0.0, 2.0, 0.0), target.position().add(0.0, 1.0, 0.0), SKY);
-      Fx.runeCircle(level, ParticleTypes.END_ROD, target.position().add(0.0, 0.05, 0.0), 1.4, THEFT_TICKS, SKY);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.BREEZE_CHARGE, SoundSource.HOSTILE, 1.4F, 1.2F);
    }
 
@@ -1291,7 +1290,6 @@ public final class GaleWardenManager {
          fight.pending.add(new Pending("gust", at, null, 16 + i * 6, 0));
          Fx.comet(level, ParticleTypes.CLOUD, at, landing, 4, GALE_WHITE);
          Fx.gust(level, ParticleTypes.GUST, at.add(0.0, 1.0, 0.0), landing.subtract(at), Math.min(24.0, landing.distanceTo(at)), SKY);
-         Fx.runeCircle(level, ParticleTypes.END_ROD, floorUnder(level, at).add(0.0, 0.05, 0.0), 3.4, 16 + i * 6, SKY);
          level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_IDLE_GROUND, SoundSource.HOSTILE, 1.2F, 1.4F);
          at = landing;
       }
@@ -1321,7 +1319,6 @@ public final class GaleWardenManager {
          double z = anchor != null ? anchor.getZ() + (RANDOM.nextDouble() - 0.5) * 10.0 : boss.getZ() + (RANDOM.nextDouble() - 0.5) * 16.0;
          double y = BossGrounding.groundY(level, x, z, boss.getY());
          fight.pending.add(new Pending("column", new Vec3(x, y, z), null, 24 + i * 6, 0));
-         Fx.runeCircle(level, ParticleTypes.END_ROD, new Vec3(x, y + 0.05, z), COLUMN_RADIUS, 24 + i * 6, SKY);
       }
    }
 
@@ -1476,7 +1473,6 @@ public final class GaleWardenManager {
          double y = BossGrounding.groundY(level, x, z, boss.getY());
          int fuse = 30 + RANDOM.nextInt(45);
          fight.pending.add(new Pending("skyfall", new Vec3(x, y, z), null, fuse, 0));
-         Fx.runeCircle(level, ParticleTypes.END_ROD, new Vec3(x, y + 0.05, z), 3.0, fuse, SKY);
       }
       Fx.pillar(level, ParticleTypes.CLOUD, boss.position(), 18.0, GALE_WHITE);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BREEZE_CHARGE, SoundSource.HOSTILE, 1.6F, 0.6F);
@@ -1598,7 +1594,6 @@ public final class GaleWardenManager {
       fight.chargeFrom = boss.position();
       Fx.vortex(level, ParticleTypes.CLOUD, boss.position(), 10.0, CHARGE_TICKS, STORM);
       Fx.aura(level, ParticleTypes.END_ROD, boss.position(), 5.0, CHARGE_TICKS, GALE_WHITE);
-      Fx.runeCircle(level, ParticleTypes.END_ROD, floorUnder(level, boss.position()).add(0.0, 0.05, 0.0), ABSOLUTE_RADIUS, CHARGE_TICKS, SKY);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BREEZE_INHALE, SoundSource.HOSTILE, 2.0F, 0.6F);
    }
 
@@ -1765,7 +1760,6 @@ public final class GaleWardenManager {
       Vec3 end = s.at.add(s.dir.scale(SHEAR_LENGTH));
       Fx.beam(level, ParticleTypes.END_ROD, s.at.add(side).add(0.0, 0.15, 0.0), end.add(side).add(0.0, 0.15, 0.0), SKY);
       Fx.beam(level, ParticleTypes.END_ROD, s.at.subtract(side).add(0.0, 0.15, 0.0), end.subtract(side).add(0.0, 0.15, 0.0), SKY);
-      Fx.runeCircle(level, ParticleTypes.END_ROD, end.add(0.0, 0.05, 0.0), SHEAR_HALF_WIDTH, 10, STORM);
    }
 
    /**
@@ -1786,7 +1780,6 @@ public final class GaleWardenManager {
       fight.hold = EYE_WARN;
       fight.nextMove = Math.max(fight.nextMove, now + EYE_WARN + 20L);
       Fx.dome(level, ParticleTypes.END_ROD, center, EYE_SAFE, EYE_WARN, GALE_WHITE);
-      Fx.runeCircle(level, ParticleTypes.END_ROD, center.add(0.0, 0.05, 0.0), EYE_SAFE, EYE_WARN, SKY);
       Fx.vortex(level, ParticleTypes.CLOUD, center, EYE_REACH, EYE_WARN, STORM);
       level.playSound(null, center.x, center.y, center.z, SoundEvents.BREEZE_WHIRL, SoundSource.HOSTILE, 2.0F, 0.6F);
       overlayNear(level, boss, 90.0, "§f§lEYE OF THE STORM §8Calm in the middle. §7Get close.");
@@ -2073,7 +2066,7 @@ public final class GaleWardenManager {
                      double a = i * (Math.PI * 2.0 / 8.0) + pending.life * 0.22;
                      double r = TORNADO_RADIUS * (0.35 + 0.65 * ((i % 4) / 3.0));
                      Vec3 q = p.add(Math.cos(a) * r, 1.0 + (i % 5) * 1.6, Math.sin(a) * r);
-                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMALL_GUST, q.x, q.y, q.z, 1, 0.0, 0.0, 0.0, 0.0);
+                     Fx.vanilla(level, ParticleTypes.SMALL_GUST, q.x, q.y, q.z, 1, 0.0, 0.0, 0.0, 0.0);
                   }
                });
             }
@@ -2117,7 +2110,7 @@ public final class GaleWardenManager {
                   for (int i = 0; i < 8; i++) {
                      double a = i * (Math.PI * 2.0 / 8.0) - pending.life * 0.18;
                      Vec3 q = c.add(Math.cos(a) * span * 0.6, 2.0 + (i % 4) * 2.0, Math.sin(a) * span * 0.6);
-                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMALL_GUST, q.x, q.y, q.z, 1, 0.0, 0.0, 0.0, 0.0);
+                     Fx.vanilla(level, ParticleTypes.SMALL_GUST, q.x, q.y, q.z, 1, 0.0, 0.0, 0.0, 0.0);
                   }
                });
             }
@@ -2165,7 +2158,7 @@ public final class GaleWardenManager {
       vanillaOnly(() -> {
          for (int i = 0; i < sites; i += step) {
             double a = (Math.PI * 2.0 * i) / sites;
-            com.fortuneandfavors.net.FfVfx.particles(
+            Fx.vanilla(
                level, p, c.x + Math.cos(a) * radius, c.y + y, c.z + Math.sin(a) * radius, step, 0.08, 0.04, 0.08, 0.01
             );
          }
@@ -2181,7 +2174,7 @@ public final class GaleWardenManager {
             double y = 1.0 - 2.0 * (i + 0.5) / n;
             double ring = Math.sqrt(Math.max(0.0, 1.0 - y * y));
             double a = i * 2.399963;
-            com.fortuneandfavors.net.FfVfx.particles(
+            Fx.vanilla(
                level, p, c.x + Math.cos(a) * ring * radius, c.y + y * radius, c.z + Math.sin(a) * ring * radius, 1, 0.05, 0.05, 0.05, 0.01
             );
          }
@@ -2193,7 +2186,7 @@ public final class GaleWardenManager {
       vanillaOnly(() -> {
          int n = Math.max(2, Math.min(12, (int)(height / 1.5)));
          for (int i = 0; i <= n; i++) {
-            com.fortuneandfavors.net.FfVfx.particles(level, p, base.x, base.y + height * i / n, base.z, Math.max(1, each), 0.3, 0.1, 0.3, 0.02);
+            Fx.vanilla(level, p, base.x, base.y + height * i / n, base.z, Math.max(1, each), 0.3, 0.1, 0.3, 0.02);
          }
       });
    }
@@ -2204,7 +2197,7 @@ public final class GaleWardenManager {
          int n = Math.max(2, Math.min(24, (int)from.distanceTo(to)));
          for (int i = 0; i <= n; i++) {
             Vec3 q = from.lerp(to, i / (double)n);
-            com.fortuneandfavors.net.FfVfx.particles(level, p, q.x, q.y, q.z, 1, thickness * 0.3, thickness * 0.3, thickness * 0.3, 0.0);
+            Fx.vanilla(level, p, q.x, q.y, q.z, 1, thickness * 0.3, thickness * 0.3, thickness * 0.3, 0.0);
          }
       });
    }

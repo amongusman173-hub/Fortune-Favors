@@ -6770,6 +6770,7 @@ public final class BossManager {
          }
 
          bar.setName(Component.literal(name));
+         bar.setColor(lvl >= 3 ? BossBarColor.RED : BossBarColor.PURPLE);
          bar.setProgress(Math.max(0.0F, Math.min(1.0F, (float)remainingTicks / 640.0F)));
       } catch (Exception var6) {
       }
@@ -12746,8 +12747,29 @@ public final class BossManager {
                   m.corruptionUntil.put(e.getKey(), until - 6L);
                }
 
+               // Full control does not wear off: it ends when they break out, or when the clock
+               // below runs out and the Mindbinder takes them (a copy of them fights on, wearing their gear).
+               if (lvl >= 3 && !wearsPossessedMask(p)) {
+                  until = now + 40L;
+                  m.corruptionUntil.put(e.getKey(), until);
+                  long since = corruptionThreeSince.computeIfAbsent(e.getKey(), k -> now);
+                  long holdLeft = FULL_CONTROL_TICKS - (now - since);
+                  if (holdLeft <= 0L) {
+                     corruptionThreeSince.remove(e.getKey());
+                     p.setHealth(Math.min(p.getHealth(), 2.0F));
+                     drainCorruptionStep(level, p);   // the hold's own lethal step: the pack is held, the echo rises
+                     continue;
+                  }
+                  if (now % 10L == 0L) {
+                     actionBar(p, "§c§lFULL CONTROL §f- mash JUMP §7or it takes you in §c" + ((holdLeft + 19L) / 20L) + "s");
+                  }
+               } else {
+                  corruptionThreeSince.remove(e.getKey());
+               }
+
                if (now % 20L == 0L) {
                   sendCorruptionFx(p, true);
+                  com.fortuneandfavors.net.FfNet.send(p, new FfScreenFxPayload(FfScreenFxPayload.FX_CORRUPTION_STAGE + Math.min(3, lvl) - 1, true));
                }
 
                if (now % 20L == 0L) {
@@ -12758,7 +12780,10 @@ public final class BossManager {
                      case 2 -> "§5§lCORRUPTION II - §fPuppet";
                      default -> "§c§lCORRUPTION III - §fFull Control";
                   };
-                  String bar = stage + " §7for " + left + "s";
+                  Long held = corruptionThreeSince.get(p.getUUID());
+                  String bar = held != null
+                     ? stage + " §7- break free in §c" + Math.max(0L, (FULL_CONTROL_TICKS - (now - held) + 19L) / 20L) + "s"
+                     : stage + " §7for " + left + "s";
                   if (maskSurgeImmune.getOrDefault(p.getUUID(), 0L) > now) {
                      bar = bar + " §b· SURGE";
                   }
@@ -12785,6 +12810,7 @@ public final class BossManager {
                   }
 
                   if (possessionPulse(server, level, p, witch, now)) {
+                     corruptionThreeSince.remove(p.getUUID());
                      breakCorruption(server, p, "§aYou wrench free - the hold breaks!");
                   } else if (now % 20L == 0L && witch.isAlive()) {
                      float cap = witch.getMaxHealth() * 0.6F;
@@ -13165,6 +13191,11 @@ public final class BossManager {
          }
       }
    }
+
+   /** How long full control (corruption III) holds a player before the Mindbinder takes them. */
+   private static final long FULL_CONTROL_TICKS = 200L;
+   /** When each player entered full control. */
+   private static final Map<UUID, Long> corruptionThreeSince = new HashMap<>();
 
    /** How long one stage holds before it fades to the one below it. */
    private static int corruptionStageTicks(MindState m) {

@@ -249,6 +249,28 @@ def axe_cap(x, y):
     return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
 
 
+def veins(x, y):
+    # Corruption: thin violet veins branching along the bar.
+    return 1.8 if (x * 3 + y * 7) % 23 == 0 or (x + y * 5) % 31 == 0 else 0
+
+
+def tendrils(x, y):
+    # Sculk infection: soul flecks and a creeping dark vein along the bottom.
+    if x % 11 == 5 and y == 2:
+        return 1.9
+    return 0.6 if y == 3 and (x // 4) % 2 == 0 else 0
+
+
+def cracked_eye(x, y):
+    shape = ["........", ".1111...", "122221..", "1233321.", "1234321.", "1233321.", "122221..", ".1111...", "........", "........", "........"]
+    return {"1": 1, "2": 2, "3": 1, "4": 3}.get(shape[y][x], 0)
+
+
+def soul_cap(x, y):
+    shape = ["...1....", "..121...", "..131...", ".12321..", ".12321..", "..121...", "...1....", "........", "........", "........", "........"]
+    return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
+
+
 SIGNATURE = {
     # key: (frame, start, end, accent, pattern, (frame border, frame light, cap))
     "ender_dragon":        ((24, 6, 30), (150, 40, 180), (230, 110, 240), (255, 220, 255), scales, ((40, 10, 52), (200, 120, 230), horn)),
@@ -268,6 +290,9 @@ SIGNATURE = {
     "elder_warden":        ((4, 16, 20), (14, 70, 80), (30, 170, 170), (150, 255, 245), soul_pulse, ((8, 30, 36), (60, 220, 210), horns)),
     "elder_warden_red":    ((20, 6, 10), (90, 20, 40), (40, 200, 190), (150, 255, 245), soul_pulse, ((40, 10, 16), (60, 220, 210), horns)),
     "raid":                ((30, 10, 10), (120, 20, 24), (210, 50, 40), (255, 210, 90), banner_stripes, ((50, 30, 20), (226, 176, 66), axe_cap)),
+    "corruption":          ((20, 4, 30), (80, 20, 130), (170, 70, 240), (120, 230, 255), veins, ((36, 10, 56), (190, 120, 255), cracked_eye)),
+    "corruption_red":      ((30, 2, 14), (130, 10, 60), (240, 50, 120), (255, 200, 230), veins, ((60, 8, 30), (255, 90, 160), cracked_eye)),
+    "sculk_infection":     ((4, 14, 18), (10, 60, 70), (30, 150, 150), (150, 255, 245), tendrils, ((6, 26, 30), (60, 220, 210), soul_cap)),
     "slime_king":          ((14, 46, 18), (60, 170, 60), (140, 230, 90), (220, 255, 190), bubbles, ((20, 70, 24), (120, 220, 90), drop)),
 }
 

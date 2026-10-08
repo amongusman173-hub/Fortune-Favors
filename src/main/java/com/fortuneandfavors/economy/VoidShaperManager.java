@@ -960,9 +960,9 @@ public final class VoidShaperManager {
       } else {
          impactFx(level, kind, at, shot.vel);
          Fx.vanillaOnly(() -> {
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION, x, y + 0.2, z, 1, 0.0, 0.0, 0.0, 0.0);
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, x, y + 0.3, z, 8, 0.4, 0.3, 0.4, 0.05);
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIT, x, y + 0.2, z, 6, 0.3, 0.3, 0.3, 0.06);
+            Fx.vanilla(level, ParticleTypes.EXPLOSION, x, y + 0.2, z, 1, 0.0, 0.0, 0.0, 0.0);
+            Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, x, y + 0.3, z, 8, 0.4, 0.3, 0.4, 0.05);
+            Fx.vanilla(level, ParticleTypes.CRIT, x, y + 0.2, z, 6, 0.3, 0.3, 0.3, 0.06);
          });
       }
       level.playSound(null, x, y, z, onTerrain ? SoundEvents.STONE_BREAK : SoundEvents.STONE_HIT, SoundSource.HOSTILE, shot.fragment ? 0.6F : 1.2F, 1.0F);
@@ -1502,8 +1502,8 @@ public final class VoidShaperManager {
             for (int i = 0; i < 10; i++) {
                double ox = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
                double oz = (RANDOM.nextDouble() - 0.5) * 2.0 * ARENA_RADIUS * 0.5;
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, x + ox, y + RANDOM.nextDouble() * 2.0, z + oz, 1, 0.0, 0.9, 0.0, 0.25);
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, x + ox, y, z + oz, 1, 0.0, 1.2, 0.0, 0.3);
+               Fx.vanilla(level, ParticleTypes.END_ROD, x + ox, y + RANDOM.nextDouble() * 2.0, z + oz, 1, 0.0, 0.9, 0.0, 0.25);
+               Fx.vanilla(level, ParticleTypes.REVERSE_PORTAL, x + ox, y, z + oz, 1, 0.0, 1.2, 0.0, 0.3);
             }
          });
       }
@@ -1582,8 +1582,8 @@ public final class VoidShaperManager {
       Fx.tear(level, ParticleTypes.REVERSE_PORTAL, dest.add(0.0, 1.8, 0.0), new Vec3(0.0, 1.0, 0.0), 3.0, 10, VOID_LIGHT);
       Vec3 out = dest;
       Fx.vanillaOnly(() -> {
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, from.x, from.y + 1.5, from.z, 24, 0.6, 1.0, 0.6, 0.15);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, out.x, out.y + 1.5, out.z, 24, 0.6, 1.0, 0.6, 0.15);
+         Fx.vanilla(level, ParticleTypes.REVERSE_PORTAL, from.x, from.y + 1.5, from.z, 24, 0.6, 1.0, 0.6, 0.15);
+         Fx.vanilla(level, ParticleTypes.REVERSE_PORTAL, out.x, out.y + 1.5, out.z, 24, 0.6, 1.0, 0.6, 0.15);
       });
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.5F, 0.8F);
       // He arrives holding something, always.
@@ -1625,7 +1625,7 @@ public final class VoidShaperManager {
          Fx.vanillaOnly(() -> {
             for (int i = 0; i < 20; i++) {
                double a = i * (Math.PI * 2.0 / 20.0);
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, target.x + Math.cos(a) * r, target.y + 0.2, target.z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
+               Fx.vanilla(level, ParticleTypes.PORTAL, target.x + Math.cos(a) * r, target.y + 0.2, target.z + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
             }
          });
       }
@@ -1641,9 +1641,9 @@ public final class VoidShaperManager {
       Fx.rockburst(level, groundDust(level, target.x, target.y, target.z), target.add(0.0, 0.3, 0.0), 3.2, VOID_DARK);
       Fx.starburst(level, ParticleTypes.END_ROD, target.add(0.0, 0.6, 0.0), 5.0, VOID_LIGHT);
       Fx.vanillaOnly(() -> {
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, target.x, target.y + 0.3, target.z, 2, 1.5, 0.5, 1.5, 0.0);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.GUST, target.x, target.y + 0.3, target.z, 16, 4.0, 0.4, 4.0, 0.2);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, target.x, target.y + 0.5, target.z, 24, 4.0, 0.8, 4.0, 0.2);
+         Fx.vanilla(level, ParticleTypes.EXPLOSION_EMITTER, target.x, target.y + 0.3, target.z, 2, 1.5, 0.5, 1.5, 0.0);
+         Fx.vanilla(level, ParticleTypes.GUST, target.x, target.y + 0.3, target.z, 16, 4.0, 0.4, 4.0, 0.2);
+         Fx.vanilla(level, ParticleTypes.REVERSE_PORTAL, target.x, target.y + 0.5, target.z, 24, 4.0, 0.8, 4.0, 0.2);
       });
       level.playSound(null, target.x, target.y, target.z, ModSounds.BOSS_SLAM, SoundSource.HOSTILE, 2.2F, 0.6F);
       for (ServerPlayer p : playersNear(level, target.x, target.y, target.z, 5.5)) {
@@ -1882,8 +1882,8 @@ public final class VoidShaperManager {
          Fx.meteor(level, groundDust(level, x, y, z), new Vec3(x - Math.cos(a) * 3.0, y + 18.0, z - Math.sin(a) * 3.0), new Vec3(x, y + 0.2, z), 14 + RANDOM.nextInt(10), VOID_LIGHT);
       }
       Fx.vanillaOnly(() -> {
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 3, 2.0, 2.0, 2.0, 0.15);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 40, 5.0, 3.0, 5.0, 0.3);
+         Fx.vanilla(level, ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 3, 2.0, 2.0, 2.0, 0.15);
+         Fx.vanilla(level, ParticleTypes.REVERSE_PORTAL, boss.getX(), boss.getY() + 1.5, boss.getZ(), 40, 5.0, 3.0, 5.0, 0.3);
       });
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 2.2F, 0.7F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ENDERMAN_SCREAM, SoundSource.HOSTILE, 2.0F, 0.4F);
@@ -2206,7 +2206,10 @@ public final class VoidShaperManager {
          return false;
       }
       LIFTED.remove(displayId);
-      Vec3 from = raw.position();
+      // Launched from just in front of the eye along the throw, not from wherever the hover had
+      // drifted to: a hover tucked into grass, snow or the floor ended the throw on its first step.
+      Vec3 from = owner.getEyePosition().add(dir.normalize().scale(1.4)).add(-0.5, -0.5, -0.5);
+      raw.setPos(from.x, from.y, from.z);
       Vec3 vel = dir.normalize().scale(lift.kind.speed);
       playerTearFx(level, from, dir);
       level.playSound(null, from.x, from.y, from.z, SoundEvents.DEEPSLATE_BREAK, SoundSource.PLAYERS, 1.0F, 1.1F);
@@ -2354,11 +2357,14 @@ public final class VoidShaperManager {
             loose.pos = loose.pos.add(loose.vel.scale(1.0 / steps));
             display.setPos(loose.pos.x, loose.pos.y, loose.pos.z);
             display.hurtMarked = true;
-            if (!level.getBlockState(BlockPos.containing(loose.pos)).isAir()) {
+            // The block's centre against blocks that actually stop things - grass, flowers, snow
+            // layers and water used to count as walls, so a throw could die where it started.
+            BlockPos cell = BlockPos.containing(loose.pos.add(0.5, 0.5, 0.5));
+            if (!level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()) {
                done = true;
                break;
             }
-            LivingEntity victim = livingNear(level, loose.thrower, loose.pos, 1.3, loose.kind);
+            LivingEntity victim = livingNear(level, loose.thrower, loose.pos.add(0.5, 0.5, 0.5), 1.3, loose.kind);
             if (victim != null) {
                Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, victim.getBbHeight() * 0.6, 0.0), loose.vel.normalize(), 0.0, 0.0, 0xB06BFF);
                done = true;

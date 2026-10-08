@@ -184,6 +184,11 @@ public final class VoidShaperGear {
             return null;
          }
          SIGIL_UNTIL.put(player.getUUID(), now + SIGIL_COOLDOWN_TICKS);
+         // The hurl: a rift tears open where it leaves the hand and the air folds in behind it.
+         Vec3 hand = player.getEyePosition().add(aim.scale(1.2));
+         Fx.riftPortal(level, ParticleTypes.REVERSE_PORTAL, hand.add(0.0, -0.6, 0.0), aim, 1.4, 8, 0xB06BFF);
+         Fx.shockwave(level, ParticleTypes.REVERSE_PORTAL, hand, 2.2, 0x6A2AB0);
+         Fx.voidCollapse(level, ParticleTypes.REVERSE_PORTAL, player.position().add(0.0, 0.4, 0.0), 1.2, 6, 0x6A2AB0);
          bar(player, aimed(level, player) ? "&5Shaping Sigil &7- &fblock hurled &8(at a mark)" : "&5Shaping Sigil &7- &fblock hurled");
          return null;
       }
@@ -208,6 +213,10 @@ public final class VoidShaperGear {
          return null;
       }
       NEXT_GRIP.put(player.getUUID(), now + GRIP_COOLDOWN_TICKS);
+      // The grip: void chains reach from the hand to the block and a vortex lifts it out.
+      Vec3 block = Vec3.atCenterOf(pos);
+      Fx.chains(level, ParticleTypes.REVERSE_PORTAL, player.getEyePosition().add(0.0, -0.3, 0.0), block, 0xB06BFF);
+      Fx.vortex(level, ParticleTypes.REVERSE_PORTAL, block, 1.4, 14, 0x6A2AB0);
       bar(player, "&5Gripped &7- &fsneak-right-click &7to hurl it");
       return null;
    }

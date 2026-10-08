@@ -21,6 +21,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class BossHealthOverlayMixin {
    /** Name phrase (lower case) -> sprite key under textures/gui/sprites/boss_bar/. First match wins. */
    private static final String[][] FF_BARS = {
+      // The status bars come first: their names can mention a boss ("...the Mindbinder...").
+      {"corruption", "corruption"},
+      {"sculk infection", "sculk_infection"},
       {"time lord", "time_lord"},
       {"slime king", "slime_king"},
       {"scarlet devil", "scarlet_devil"},
@@ -64,6 +67,7 @@ public abstract class BossHealthOverlayMixin {
       }
       boolean signature = key.equals("ender_dragon") || key.equals("time_lord") || key.equals("slime_king") || key.equals("wither")
          || key.equals("stone_golem") || key.equals("wither_king") || key.equals("mindbinder") || key.equals("snow_queen") || key.equals("elder_warden") || key.equals("raid")
+         || key.equals("corruption") || key.equals("sculk_infection")
          || FF_PHASED.contains(key);
       if (key.equals("wither") && event.getName().getString().toLowerCase(Locale.ROOT).contains("supercharged")) {
          key = "wither_supercharged";
@@ -80,6 +84,8 @@ public abstract class BossHealthOverlayMixin {
          key = "time_lord_red";
       } else if (key.equals("snow_queen") && (color == BossEvent.BossBarColor.BLUE || color == BossEvent.BossBarColor.RED)) {
          key = color == BossEvent.BossBarColor.RED ? "snow_queen_red" : "snow_queen_blue";
+      } else if (key.equals("corruption") && color == BossEvent.BossBarColor.RED) {
+         key = "corruption_red";
       } else if (key.equals("elder_warden") && color == BossEvent.BossBarColor.RED) {
          key = "elder_warden_red";
       } else if (key.equals("mindbinder") && color == BossEvent.BossBarColor.RED) {

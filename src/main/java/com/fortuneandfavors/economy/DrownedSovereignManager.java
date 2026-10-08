@@ -1013,7 +1013,6 @@ public final class DrownedSovereignManager {
       }
       Vec3 mark = floorAt(level, target.position());
       fight.pending.add(new Pending("charge", mark, CHARGE_TELL, 0));
-      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, mark.add(0.0, 0.05, 0.0), CHARGE_RADIUS, CHARGE_TELL, TIDE);
    }
 
    /** Tentacles out of the ground around whoever is standing where. */
@@ -1028,7 +1027,6 @@ public final class DrownedSovereignManager {
          int fuse = 22 + RANDOM.nextInt(10);
          Vec3 at = new Vec3(x, y, z);
          fight.pending.add(new Pending("tentacle", at, fuse, 0));
-         Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, at.add(0.0, 0.05, 0.0), TENTACLE_RADIUS, fuse, ABYSS);
       }
       hint(playersNear(level, boss.position(), 60.0), "\u00a78Bubbles underfoot. \u00a77Move.");
    }
@@ -1185,7 +1183,6 @@ public final class DrownedSovereignManager {
       }
       Vec3 floor = floorAt(level, target.position());
       fight.pending.add(new Pending("prison", floor, PRISON_FUSE, PRISON_TICKS));
-      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, floor.add(0.0, 0.05, 0.0), PRISON_RADIUS, PRISON_FUSE, FOAM);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.CONDUIT_ACTIVATE, SoundSource.HOSTILE, 1.4F, 1.6F);
       hint(List.of(target), "\u00a78Water's closing on you. \u00a77Step out.");
    }
@@ -1220,7 +1217,6 @@ public final class DrownedSovereignManager {
       Pending beam = new Pending("beam", origin.add(flat.normalize().scale(BEAM_REACH)), 0, BEAM_TELL + BEAM_LIFE);
       beam.origin = origin;
       fight.pending.add(beam);
-      Fx.runeCircle(level, ParticleTypes.GLOW_SQUID_INK, origin.add(0.0, 0.05, 0.0), 2.5, BEAM_TELL, ABYSS);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.HOSTILE, 1.1F, 0.7F);
       hint(playersNear(level, origin, BEAM_REACH + 4.0), "\u00a78A line on the water. \u00a77Get off it.");
    }
@@ -1246,7 +1242,6 @@ public final class DrownedSovereignManager {
          Vec3 mark = floorAt(level, anchor.position());
          int fuse = 24 + i * 16;
          fight.pending.add(new Pending("erupt", mark, fuse, 0));
-         Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, mark.add(0.0, 0.05, 0.0), 5.0, fuse, TIDE);
       }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_HURT, SoundSource.HOSTILE, 1.6F, 0.5F);
       hint(playersNear(level, boss.position(), 60.0), "\u00a78He's under the floor. \u00a77Watch the circles.");
@@ -1279,7 +1274,6 @@ public final class DrownedSovereignManager {
          double y = BossGrounding.groundY(level, x, z, boss.getY());
          int fuse = 30 + RANDOM.nextInt(20);
          fight.pending.add(new Pending("eye", new Vec3(x, y + 0.4, z), fuse, EYE_LIFE));
-         Fx.runeCircle(level, ParticleTypes.GLOW_SQUID_INK, new Vec3(x, y + 0.05, z), EYE_RADIUS, fuse, ABYSS);
       }
       announceNear(level, boss, 70.0, SAY + "\u00a7fLook down.");
    }
@@ -1402,7 +1396,6 @@ public final class DrownedSovereignManager {
          int fuse = FINAL_DEPTH_TELL + i * 8;
          fight.pending.add(new Pending("final", mark, fuse, 0));
          // The mark on the floor is the whole tell - see the class doc on why he says nothing.
-         Fx.runeCircle(level, ParticleTypes.GLOW_SQUID_INK, mark.add(0.0, 0.05, 0.0), 3.4, fuse, ABYSS);
          i++;
          if (i >= FINAL_DEPTH_MARKS) {
             break;
@@ -1440,8 +1433,6 @@ public final class DrownedSovereignManager {
       fight.nextBreaker = fight.now + BREAKER_COOLDOWN - (fight.phase - 1) * 40L;
       // The ring is the move: nothing else is thrown while it is rolling.
       fight.nextMove = Math.max(fight.nextMove, last + 24L);
-      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, at.add(0.0, 0.05, 0.0), 3.0, BREAKER_WARN, FOAM);
-      Fx.ring(level, ParticleTypes.BUBBLE_POP, at.add(0.0, 0.1, 0.0), BREAKER_REACH, ABYSS);
       Fx.aura(level, ParticleTypes.BUBBLE, boss.position(), 5.5, BREAKER_WARN, TIDE);
       level.playSound(null, at.x, at.y, at.z, SoundEvents.CONDUIT_ACTIVATE, SoundSource.HOSTILE, 1.6F, 0.6F);
       level.playSound(null, at.x, at.y, at.z, SoundEvents.BUBBLE_COLUMN_UPWARDS_AMBIENT, SoundSource.HOSTILE, 1.4F, 0.5F);
@@ -1472,7 +1463,6 @@ public final class DrownedSovereignManager {
       fight.nextGlare = fight.now + GLARE_COOLDOWN;
       fight.nextMove = Math.max(fight.nextMove, land + 16L);
       Vec3 eye = eyeOf(boss);
-      Fx.dome(level, ParticleTypes.SQUID_INK, boss.position(), GLARE_REACH, GLARE_WARN, ABYSS);
       Fx.resonance(level, ParticleTypes.GLOW_SQUID_INK, eye, GLARE_WARN, FOAM);
       // The deep gathers in his eye: dark motes drawn in from across the dome for exactly the
       // length of the warning, so the ring the collapse throws out goes off as the stare lands.
@@ -2240,7 +2230,7 @@ public final class DrownedSovereignManager {
       vanillaOnly(() -> {
          for (int i = 0; i < n; i++) {
             double a = Math.PI * 2.0 * i / n;
-            FfVfx.particles(level, type, center.x + Math.cos(a) * radius, center.y + y, center.z + Math.sin(a) * radius, 1, 0.04, 0.03, 0.04, 0.01);
+            Fx.vanilla(level, type, center.x + Math.cos(a) * radius, center.y + y, center.z + Math.sin(a) * radius, 1, 0.04, 0.03, 0.04, 0.01);
          }
       });
    }
@@ -2263,7 +2253,7 @@ public final class DrownedSovereignManager {
             double d = -halfWidth + 2.0 * halfWidth * c / Math.max(1, cols - 1);
             for (int r = 0; r < rows; r++) {
                Vec3 q = center.add(across.scale(d)).add(0.0, height * r / rows, 0.0);
-               FfVfx.particles(level, type, q.x, q.y, q.z, Math.max(1, count), 0.15, 0.2, 0.15, 0.02);
+               Fx.vanilla(level, type, q.x, q.y, q.z, Math.max(1, count), 0.15, 0.2, 0.15, 0.02);
             }
          }
       });
@@ -2276,7 +2266,7 @@ public final class DrownedSovereignManager {
          for (int i = 0; i < n; i++) {
             double a = Math.PI * 2.0 * i / n;
             double b = Math.PI * ((i * 7) % n) / n;
-            FfVfx.particles(level, type, center.x + Math.cos(a) * Math.sin(b) * radius, center.y + Math.cos(b) * radius * 0.6,
+            Fx.vanilla(level, type, center.x + Math.cos(a) * Math.sin(b) * radius, center.y + Math.cos(b) * radius * 0.6,
                center.z + Math.sin(a) * Math.sin(b) * radius, 1, 0.05, 0.05, 0.05, 0.0);
          }
       });

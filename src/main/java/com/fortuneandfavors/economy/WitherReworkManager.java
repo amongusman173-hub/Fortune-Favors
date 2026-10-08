@@ -911,14 +911,14 @@ public final class WitherReworkManager {
 
    private static void fightTick(MinecraftServer server, ServerLevel level, WitherBoss w, WitherFight f) {
       f.bossRef = w;
-      if (f.stormWaves > 0 && f.deathAnim <= 0 && level.getGameTime() % 15L == 0L) {
+      if (f.stormWaves > 0 && f.deathAnim <= 0 && ServerClock.clock(level) % 15L == 0L) {
          f.stormWaves--;
          skullStorm(level, w, f);
       }
       // The King below half: his theme's beat pulses round the screens of everyone at the fight.
       // Re-sent every two seconds so anyone who walks in late gets it; the client hides it
       // whenever the theme is not playing, so a stale "on" can never leave a pulse behind.
-      if (f.king && f.deathAnim <= 0 && w.getHealth() <= f.maxHealth * 0.5F && level.getGameTime() % 40L == 0L) {
+      if (f.king && f.deathAnim <= 0 && w.getHealth() <= f.maxHealth * 0.5F && ServerClock.clock(level) % 40L == 0L) {
          f.beatOn = true;
          for (ServerPlayer p : level.getPlayers(pl -> pl.distanceToSqr(w) < 64.0 * 64.0)) {
             com.fortuneandfavors.net.FfNet.send(p, new com.fortuneandfavors.net.FfScreenFxPayload(com.fortuneandfavors.net.FfScreenFxPayload.FX_BEAT, true));

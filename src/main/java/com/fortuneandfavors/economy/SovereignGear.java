@@ -286,8 +286,8 @@ public final class SovereignGear {
          FfVfx.shape(level, FxKinds.CRESCENT, ParticleTypes.CRIT, villager.position().add(0.0, villager.getBbHeight() * 0.6, 0.0),
             new Vec3(swing.x, 0.0, swing.z), 2.6, 0.0, CROWN);
          Fx.vanillaOnly(() -> {
-            FfVfx.particles(level, ParticleTypes.SWEEP_ATTACK, foe.getX(), foe.getY() + 0.8, foe.getZ(), 3, 0.3, 0.3, 0.3, 0.04);
-            FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, villager.getX(), villager.getY() + 1.6, villager.getZ(), 4, 0.3, 0.3, 0.3, 0.02);
+            Fx.vanilla(level, ParticleTypes.SWEEP_ATTACK, foe.getX(), foe.getY() + 0.8, foe.getZ(), 3, 0.3, 0.3, 0.3, 0.04);
+            Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, villager.getX(), villager.getY() + 1.6, villager.getZ(), 4, 0.3, 0.3, 0.3, 0.02);
          });
          level.playSound(null, villager.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.NEUTRAL, 0.8F, 1.3F);
       }

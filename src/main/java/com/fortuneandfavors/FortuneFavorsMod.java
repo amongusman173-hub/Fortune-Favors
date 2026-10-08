@@ -48,6 +48,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.ServerSt
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.ServerStopping;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.EndTick;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import com.fortuneandfavors.net.FfVfxPayload;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.Context;
 import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
@@ -86,7 +87,7 @@ public class FortuneFavorsMod implements ModInitializer {
       PayloadTypeRegistry.clientboundPlay().register(FfEndIntroPayload.TYPE, FfEndIntroPayload.CODEC);
       PayloadTypeRegistry.clientboundPlay().register(FfConfigPayload.TYPE, FfConfigPayload.CODEC);
       // Visual cues for modded clients, which draw the fight's effects themselves (net.FfVfx).
-      PayloadTypeRegistry.clientboundPlay().register(com.fortuneandfavors.net.FfVfxPayload.TYPE, com.fortuneandfavors.net.FfVfxPayload.CODEC);
+      PayloadTypeRegistry.clientboundPlay().register(FfVfxPayload.TYPE, FfVfxPayload.CODEC);
       ServerTickEvents.END_SERVER_TICK.register((EndTick)com.fortuneandfavors.net.FfVfx::flush);
       PayloadTypeRegistry.serverboundPlay().register(FfConfigPayload.TYPE, FfConfigPayload.CODEC);
       PayloadTypeRegistry.serverboundPlay().register(FfLungePayload.TYPE, FfLungePayload.CODEC);

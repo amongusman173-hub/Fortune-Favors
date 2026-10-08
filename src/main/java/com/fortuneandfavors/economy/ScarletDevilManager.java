@@ -629,7 +629,7 @@ public final class ScarletDevilManager {
       }
       keepOutOfBlocks(level, boss, target);
       boss.setYRot(faceYaw(boss, target));
-      level.sendParticles(ParticleTypes.CRIMSON_SPORE, boss.getX(), boss.getY() + 0.8, boss.getZ(), 3, 0.35, 0.5, 0.35, 0.01);
+      Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, boss.getX(), boss.getY() + 0.8, boss.getZ(), 3, 0.35, 0.5, 0.35, 0.01);
    }
 
    // --------------------------------------------------------------- abilities
@@ -697,7 +697,7 @@ public final class ScarletDevilManager {
 
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PHANTOM_BITE, SoundSource.HOSTILE, 1.4F, 0.8F);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.GENERIC_DRINK, SoundSource.HOSTILE, 1.2F, 0.6F);
-      level.sendParticles(ParticleTypes.DAMAGE_INDICATOR, target.getX(), target.getY() + 1.0, target.getZ(), 12, 0.3, 0.3, 0.3, 0.1);
+      Fx.vanilla(level, ParticleTypes.DAMAGE_INDICATOR, target.getX(), target.getY() + 1.0, target.getZ(), 12, 0.3, 0.3, 0.3, 0.1);
       bloodBurst(level, target.getX(), target.getY() + 1.0, target.getZ(), 30);
       Vec3 facing = target.position().subtract(boss.position());
       Fx.crescent(level, ParticleTypes.CRIMSON_SPORE, boss.position().add(0.0, 0.9, 0.0), facing, 3.2, CRIMSON);
@@ -921,9 +921,9 @@ public final class ScarletDevilManager {
          double x = boss.getX() + Math.cos(a) * r;
          double z = boss.getZ() + Math.sin(a) * r;
          double y = BossGrounding.groundY(level, x, z, boss.getY());
-         level.sendParticles(ParticleTypes.CRIMSON_SPORE, x, y + 0.25, z, 1, 0.05, 0.05, 0.05, 0.0);
+         Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, x, y + 0.25, z, 1, 0.05, 0.05, 0.05, 0.0);
          if (i % 5 == 0) {
-            level.sendParticles(ParticleTypes.FALLING_LAVA, x, y + 0.3, z, 1, 0.05, 0.05, 0.05, 0.0);
+            Fx.vanilla(level, ParticleTypes.FALLING_LAVA, x, y + 0.3, z, 1, 0.05, 0.05, 0.05, 0.0);
          }
       }
 
@@ -1006,7 +1006,7 @@ public final class ScarletDevilManager {
       try {
          for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
             if (fight.participants.contains(p.getUUID())) {
-               level.sendParticles(
+               Fx.vanilla(level, 
                   ParticleTypes.CRIMSON_SPORE, p.getX(), p.getY() + 6.0, p.getZ(), 8, 5.0, 0.5, 5.0, 0.35
                );
             }
@@ -1095,7 +1095,7 @@ public final class ScarletDevilManager {
 
       // Her last act is an uncontrolled blood rain, thinning as she comes apart. She sinks
       // as it falls, back towards the pool she came out of.
-      level.sendParticles(ParticleTypes.CRIMSON_SPORE, boss.getX(), boss.getY() + 4.0, boss.getZ(), 10 + (int) (progress * 20.0), 4.0, 0.8, 4.0, 0.3);
+      Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, boss.getX(), boss.getY() + 4.0, boss.getZ(), 10 + (int) (progress * 20.0), 4.0, 0.8, 4.0, 0.3);
       drawPool(level, boss);
       if (fight.deathTicks > 20) {
          boss.setPos(boss.getX(), boss.getY() - 0.012, boss.getZ());
@@ -1372,8 +1372,8 @@ public final class ScarletDevilManager {
       double x = boss.getX();
       double y = boss.getY();
       double z = boss.getZ();
-      level.sendParticles(ParticleTypes.CRIMSON_SPORE, x, y, z, 12, 0.5, 0.2, 0.5, 0.04);
-      level.sendParticles(new DustParticleOptions(-65536, 1.2F), x, y + 0.2, z, 6, 0.6, 0.2, 0.6, 0.01);
+      Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, x, y, z, 12, 0.5, 0.2, 0.5, 0.04);
+      Fx.vanilla(level, new DustParticleOptions(-65536, 1.2F), x, y + 0.2, z, 6, 0.6, 0.2, 0.6, 0.01);
    }
 
    private static void drawAura(ServerLevel level, Mob boss) {
@@ -1381,19 +1381,19 @@ public final class ScarletDevilManager {
       double angle = t * 0.12;
       double x = boss.getX() + Math.cos(angle) * 1.1;
       double z = boss.getZ() + Math.sin(angle) * 1.1;
-      level.sendParticles(new DustParticleOptions(-65536, 0.9F), x, boss.getY() + 1.2, z, 1, 0.0, 0.0, 0.0, 0.0);
-      level.sendParticles(ParticleTypes.CRIMSON_SPORE, boss.getX(), boss.getY() + 1.4, boss.getZ(), 2, 0.4, 0.3, 0.4, 0.01);
+      Fx.vanilla(level, new DustParticleOptions(-65536, 0.9F), x, boss.getY() + 1.2, z, 1, 0.0, 0.0, 0.0, 0.0);
+      Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, boss.getX(), boss.getY() + 1.4, boss.getZ(), 2, 0.4, 0.3, 0.4, 0.01);
    }
 
    private static void drawTrail(ServerLevel level, Mob boss) {
-      level.sendParticles(ParticleTypes.CRIMSON_SPORE, boss.getX(), boss.getY() + 0.7, boss.getZ(), 6, 0.25, 0.25, 0.25, 0.02);
-      level.sendParticles(new DustParticleOptions(-65536, 1.0F), boss.getX(), boss.getY() + 0.7, boss.getZ(), 2, 0.2, 0.2, 0.2, 0.01);
+      Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, boss.getX(), boss.getY() + 0.7, boss.getZ(), 6, 0.25, 0.25, 0.25, 0.02);
+      Fx.vanilla(level, new DustParticleOptions(-65536, 1.0F), boss.getX(), boss.getY() + 0.7, boss.getZ(), 2, 0.2, 0.2, 0.2, 0.01);
    }
 
    private static void bloodBurst(ServerLevel level, double x, double y, double z, int count) {
-      level.sendParticles(ParticleTypes.CRIMSON_SPORE, x, y, z, count, 1.2, 1.4, 1.2, 0.12);
-      level.sendParticles(ParticleTypes.DAMAGE_INDICATOR, x, y, z, count / 3, 1.0, 1.0, 1.0, 0.1);
-      level.sendParticles(new DustParticleOptions(-65536, 1.4F), x, y, z, count / 2, 1.0, 1.2, 1.0, 0.06);
+      Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, x, y, z, count, 1.2, 1.4, 1.2, 0.12);
+      Fx.vanilla(level, ParticleTypes.DAMAGE_INDICATOR, x, y, z, count / 3, 1.0, 1.0, 1.0, 0.1);
+      Fx.vanilla(level, new DustParticleOptions(-65536, 1.4F), x, y, z, count / 2, 1.0, 1.2, 1.0, 0.06);
    }
 
    /** The Scarlet-Blood's model number, exposed so the item audit and the pack

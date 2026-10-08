@@ -314,17 +314,17 @@ public final class NiceKeepInventoryManager {
       double gz = pos.getZ() + 0.5;
 
       for (int i = 0; i < 18; i++) {
-         level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, gx, gy + i * 0.22, gz, 2, 0.18, 0.05, 0.18, 0.02);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, gx, gy + i * 0.22, gz, 2, 0.18, 0.05, 0.18, 0.02);
       }
 
       for (int i = 0; i < 16; i++) {
          double a = i / 16.0 * Math.PI * 2.0;
          int color = Color.HSBtoRGB(0.12F, 0.85F, 1.0F) & 16777215;
-         level.sendParticles(new DustParticleOptions(color, 1.0F), gx + Math.cos(a) * 1.1, gy + 0.3, gz + Math.sin(a) * 1.1, 1, 0.0, 0.0, 0.0, 0.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(color, 1.0F), gx + Math.cos(a) * 1.1, gy + 0.3, gz + Math.sin(a) * 1.1, 1, 0.0, 0.0, 0.0, 0.0);
       }
 
-      level.sendParticles(ParticleTypes.END_ROD, gx, gy + 0.4, gz, 12, 0.3, 0.5, 0.3, 0.04);
-      level.sendParticles(ParticleTypes.ENCHANT, gx, gy + 0.6, gz, 20, 0.4, 0.6, 0.4, 0.12);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, gx, gy + 0.4, gz, 12, 0.3, 0.5, 0.3, 0.04);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, gx, gy + 0.6, gz, 20, 0.4, 0.6, 0.4, 0.12);
       level.playSound(null, gx, gy, gz, (SoundEvent)SoundEvents.SOUL_ESCAPE.value(), SoundSource.PLAYERS, 0.6F, 0.7F);
 
       try {
@@ -487,9 +487,17 @@ public final class NiceKeepInventoryManager {
          double gx = pos.getX() + 0.5;
          double gy = pos.getY() + 0.5;
          double gz = pos.getZ() + 0.5;
-
+         // Modded clients: the grave opens - a rune circle, the soul of what it held rising out of it
+         // in a stream to its owner, a pillar of light and a soft bloom. The old shower is vanilla-only.
+         net.minecraft.world.phys.Vec3 grave = new net.minecraft.world.phys.Vec3(gx, gy - 0.4, gz);
+         com.fortuneandfavors.economy.Fx.runeCircle(level, ParticleTypes.END_ROD, grave, 1.6, 30, 0x9BFFB0);
+         com.fortuneandfavors.economy.Fx.soulStream(level, ParticleTypes.SOUL, grave.add(0.0, 0.6, 0.0), player.position().add(0.0, 1.0, 0.0), 0.6, 18, 0xB8FFE0);
+         com.fortuneandfavors.economy.Fx.pillar(level, ParticleTypes.END_ROD, grave, 5.0, 0xFFE9A0);
+         com.fortuneandfavors.economy.Fx.flare(level, ParticleTypes.END_ROD, grave.add(0.0, 0.8, 0.0), 1.4, 0xFFFFFF);
+         com.fortuneandfavors.economy.Fx.petals(level, ParticleTypes.END_ROD, player.position(), 1.8, 30, 0x9BFFB0);
+         com.fortuneandfavors.economy.Fx.vanillaOnly(() -> {
          for (int i = 0; i < 12; i++) {
-            level.sendParticles(
+            com.fortuneandfavors.net.FfVfx.particles(level, 
                ParticleTypes.HEART,
                gx + (RANDOM.nextDouble() - 0.5) * 1.2,
                gy + RANDOM.nextDouble() * 1.5,
@@ -502,11 +510,13 @@ public final class NiceKeepInventoryManager {
             );
          }
 
-         level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, gx, gy + 0.4, gz, 40, 0.7, 1.0, 0.7, 0.18);
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, gx, gy + 0.3, gz, 14, 0.5, 0.6, 0.5, 0.1);
-         level.sendParticles(ParticleTypes.END_ROD, gx, gy + 0.5, gz, 16, 0.4, 0.7, 0.4, 0.05);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.TOTEM_OF_UNDYING, gx, gy + 0.4, gz, 40, 0.7, 1.0, 0.7, 0.18);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, gx, gy + 0.3, gz, 14, 0.5, 0.6, 0.5, 0.1);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, gx, gy + 0.5, gz, 16, 0.4, 0.7, 0.4, 0.05);
          com.fortuneandfavors.VfxManager.fireworkBurst(level, gx, gy + 0.4, gz, 26);
+         });
          level.playSound(null, gx, gy, gz, SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.5F, 1.4F);
+         level.playSound(null, gx, gy, gz, SoundEvents.SOUL_ESCAPE.value(), SoundSource.PLAYERS, 1.0F, 1.2F);
          BlockPos textPos = pos.above();
 
          for (TextDisplay display : level.getEntitiesOfClass(TextDisplay.class, new AABB(textPos).inflate(0.5), td -> td.blockPosition().equals(textPos))) {
@@ -657,13 +667,13 @@ public final class NiceKeepInventoryManager {
                      double dz = owner.getZ() - e.getZ();
                      double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
                      if (dist < 2.0) {
-                        ol.sendParticles(ParticleTypes.SNOWFLAKE, e.getX(), e.getY(), e.getZ(), 14, 0.4, 0.3, 0.4, 0.04);
+                        com.fortuneandfavors.net.FfVfx.particles(ol, ParticleTypes.SNOWFLAKE, e.getX(), e.getY(), e.getZ(), 14, 0.4, 0.3, 0.4, 0.04);
                         e.discard();
                      } else {
                         e.setDeltaMovement(dx / dist * 1.2, dy / dist * 1.2, dz / dist * 1.2);
                         e.hurtMarked = true;
                         if (sl.getGameTime() % 3L == 0L) {
-                           sl.sendParticles(ParticleTypes.SNOWFLAKE, e.getX(), e.getY(), e.getZ(), 2, 0.1, 0.1, 0.1, 0.01);
+                           com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.SNOWFLAKE, e.getX(), e.getY(), e.getZ(), 2, 0.1, 0.1, 0.1, 0.01);
                         }
                      }
                      break;
@@ -720,14 +730,14 @@ public final class NiceKeepInventoryManager {
                   double px = player.getX();
                   double py = player.getY() + 1.0;
                   double pz = player.getZ();
-                  sl.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, px, py, pz, 28, 0.5, 0.8, 0.5, 0.15);
-                  sl.sendParticles(ParticleTypes.HAPPY_VILLAGER, px, py + 0.5, pz, 14, 0.4, 0.5, 0.4, 0.08);
-                  sl.sendParticles(ParticleTypes.ENCHANT, px, py + 0.3, pz, 20, 0.5, 0.6, 0.5, 0.1);
-                  sl.sendParticles(ParticleTypes.END_ROD, px, py + 0.5, pz, 16, 0.4, 0.7, 0.4, 0.05);
+                  com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.TOTEM_OF_UNDYING, px, py, pz, 28, 0.5, 0.8, 0.5, 0.15);
+                  com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.HAPPY_VILLAGER, px, py + 0.5, pz, 14, 0.4, 0.5, 0.4, 0.08);
+                  com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.ENCHANT, px, py + 0.3, pz, 20, 0.5, 0.6, 0.5, 0.1);
+                  com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.END_ROD, px, py + 0.5, pz, 16, 0.4, 0.7, 0.4, 0.05);
 
                   for (int i = 0; i < 14; i++) {
                      double a = i / 14.0 * Math.PI * 2.0;
-                     sl.sendParticles(
+                     com.fortuneandfavors.net.FfVfx.particles(sl, 
                         new DustParticleOptions(Color.HSBtoRGB(0.12F, 0.9F, 1.0F) & 16777215, 1.0F),
                         px + Math.cos(a) * 1.2,
                         py + 0.2 + i % 4 * 0.3,
@@ -740,7 +750,7 @@ public final class NiceKeepInventoryManager {
                      );
                   }
 
-                  sl.sendParticles(ParticleTypes.GLOW, px, py + 0.8, pz, 12, 0.6, 0.6, 0.6, 0.04);
+                  com.fortuneandfavors.net.FfVfx.particles(sl, ParticleTypes.GLOW, px, py + 0.8, pz, 12, 0.6, 0.6, 0.6, 0.04);
                   sl.playSound(null, px, py, pz, SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.8F, 1.2F);
                   sl.playSound(null, px, py, pz, SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.4F, 1.5F);
                   sl.playSound(null, px, py, pz, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 0.6F, 1.2F);
@@ -789,8 +799,8 @@ public final class NiceKeepInventoryManager {
                double gx = pos.getX() + 0.5;
                double gy = pos.getY() + 0.6;
                double gz = pos.getZ() + 0.5;
-               level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, gx, gy, gz, 1, 0.15, 0.1, 0.15, 0.01);
-               level.sendParticles(ParticleTypes.END_ROD, gx, gy + 0.3, gz, 1, 0.1, 0.2, 0.1, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, gx, gy, gz, 1, 0.15, 0.1, 0.15, 0.01);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, gx, gy + 0.3, gz, 1, 0.1, 0.2, 0.1, 0.01);
             }
 
             if (now - data.createdTick > 72000L) {

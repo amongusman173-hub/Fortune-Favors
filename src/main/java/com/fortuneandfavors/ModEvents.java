@@ -3946,7 +3946,7 @@ public final class ModEvents {
       "isIceStaff", "isIllusionerSpellbook", "isKingLootBox", "isMindAscended", "isMindLootBox", "isMindbinderEye",
       "isMindbinderShroud", "isMindbinderStaff", "isMysteryBox", "isPocketWatch", "isPossessedMask", "isRaidBanner",
       "isRaidBossToken", "isRaidLootBox", "isRune", "isSculkFood", "isSculkLootBox", "isSculkMageStaff",
-      "isSculkMedallion", "isSculkOrb", "isSculkSensorLeggings", "isSlimeBoots", "isSlimeBossToken", "isSlimeLauncher",
+      "isSculkMedallion", "isSculkOrb", "isSlimeBoots", "isSlimeBossToken", "isSlimeLauncher",
       "isSellSign", "isSlimeLootBox", "isSnowLootBox", "isSnowQueenToken", "isSpaceTimeRift", "isStoneGolemToken", "isStoneStaff",
       "isExpeditionCompass",
       "isTimeLordLootBox", "isWardensCall", "isWitherCloakSword", "isWitherLootBox", "isWitherStaff", "isWormholePotion",

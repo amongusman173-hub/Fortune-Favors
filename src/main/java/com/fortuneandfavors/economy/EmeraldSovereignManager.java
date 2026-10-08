@@ -994,7 +994,7 @@ public final class EmeraldSovereignManager {
                int points = 16;
                for (int i = 0; i < points; i++) {
                   double a = i * (Math.PI * 2.0 / points) + mark.fuse * 0.05;
-                  FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, mark.pos.x + Math.cos(a) * mark.radius, mark.pos.y + 0.2,
+                  Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, mark.pos.x + Math.cos(a) * mark.radius, mark.pos.y + 0.2,
                      mark.pos.z + Math.sin(a) * mark.radius, 1, 0.0, 0.0, 0.0, 0.0);
                }
             });
@@ -1327,7 +1327,7 @@ public final class EmeraldSovereignManager {
             vanillaOnly(() -> {
                for (int i = 0; i < 20; i++) {
                   double a = i * (Math.PI * 2.0 / 20.0);
-                  FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, at.x + Math.cos(a) * 1.7, at.y + 0.15, at.z + Math.sin(a) * 1.7, 1, 0.0, 0.0, 0.0, 0.0);
+                  Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, at.x + Math.cos(a) * 1.7, at.y + 0.15, at.z + Math.sin(a) * 1.7, 1, 0.0, 0.0, 0.0, 0.0);
                }
             });
          }
@@ -1448,7 +1448,7 @@ public final class EmeraldSovereignManager {
             vanillaOnly(() -> {
                for (double d = 0; d < reach; d += 1.0) {
                   Vec3 point = floorStart.add(dir.scale(d));
-                  FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, point.x, point.y, point.z, 1, 0.05, 0.0, 0.05, 0.0);
+                  Fx.vanilla(level, ParticleTypes.HAPPY_VILLAGER, point.x, point.y, point.z, 1, 0.05, 0.0, 0.05, 0.0);
                }
             });
          }

@@ -1398,7 +1398,7 @@ public final class StarboundMagisterManager {
          Fx.vanillaOnly(() -> {
             for (int i = 0; i < 12; i++) {
                double a = i * (Math.PI * 2.0 / 12.0) + fight.collapseCharge * 0.06;
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, boss.getX() + Math.cos(a) * r, boss.getY() + 1.2, boss.getZ() + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
+               Fx.vanilla(level, ParticleTypes.END_ROD, boss.getX() + Math.cos(a) * r, boss.getY() + 1.2, boss.getZ() + Math.sin(a) * r, 1, 0.0, 0.0, 0.0, 0.0);
             }
          });
       }
@@ -1540,7 +1540,7 @@ public final class StarboundMagisterManager {
                   int points = 12;
                   for (int i = 0; i < points; i++) {
                      double a = i * (Math.PI * 2.0 / points) + mark.fuse * 0.08;
-                     com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, mark.pos.x + Math.cos(a) * mark.radius, mark.pos.y + 0.15, mark.pos.z + Math.sin(a) * mark.radius, 1, 0.0, 0.0, 0.0, 0.0);
+                     Fx.vanilla(level, ParticleTypes.END_ROD, mark.pos.x + Math.cos(a) * mark.radius, mark.pos.y + 0.15, mark.pos.z + Math.sin(a) * mark.radius, 1, 0.0, 0.0, 0.0, 0.0);
                   }
                });
             }
@@ -1553,8 +1553,8 @@ public final class StarboundMagisterManager {
             Fx.starburst(level, ParticleTypes.END_ROD, mark.pos.add(0.0, 1.0, 0.0), mark.radius, STARLIGHT);
          }
          Fx.vanillaOnly(() -> {
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, mark.pos.x, mark.pos.y + 0.4, mark.pos.z, 1, 0.0, 0.0, 0.0, 0.0);
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.GUST, mark.pos.x, mark.pos.y + 0.4, mark.pos.z, 8, mark.radius * 0.6, 0.4, mark.radius * 0.6, 0.15);
+            Fx.vanilla(level, ParticleTypes.EXPLOSION_EMITTER, mark.pos.x, mark.pos.y + 0.4, mark.pos.z, 1, 0.0, 0.0, 0.0, 0.0);
+            Fx.vanilla(level, ParticleTypes.GUST, mark.pos.x, mark.pos.y + 0.4, mark.pos.z, 8, mark.radius * 0.6, 0.4, mark.radius * 0.6, 0.15);
          });
          level.playSound(null, mark.pos.x, mark.pos.y, mark.pos.z, ModSounds.BOSS_SLAM, SoundSource.HOSTILE, 1.8F, 1.0F);
          for (ServerPlayer p : playersNear(level, mark.pos.x, mark.pos.y, mark.pos.z, mark.radius)) {

@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.12.0
+
+### ✨ Boss reworks, custom VFX and art
+- **Eight bosses reworked** with new staged attacks, client VFX and rewritten lines: the Puppeteer, Scarlet Devil (Brand, Blood Pact), Emerald Sovereign (Kneel, Appraisal), Void Shaper (Fault Line, Event Horizon), Clockwork King (Pendulum, Live Current), Starbound Magister (Constellation, Eclipse), Gale Warden (Shear, Eye of the Storm) and Drowned Sovereign (Breaker Ring, The Deep Looks) - each with a signature boss bar. The Elder Warden's calling, rise and death were redone too.
+- **13 new particle sprites and 12 new effect templates**; sculk effects no longer draw as ice. The effect id space (one byte, 127) is now full - more templates need a wider id in `net/`.
+- **Players with the client mod see only the custom effects** on the reworked bosses and their gear: the vanilla particles those files still send are now vanilla-client only (`Fx.vanilla`).
+- **The Gale Warden and the Drowned Sovereign no longer paint their attacks on the floor** before they land - the ground markers ahead of a hit are gone (spawn circles, death rings and the hazards that *are* the attack, like Black Tide and Dead Air, stay).
+- **43 item icons redrawn**: the marionette, sculk staff, raid banner, and every Clockwork, Magister, Void Shaper, Sovereign King, Gale and Drowned item.
+- **Gale and Drowned gear has real effects**: the Tidecaller rolls a tide, the vortex is a maelstrom, the Chakram flies as a crescent of wind, and the Skybreaker lands in a shockwave.
+
+### 🌟 Spells that land every hit
+- **The Starpiercer fires a star, not an arrow.** Its piercing star is drawn by the client and goes through everything on its line; it no longer sticks in walls.
+- **Star Bolt (Magister's Codex) and Blood Spears** are real spell bolts too, and all three **go through hurt-immunity**: a volley of three used to lose two hits to the first one's i-frames.
+- **The Shaping Sigil throws again.** A throw started wherever the gripped block happened to hover, and the flight treated grass, flowers, snow and water as walls, so it could end on its first step. It now launches from in front of you and only stops on blocks with real collision.
+
+### 🧠 Corruption, and the Mindbinder's full control
+- **Every corruption stage has its own screen overlay** for players with the client mod: violet creeping in at I, static tearing across at II, and at III the view darkens under a heartbeat border, strings and an opening eye.
+- **Corruption and sculk infection have their own boss bars** (custom art; corruption turns red at III).
+- **Corruption III no longer wears off.** Break out (mash JUMP) within **10 seconds** or the Mindbinder takes you: you die, your pack is held and handed back, and a copy of you wearing your gear fights for him.
+- **The Mindbinder holds still through his death** - the rift death plays while he stands, and he dies when it seals.
+
+### 🪦 Grave claims look like something
+- Claiming a grave opens a rune circle, sends the soul of what it held streaming back to you, and raises a pillar of light (client mod); the old shower is for vanilla clients.
+
+### 🛡️ Player raid
+- Bigger early waves with ravagers, the Warlord's betrayal offer appears again (needs at least 2 players), and the raid timers work.
+- Illusion spellbook: the copies follow you, you are fully invisible (armour hidden, no particles, no footsteps), and it ends when you are hit, re-use the book or leave. The Multidimensional Army walks out of a rift.
+
+### 🔧 Fixes
+- The Puppeteer's **Last String** comes again in phase three: the thread cast ran first and returned whenever it landed, starving it.
+- The Stone Golem's boulder display is removed when the fight ends.
+- The Wither King's storm waves and beat overlay run on the shared clock (`ffAuditSources` caught two frozen-clock reads).
+- The resource pack zip and Bedrock `.mcpack` were rebuilt; they were missing the newer art.
+
 ## 1.11.10
 
 ### 🔧 A Super Hopper now feeds furnaces and Super Smelters properly

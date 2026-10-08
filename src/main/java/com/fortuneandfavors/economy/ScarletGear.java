@@ -402,7 +402,7 @@ public final class ScarletGear {
       // Night falls outward from the caster to the edge of the blind, and the swarm bursts out of it.
       Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.LARGE_SMOKE, player.position().add(0.0, 0.4, 0.0), Vec3.ZERO, 12.0, 0.0, CLOT);
       Fx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, ParticleTypes.LARGE_SMOKE, player.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 0.0, 1.0, CLOT);
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, player.getX(), player.getY() + 1.0, player.getZ(), 30, 1.4, 0.9, 1.4, 0.03);
+      Fx.vanilla(level, ParticleTypes.LARGE_SMOKE, player.getX(), player.getY() + 1.0, player.getZ(), 30, 1.4, 0.9, 1.4, 0.03);
       return true;
    }
 
@@ -439,7 +439,7 @@ public final class ScarletGear {
       if (drained > 0.0) {
          player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + (float) Math.min(8.0, drained * 0.35)));
       }
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIMSON_SPORE, player.getX(), player.getY() + 6.0, player.getZ(), 120, 7.0, 1.0, 7.0, 0.3);
+      Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, player.getX(), player.getY() + 6.0, player.getZ(), 120, 7.0, 1.0, 7.0, 0.3);
       // The circle the rain falls inside, drawn on the ground at its true radius.
       Fx.runeCircle(level, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), RAIN_RADIUS, 50, SCARLET);
       Fx.emberRain(level, ParticleTypes.CRIMSON_SPORE, player.position(), RAIN_RADIUS, 40, SCARLET);
@@ -568,20 +568,11 @@ public final class ScarletGear {
          if (dir.lengthSqr() < 1.0E-4) {
             dir = new Vec3(0.0, -1.0, 0.0);
          }
-         net.minecraft.world.entity.projectile.arrow.Arrow arrow = new net.minecraft.world.entity.projectile.arrow.Arrow(
-            s.level, s.caster, new ItemStack(Items.REDSTONE), new ItemStack(Items.BOW)
-         );
-         arrow.setPos(s.origin.x, s.origin.y, s.origin.z);
-         arrow.setDeltaMovement(dir.normalize().scale(SPEAR_SPEED));
-         // An arrow hits for its speed times its base damage, so a base of SPEAR_DAMAGE at this
-         // speed was a 14-point spear. Divided back out, each spear hits for SPEAR_DAMAGE.
-         arrow.setBaseDamage(SPEAR_DAMAGE / SPEAR_SPEED);
-         Fx.shape(s.level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, s.origin, eye, 0.0, 0.0, SCARLET);
+         // A spear of blood, not an arrow: swept by Bolts and thrown through the target's i-frames,
+         // so all three of the volley land instead of the first one eating the other two.
+         Bolts.fire(s.level, s.caster, ParticleTypes.CRIMSON_SPORE, s.origin, dir, SPEAR_SPEED, 32.0, SPEAR_DAMAGE, false, SCARLET);
          Fx.shape(s.level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.CRIMSON_SPORE, s.origin, dir.normalize(), 0.0, 0.0, GLINT);
-         arrow.setCritArrow(false);
-         arrow.pickup = net.minecraft.world.entity.projectile.arrow.AbstractArrow.Pickup.DISALLOWED;
-         s.level.addFreshEntity(arrow);
-         s.level.sendParticles(ParticleTypes.CRIMSON_SPORE, s.origin.x, s.origin.y, s.origin.z, 8, 0.2, 0.2, 0.2, 0.05);
+         Fx.vanilla(s.level, ParticleTypes.CRIMSON_SPORE, s.origin.x, s.origin.y, s.origin.z, 8, 0.2, 0.2, 0.2, 0.05);
          s.remaining--;
          s.next = ServerClock.clock(s.level) + 3L;
          if (s.remaining <= 0) {
@@ -609,7 +600,7 @@ public final class ScarletGear {
          ServerLevel level = (ServerLevel) mob.level();
          long now = ServerClock.clock(level);
          if (now % 10L == 0L) {
-            level.sendParticles(new DustParticleOptions(-65536, 0.7F), mob.getX(), mob.getY() + 0.3, mob.getZ(), 1, 0.15, 0.15, 0.15, 0.0);
+            Fx.vanilla(level, new DustParticleOptions(-65536, 0.7F), mob.getX(), mob.getY() + 0.3, mob.getZ(), 1, 0.15, 0.15, 0.15, 0.0);
          }
 
          ServerPlayer owner = server.getPlayerList().getPlayer(bat.owner);
@@ -660,7 +651,7 @@ public final class ScarletGear {
          ServerLevel level = (ServerLevel) mob.level();
          ServerPlayer owner = server.getPlayerList().getPlayer(servant.owner);
          if (ServerClock.clock(level) % 6L == 0L) {
-            level.sendParticles(ParticleTypes.CRIMSON_SPORE, mob.getX(), mob.getY() + 0.6, mob.getZ(), 3, 0.3, 0.5, 0.3, 0.02);
+            Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, mob.getX(), mob.getY() + 0.6, mob.getZ(), 3, 0.3, 0.5, 0.3, 0.02);
          }
 
          // Hard guard: an ally is never a target. Vanilla's own player-seeking
@@ -801,7 +792,7 @@ public final class ScarletGear {
       double x = target != null ? target.getX() : ritual.anchor.x;
       double y = target != null ? target.getY() : ritual.anchor.y;
       double z = target != null ? target.getZ() : ritual.anchor.z;
-      com.fortuneandfavors.net.FfVfx.particles(ritual.level, ParticleTypes.POOF, x, y + 1.0, z, 24, 1.0, 1.0, 1.0, 0.05);
+      Fx.vanilla(ritual.level, ParticleTypes.POOF, x, y + 1.0, z, 24, 1.0, 1.0, 1.0, 0.05);
       Fx.shape(ritual.level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.SMOKE, new Vec3(x, y + 0.2, z), Vec3.ZERO, 1.8, 0.0, CLOT);
       ritual.level.playSound(null, x, y, z, SoundEvents.FIRE_EXTINGUISH, SoundSource.PLAYERS, 1.0F, 0.8F);
    }
@@ -1037,7 +1028,7 @@ public final class ScarletGear {
          }
          entry.setValue(left);
          if (left % 40 == 0 && p.level() instanceof ServerLevel level) {
-            level.sendParticles(new DustParticleOptions(-65536, 0.8F), p.getX(), p.getY() + 1.2, p.getZ(), 2, 0.35, 0.5, 0.35, 0.0);
+            Fx.vanilla(level, new DustParticleOptions(-65536, 0.8F), p.getX(), p.getY() + 1.2, p.getZ(), 2, 0.35, 0.5, 0.35, 0.0);
          }
       }
    }
@@ -1178,8 +1169,8 @@ public final class ScarletGear {
    }
 
    private static void blood(ServerLevel level, double x, double y, double z, int count) {
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIMSON_SPORE, x, y, z, count, 0.9, 0.9, 0.9, 0.1);
-      com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-65536, 1.3F), x, y, z, count / 2, 0.8, 0.8, 0.8, 0.05);
+      Fx.vanilla(level, ParticleTypes.CRIMSON_SPORE, x, y, z, count, 0.9, 0.9, 0.9, 0.1);
+      Fx.vanilla(level, new DustParticleOptions(-65536, 1.3F), x, y, z, count / 2, 0.8, 0.8, 0.8, 0.05);
    }
 
    /** Called on shutdown so no servant outlives the world it was summoned in. */

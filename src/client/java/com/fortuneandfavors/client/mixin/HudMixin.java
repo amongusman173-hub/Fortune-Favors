@@ -52,6 +52,7 @@ public abstract class HudMixin {
          fortuneandfavors$beat(extractor);
          fortuneandfavors$fracture(extractor);
          fortuneandfavors$puppet(extractor);
+         fortuneandfavors$corruption(extractor);
 
          if (ScreenFx.deadeyeActive()) {
             // Subtle red flash when a Deadeye shot goes live - softer than the
@@ -199,6 +200,68 @@ public abstract class HudMixin {
             int x = (int)(top + (w / 2 - top) * (y / (h / 2.0)) + sway * (1.0 - y / (h / 2.0)));
             g.fill(x, y, x + 1, y + 2, fortuneandfavors$argb(0.45F * k, 0xC07CFF));
          }
+      }
+   }
+
+   /**
+    * Corruption, one look per stage. I: violet creeping in at the edges. II: heavier, with violet and
+    * cyan static tearing across it. III, full control: the view goes dark, a red-violet border beats
+    * like a heart, strings hang from the top, and an eye opens over it all.
+    */
+   @Unique
+   private static void fortuneandfavors$corruption(GuiGraphicsExtractor g) {
+      int stage = ScreenFx.corruptionStage();
+      if (stage <= 0) {
+         return;
+      }
+      int w = g.guiWidth();
+      int h = g.guiHeight();
+      long t = System.currentTimeMillis();
+      float breathe = 0.5F + 0.5F * (float)Math.sin(t / (stage >= 3 ? 180.0 : 600.0));
+      int edge = stage >= 3 ? 0x6A0A3A : 0x3A0A5A;
+      int band = h / (stage >= 3 ? 3 : 6);
+      float a = (0.18F + 0.12F * stage) * (0.8F + 0.2F * breathe);
+      g.fillGradient(0, 0, w, band, fortuneandfavors$argb(a, edge), 0);
+      g.fillGradient(0, h - band, w, h, 0, fortuneandfavors$argb(a, edge));
+      int side = w / (stage >= 3 ? 4 : 8);
+      for (int i = 0; i < side; i += 2) {
+         float k = a * (1.0F - i / (float)side);
+         g.fill(i, 0, i + 2, h, fortuneandfavors$argb(k * 0.6F, edge));
+         g.fill(w - i - 2, 0, w - i, h, fortuneandfavors$argb(k * 0.6F, edge));
+      }
+      if (stage >= 2) {
+         java.util.Random r = new java.util.Random(t / (stage >= 3 ? 60L : 140L));
+         for (int i = 0; i < 3 + stage * 2; i++) {
+            int y = r.nextInt(Math.max(1, h));
+            int shift = r.nextInt(30) - 15;
+            g.fill(Math.max(0, shift), y, Math.min(w, w + shift), y + 1 + r.nextInt(2), fortuneandfavors$argb(0.08F * stage, r.nextBoolean() ? 0xB04CFF : 0x4CE0FF));
+         }
+      }
+      if (stage >= 3) {
+         g.fill(0, 0, w, h, fortuneandfavors$argb(0.14F + 0.08F * breathe, 0x12001C));
+         int o = (int)(4 + breathe * 6);
+         int c = fortuneandfavors$argb(0.55F * breathe + 0.2F, 0xD0205A);
+         g.fill(0, 0, w, o, c);
+         g.fill(0, h - o, w, h, c);
+         g.fill(0, o, o, h - o, c);
+         g.fill(w - o, o, w, h - o, c);
+         for (int s2 = 0; s2 < 3; s2++) {
+            int top = w / 2 + (s2 - 1) * w / 4;
+            double sway = Math.sin(t / 260.0 + s2) * 8.0;
+            for (int y = 0; y < h / 2 - 20; y += 3) {
+               int x = (int)(top + (w / 2 - top) * (y / (h / 2.0)) + sway * (1.0 - y / (h / 2.0)));
+               g.fill(x, y, x + 1, y + 2, fortuneandfavors$argb(0.5F, 0xC07CFF));
+            }
+         }
+         // The eye: an almond of violet with a cyan iris, opening and closing with the beat.
+         int cx = w / 2, cy = h / 7, ew = w / 10, eh = (int)(2 + breathe * h / 40);
+         for (int dy = -eh; dy <= eh; dy++) {
+            int half = (int)(ew * Math.sqrt(1.0 - (dy / (double)(eh + 1)) * (dy / (double)(eh + 1))));
+            g.fill(cx - half, cy + dy, cx + half, cy + dy + 1, fortuneandfavors$argb(0.6F, 0x5A1A8A));
+         }
+         int ir = Math.max(1, eh - 1);
+         g.fill(cx - ir, cy - ir, cx + ir, cy + ir, fortuneandfavors$argb(0.85F, 0x4CE0FF));
+         g.fill(cx - 1, cy - ir, cx + 1, cy + ir, fortuneandfavors$argb(0.9F, 0x050008));
       }
    }
 

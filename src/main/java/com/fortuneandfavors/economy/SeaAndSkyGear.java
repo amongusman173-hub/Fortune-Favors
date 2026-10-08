@@ -430,6 +430,8 @@ public final class SeaAndSkyGear {
       Vec3 look = flatLook(player);
       Vec3 from = player.position().add(0.0, 0.2, 0.0).add(look.scale(1.2));
       WAVES.add(new Wave(player.getUUID(), level, from, look));
+      Fx.tideWave(level, ParticleTypes.SPLASH, from, look, WAVE_REACH, (int)(WAVE_REACH * WAVE_TICKS_PER_STEP), TIDE);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, from, Vec3.ZERO, 2.5, 0.0, FOAM);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIDENT_RIPTIDE_1, SoundSource.PLAYERS, 1.3F, 0.8F);
       bar(player, "&3The tide answers &8- &7it is going that way.");
       return null;
@@ -525,7 +527,7 @@ public final class SeaAndSkyGear {
       long until = ServerClock.clock(bearer.level()) + MARK_TICKS;
       Map<UUID, Long> marks = MARKS.computeIfAbsent(bearer.getUUID(), k -> new HashMap<>());
       Long previous = marks.put(victim.getUUID(), until);
-      BossVfx.at(
+      Fx.vanillaOnly(() -> BossVfx.at(
          victim.level() instanceof ServerLevel sl ? sl : null,
          victim.position().add(0.0, victim.getBbHeight() + 0.35, 0.0),
          0.0,
@@ -535,7 +537,7 @@ public final class SeaAndSkyGear {
          0.1,
          0.2,
          0.02
-      );
+      ));
       return previous != null && previous > ServerClock.clock(bearer.level());
    }
 
@@ -569,7 +571,8 @@ public final class SeaAndSkyGear {
          player.hurtMarked = true;
          player.fallDistance = 0.0F;
          SLAMS.add(new SkySlam(player.getUUID(), level, BREAK_FALL_TICKS));
-         BossVfx.at(level, player.position(), 0.0, ParticleTypes.GUST, 18, 0.5, 0.3, 0.5, 0.12);
+         Fx.gust(level, ParticleTypes.GUST, player.position(), new Vec3(0.0, 1.0, 0.0), 6.0, GALE);
+         Fx.vanillaOnly(() -> BossVfx.at(level, player.position(), 0.0, ParticleTypes.GUST, 18, 0.5, 0.3, 0.5, 0.12));
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_JUMP, SoundSource.PLAYERS, 1.3F, 0.9F);
          bar(player, "&fBreak the Sky &8- &7come down on all of it.");
          return null;
@@ -710,8 +713,8 @@ public final class SeaAndSkyGear {
       player.setDeltaMovement(player.getDeltaMovement().x * 0.4, WINDSTEP_POWER, player.getDeltaMovement().z * 0.4);
       player.hurtMarked = true;
       if (player.level() instanceof ServerLevel level) {
-         BossVfx.ring(level, player.position().add(0.0, 0.4, 0.0), 4.0, 30, ParticleTypes.GUST, 0.0);
-         BossVfx.at(level, player.position(), 0.0, ParticleTypes.GUST_EMITTER_SMALL, 4, 1.2, 0.6, 1.2, 0.0);
+         Fx.vanillaOnly(() -> BossVfx.ring(level, player.position().add(0.0, 0.4, 0.0), 4.0, 30, ParticleTypes.GUST, 0.0));
+         Fx.vanillaOnly(() -> BossVfx.at(level, player.position(), 0.0, ParticleTypes.GUST_EMITTER_SMALL, 4, 1.2, 0.6, 1.2, 0.0));
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.PLAYERS, 1.6F, 1.0F);
       }
       bar(player, "&fSecond Wind &8- &7the sky gave it back.");
@@ -790,7 +793,7 @@ public final class SeaAndSkyGear {
             player.setDeltaMovement(player.getDeltaMovement().x, MANTLE_UPDRAFT, player.getDeltaMovement().z);
             player.hurtMarked = true;
             if (player.level() instanceof ServerLevel level) {
-               BossVfx.at(level, player.position(), 0.0, ParticleTypes.GUST, 14, 0.4, 0.5, 0.4, 0.1);
+               Fx.vanillaOnly(() -> BossVfx.at(level, player.position(), 0.0, ParticleTypes.GUST, 14, 0.4, 0.5, 0.4, 0.1));
                level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_CHARGE, SoundSource.PLAYERS, 0.9F, 1.4F);
             }
          }
@@ -824,8 +827,8 @@ public final class SeaAndSkyGear {
       player.setDeltaMovement(look.x * WINDSTEP_POWER, Math.max(0.18, player.getDeltaMovement().y), look.z * WINDSTEP_POWER);
       player.hurtMarked = true;
       if (player.level() instanceof ServerLevel level) {
-         BossVfx.beam(level, player.position(), player.position().add(look.scale(3.0)), 0.2, ParticleTypes.CLOUD);
-         BossVfx.at(level, player.position(), 0.0, ParticleTypes.SMALL_GUST, 16, 0.5, 0.2, 0.5, 0.08);
+         Fx.vanillaOnly(() -> BossVfx.beam(level, player.position(), player.position().add(look.scale(3.0)), 0.2, ParticleTypes.CLOUD));
+         Fx.vanillaOnly(() -> BossVfx.at(level, player.position(), 0.0, ParticleTypes.SMALL_GUST, 16, 0.5, 0.2, 0.5, 0.08));
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_SLIDE, SoundSource.PLAYERS, 1.0F, 1.2F);
       }
    }
@@ -867,9 +870,9 @@ public final class SeaAndSkyGear {
    private static void drawWave(Wave wave) {
       Vec3 left = wave.at.add(wave.side.scale(WAVE_HALF_WIDTH));
       Vec3 right = wave.at.subtract(wave.side.scale(WAVE_HALF_WIDTH));
-      BossVfx.beam(wave.level, left.add(0.0, 0.6, 0.0), right.add(0.0, 0.6, 0.0), 0.5, ParticleTypes.SPLASH);
-      BossVfx.at(wave.level, wave.at.add(0.0, 0.4, 0.0), 0.0, ParticleTypes.FALLING_WATER, 22, 1.2, 0.8, 1.2, 0.14);
-      BossVfx.at(wave.level, wave.at.add(0.0, 0.2, 0.0), 0.0, ParticleTypes.BUBBLE, 12, 1.4, 0.3, 1.4, 0.06);
+      Fx.vanillaOnly(() -> BossVfx.beam(wave.level, left.add(0.0, 0.6, 0.0), right.add(0.0, 0.6, 0.0), 0.5, ParticleTypes.SPLASH));
+      Fx.vanillaOnly(() -> BossVfx.at(wave.level, wave.at.add(0.0, 0.4, 0.0), 0.0, ParticleTypes.FALLING_WATER, 22, 1.2, 0.8, 1.2, 0.14));
+      Fx.vanillaOnly(() -> BossVfx.at(wave.level, wave.at.add(0.0, 0.2, 0.0), 0.0, ParticleTypes.BUBBLE, 12, 1.4, 0.3, 1.4, 0.06));
    }
 
    private static void tickVortexes() {
@@ -879,7 +882,7 @@ public final class SeaAndSkyGear {
       for (Iterator<Vortex> it = VORTEXES.iterator(); it.hasNext();) {
          Vortex vortex = it.next();
          if (--vortex.ticks <= 0) {
-            BossVfx.at(vortex.level, vortex.at, 0.0, ParticleTypes.GUST, 20, 1.4, 0.4, 1.4, 0.15);
+            Fx.vanillaOnly(() -> BossVfx.at(vortex.level, vortex.at, 0.0, ParticleTypes.GUST, 20, 1.4, 0.4, 1.4, 0.15));
             it.remove();
             continue;
          }
@@ -889,7 +892,7 @@ public final class SeaAndSkyGear {
          for (int i = 0; i < points; i++) {
             double a = spin + i * (Math.PI * 2.0 / points);
             double r = VORTEX_RADIUS * (0.35 + 0.65 * ((i * 7 % points) / (double)points));
-            BossVfx.at(
+            Fx.vanillaOnly(() -> BossVfx.at(
                vortex.level,
                vortex.at.add(Math.cos(a) * r, 0.35, Math.sin(a) * r),
                0.0,
@@ -899,7 +902,7 @@ public final class SeaAndSkyGear {
                0.0,
                0.0,
                0.0
-            );
+            ));
          }
          if (vortex.ticks % 4 != 0) {
             continue;
@@ -950,9 +953,9 @@ public final class SeaAndSkyGear {
                   if (!owner.onGround()) {
                      owner.setDeltaMovement(owner.getDeltaMovement().x, AIR_CATCH_LIFT, owner.getDeltaMovement().z);
                      owner.hurtMarked = true;
-                     BossVfx.at(chakram.level, owner.position(), 0.0, ParticleTypes.GUST, 14, 0.4, 0.4, 0.4, 0.1);
+                     Fx.vanillaOnly(() -> BossVfx.at(chakram.level, owner.position(), 0.0, ParticleTypes.GUST, 14, 0.4, 0.4, 0.4, 0.1));
                   }
-                  BossVfx.at(chakram.level, chakram.at, 0.0, ParticleTypes.CLOUD, 10, 0.3, 0.3, 0.3, 0.02);
+                  Fx.vanillaOnly(() -> BossVfx.at(chakram.level, chakram.at, 0.0, ParticleTypes.CLOUD, 10, 0.3, 0.3, 0.3, 0.02));
                   discardChakramBody(chakram);
                   it.remove();
                   continue;
@@ -966,6 +969,9 @@ public final class SeaAndSkyGear {
             Vec3 side = new Vec3(-chakram.forward.z, 0.0, chakram.forward.x);
             double bend = owner.isShiftKeyDown() ? CURVE_SIDE : 0.0;
             chakram.at = chakram.at.add(chakram.forward.scale(CHAKRAM_SPEED)).add(side.scale(bend));
+            if ((chakram.travelled * 10) % 2 < 1) {
+               Fx.crescent(chakram.level, ParticleTypes.GUST, chakram.at, chakram.forward, 1.4, GALE);
+            }
             chakram.travelled += CHAKRAM_SPEED;
             if (chakram.travelled >= CHAKRAM_REACH) {
                chakram.returning = true;
@@ -1041,7 +1047,7 @@ public final class SeaAndSkyGear {
       int points = 14;
       for (int i = 0; i < points; i++) {
          double a = i * (Math.PI * 2.0 / points);
-         BossVfx.at(
+         Fx.vanillaOnly(() -> BossVfx.at(
             chakram.level,
             chakram.at.add(Math.cos(a) * 0.7, Math.sin(a) * 0.7, 0.0),
             0.0,
@@ -1051,9 +1057,9 @@ public final class SeaAndSkyGear {
             0.0,
             0.0,
             0.0
-         );
+         ));
       }
-      BossVfx.at(chakram.level, chakram.at, 0.0, ParticleTypes.SMALL_GUST, 3, 0.2, 0.2, 0.2, 0.02);
+      Fx.vanillaOnly(() -> BossVfx.at(chakram.level, chakram.at, 0.0, ParticleTypes.SMALL_GUST, 3, 0.2, 0.2, 0.2, 0.02));
    }
 
    private static void bladeChakram(ServerPlayer owner, Chakram chakram) {
@@ -1072,7 +1078,7 @@ public final class SeaAndSkyGear {
          Vec3 away = flatAway(chakram.at, e);
          e.push(away.x * push, 0.3, away.z * push);
          e.hurtMarked = true;
-         BossVfx.at(chakram.level, chakram.at, 0.0, ParticleTypes.GUST, 10, 0.4, 0.4, 0.4, 0.1);
+         Fx.vanillaOnly(() -> BossVfx.at(chakram.level, chakram.at, 0.0, ParticleTypes.GUST, 10, 0.4, 0.4, 0.4, 0.1));
          chakram.level.playSound(null, e.getX(), e.getY(), e.getZ(), SoundEvents.BREEZE_DEFLECT, SoundSource.PLAYERS, 1.0F, 1.2F);
          if (streak >= 2) {
             bar(owner, "&fRazor Current &8x&f" + streak + " &8- &7it is going further each time.");
@@ -1105,9 +1111,12 @@ public final class SeaAndSkyGear {
             e.hurtMarked = true;
             hits++;
          }
-         BossVfx.ring(slam.level, at.add(0.0, 0.3, 0.0), BREAK_RADIUS, 46, ParticleTypes.GUST, 0.0);
-         BossVfx.ring(slam.level, at.add(0.0, 0.9, 0.0), BREAK_RADIUS * 0.6, 30, ParticleTypes.CLOUD, 0.0);
-         BossVfx.at(slam.level, at, 0.0, ParticleTypes.GUST_EMITTER_LARGE, 5, 1.6, 0.6, 1.6, 0.0);
+         Fx.vanillaOnly(() -> BossVfx.ring(slam.level, at.add(0.0, 0.3, 0.0), BREAK_RADIUS, 46, ParticleTypes.GUST, 0.0));
+         Fx.vanillaOnly(() -> BossVfx.ring(slam.level, at.add(0.0, 0.9, 0.0), BREAK_RADIUS * 0.6, 30, ParticleTypes.CLOUD, 0.0));
+         Fx.vanillaOnly(() -> BossVfx.at(slam.level, at, 0.0, ParticleTypes.GUST_EMITTER_LARGE, 5, 1.6, 0.6, 1.6, 0.0));
+         Fx.shockwave(slam.level, ParticleTypes.GUST, at, BREAK_RADIUS, GALE);
+         Fx.gust(slam.level, ParticleTypes.GUST, at.add(0.0, 0.4, 0.0), new Vec3(0.0, 1.0, 0.0), 4.0, GALE);
+         Fx.shape(slam.level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, at, Vec3.ZERO, BREAK_RADIUS * 0.5, 0.0, 0x9AA6B4);
          slam.level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.PLAYERS, 1.8F, 0.8F);
          slam.level.playSound(null, at.x, at.y, at.z, SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.PLAYERS, 1.4F, 1.1F);
          bar(owner, "&fBreak the Sky &8- &7the ring caught &f" + hits + "&7.");
@@ -1122,7 +1131,9 @@ public final class SeaAndSkyGear {
       }
       Vec3 at = player.position();
       VORTEXES.add(new Vortex(player.getUUID(), level, at, VORTEX_TICKS));
-      BossVfx.ring(level, at, VORTEX_RADIUS, 30, ParticleTypes.BUBBLE, 0.0);
+      Fx.vortex(level, ParticleTypes.BUBBLE_POP, at, VORTEX_RADIUS, VORTEX_TICKS, ABYSS);
+      Fx.runeCircle(level, ParticleTypes.BUBBLE_POP, at.add(0.0, 0.05, 0.0), VORTEX_RADIUS, VORTEX_TICKS, TIDE);
+      Fx.vanillaOnly(() -> BossVfx.ring(level, at, VORTEX_RADIUS, 30, ParticleTypes.BUBBLE, 0.0));
       level.playSound(null, at.x, at.y, at.z, SoundEvents.CONDUIT_ACTIVATE, SoundSource.PLAYERS, 1.4F, 0.7F);
       bar(player, "&3Undertow &8- &7everything nearby is leaning in.");
       return null;

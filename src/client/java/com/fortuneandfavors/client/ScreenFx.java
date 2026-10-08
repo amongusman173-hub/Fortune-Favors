@@ -14,6 +14,8 @@ public final class ScreenFx {
    private static int lootFx;
    private static long fractureStart;
    private static long puppetUntil;
+   private static int corruptStage;
+   private static long corruptStageUntil;
    private static long lootStart;
    /** Longest a stop is ever shown for, in case the "time resumes" packet never arrives. */
    private static final long TIMESTOP_MAX_MS = 30000L;
@@ -66,6 +68,9 @@ public final class ScreenFx {
       } else if (fx == 6) {
          deadeye = active;
          deadeyeExpires = active ? System.currentTimeMillis() + 700L : 0L;
+      } else if (fx >= 16 && fx <= 18) {
+         corruptStage = fx - 15;
+         corruptStageUntil = System.currentTimeMillis() + 1600L;
       } else if (fx == 15) {
          puppetUntil = System.currentTimeMillis() + 650L;
       } else if (fx == 14) {
@@ -116,6 +121,11 @@ public final class ScreenFx {
    }
 
    /** How strongly the seize overlay shows (fades out over its last 650ms), 0 when off. */
+   /** The corruption stage being shown (1..3), or 0. */
+   public static int corruptionStage() {
+      return System.currentTimeMillis() < corruptStageUntil ? corruptStage : 0;
+   }
+
    public static float puppetStrength() {
       long left = puppetUntil - System.currentTimeMillis();
       return left <= 0L ? 0.0F : Math.min(1.0F, left / 400.0F);

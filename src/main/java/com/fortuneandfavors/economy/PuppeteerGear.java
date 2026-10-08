@@ -182,8 +182,8 @@ public final class PuppeteerGear {
          Vec3 feet = puppet.position();
          Fx.runeCircle(level, ParticleTypes.SOUL, feet.add(0.0, 0.05, 0.0), 1.8, 30, THREAD);
          stringsFromAbove(level, puppet, 9.0);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 30, 0.6, 0.8, 0.6, 0.06);
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, puppet.getX(), puppet.getY() + 1.4, puppet.getZ(), 20, 0.5, 0.7, 0.5, 0.04);
+         Fx.vanilla(level, ParticleTypes.SOUL, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 30, 0.6, 0.8, 0.6, 0.06);
+         Fx.vanilla(level, ParticleTypes.END_ROD, puppet.getX(), puppet.getY() + 1.4, puppet.getZ(), 20, 0.5, 0.7, 0.5, 0.04);
          level.playSound(null, puppet.getX(), puppet.getY(), puppet.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.0F, 0.8F);
          killer.sendOverlayMessage(Component.literal("\u00a75The mask takes the body \u00a78| \u00a7f" + name + " \u00a77is yours for 20s"));
       } catch (Throwable ignored) {
@@ -400,7 +400,7 @@ public final class PuppeteerGear {
          level, player, "\u00a78" + player.getName().getString(), player.getMaxHealth(), false
       );
       if (decoy != null) {
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.POOF, decoy.getX(), decoy.getY() + 1.0, decoy.getZ(), 30, 0.5, 0.8, 0.5, 0.06);
+         Fx.vanilla(level, ParticleTypes.POOF, decoy.getX(), decoy.getY() + 1.0, decoy.getZ(), 30, 0.5, 0.8, 0.5, 0.06);
          // The swap: a mirror tears where they stood and the decoy is left hanging in it.
          Fx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.END_ROD, decoy.position().add(0.0, 1.0, 0.0), new Vec3(1.0, 0.0, 0.0), 1.6, 18, TAUT);
          stringsFromAbove(level, decoy, 7.0);
@@ -421,7 +421,7 @@ public final class PuppeteerGear {
 
       Chat.msg(player, "&8&lTHE PUPPET TAKES YOUR PLACE.");
       player.sendOverlayMessage(Component.literal("\u00a78THE PUPPET TAKES YOUR PLACE \u00a78| \u00a7frun."));
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMOKE, player.getX(), player.getY() + 1.0, player.getZ(), 40, 0.7, 1.0, 0.7, 0.05);
+      Fx.vanilla(level, ParticleTypes.SMOKE, player.getX(), player.getY() + 1.0, player.getZ(), 40, 0.7, 1.0, 0.7, 0.05);
       Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.SMOKE, player.position().add(0.0, 0.3, 0.0), Vec3.ZERO, 3.5, 0.0, 0x2A2236);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.PLAYERS, 1.4F, 0.8F);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ILLUSIONER_MIRROR_MOVE, SoundSource.PLAYERS, 1.2F, 0.7F);
@@ -499,7 +499,7 @@ public final class PuppeteerGear {
             continue;
          }
          mob.setTarget(null);
-         level.sendParticles(ParticleTypes.SMOKE, mob.getX(), mob.getEyeY(), mob.getZ(), 3, 0.2, 0.2, 0.2, 0.01);
+         Fx.vanilla(level, ParticleTypes.SMOKE, mob.getX(), mob.getEyeY(), mob.getZ(), 3, 0.2, 0.2, 0.2, 0.01);
       }
    }
 
@@ -523,7 +523,7 @@ public final class PuppeteerGear {
          now = ServerClock.clock(level);
          if (now >= ally.until) {
             it.remove();
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.POOF, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 16, 0.4, 0.6, 0.4, 0.05);
+            Fx.vanilla(level, ParticleTypes.POOF, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 16, 0.4, 0.6, 0.4, 0.05);
             // Its strings are cut and it drops.
             Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.END_ROD, puppet.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.2, 0.0, THREAD);
             level.playSound(null, puppet.getX(), puppet.getY(), puppet.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.PLAYERS, 0.8F, 1.2F);
