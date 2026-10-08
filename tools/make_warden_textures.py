@@ -193,8 +193,9 @@ def main():
     for name, grid in GRIDS.items():
         assert len(grid) == 16 and all(len(r) == 16 for r in grid), (name, [len(r) for r in grid])
         write_png(f"{OUT}/{name}.png", [[PAL[ch] for ch in r] for r in grid])
+    # sculk_mage_staff is drawn by tools/make_reworked_textures_a.py now.
     for name, fn in (("sculk_orb", sculk_orb), ("sculk_medallion", sculk_medallion), ("distant_memory_shard", distant_memory_shard),
-                     ("sculk_mage_staff", sculk_mage_staff), ("wardens_call", wardens_call)):
+                     ("wardens_call", wardens_call)):
         write_png(f"{OUT}/{name}.png", fn())
 
 

@@ -483,21 +483,16 @@ def sovereign_loot_box():
 
 
 if __name__ == "__main__":
-    clockwork_core()
-    clockwork_trophy()
-    mech_scrap()
-    # clockwork_gauntlet() - drawn by tools/make_boss_gear_textures.py now
-    # mechanical_heart() - drawn by tools/make_boss_gear_textures.py now
-    clockwork_loot_box()
-    # automaton_armor() - drawn by tools/make_boss_gear_textures.py now
+    # clockwork_core(), clockwork_trophy(), mech_scrap() - drawn by tools/make_reworked_textures_a.py now
+    # clockwork_gauntlet() - drawn by tools/make_reworked_textures_a.py now
+    # mechanical_heart() - drawn by tools/make_reworked_textures_a.py now
+    # clockwork_loot_box() - drawn by tools/make_reworked_textures_a.py now
+    # automaton_armor() - drawn by tools/make_reworked_textures_a.py now
 
-    astral_compass()
-    starbound_trophy()
-    magical_essence()
-    # starpiercer() - drawn by tools/make_boss_gear_textures.py now
-    # astral_mantle() - drawn by tools/make_boss_gear_textures.py now
-    magisters_codex()
-    starbound_loot_box()
+    # astral_compass(), starbound_trophy(), magical_essence() - drawn by tools/make_reworked_textures_a.py now
+    # starpiercer() - drawn by tools/make_reworked_textures_a.py now
+    # astral_mantle() - drawn by tools/make_reworked_textures_a.py now
+    # magisters_codex(), starbound_loot_box() - drawn by tools/make_reworked_textures_a.py now
 
     void_anchor()
     colossus_trophy()

@@ -189,7 +189,7 @@ def main():
     distant_memory_sword()
     distant_memory_shard()
     mindbinder_shroud()
-    raid_banner()
+    # raid_banner() - drawn by tools/make_reworked_textures_a.py now
     bounty_compass()
     death_compass()
 

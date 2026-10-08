@@ -254,7 +254,7 @@ def puppeteer_loot_box():
 
 
 if __name__ == "__main__":
-    wooden_marionette()
+    # wooden_marionette() - drawn by tools/make_reworked_textures_a.py now
     puppeteers_mask()
     empty_mask()
     marionette_strings()

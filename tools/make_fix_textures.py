@@ -348,5 +348,5 @@ if __name__ == "__main__":
     # but no longer run, so a rerun of this script cannot overwrite the newer art.
     excalibur()
     mystery_box()
-    clockwork_trophy()
-    # clockwork_gauntlet() - drawn by tools/make_boss_gear_textures.py now
+    # clockwork_trophy() - drawn by tools/make_reworked_textures_a.py now
+    # clockwork_gauntlet() - drawn by tools/make_reworked_textures_a.py now
