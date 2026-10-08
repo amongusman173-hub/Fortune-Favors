@@ -111,6 +111,14 @@ public final class FxKinds {
    public static final int STAR_TRAIL = 136;
    /** Souls climbing a column: a = height, b = ticks, color. */
    public static final int SOUL_PILLAR = 137;
+   /** A taut string from at to aux, pulses running along it toward aux. b = life. */
+   public static final int LINK = 138;
+   /** A spinning halo of radius a over at. b = life. */
+   public static final int HALO = 139;
+   /** A double helix of height a rising at at. b = life. */
+   public static final int HELIX = 140;
+   /** A ground ring growing to radius a. b = life. */
+   public static final int PULSE_WAVE = 141;
 
    private FxKinds() {
    }

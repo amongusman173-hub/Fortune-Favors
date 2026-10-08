@@ -1209,6 +1209,11 @@ public final class PuppeteerManager {
          tickDeath(level, boss, fight);
          return;
       }
+      // Every fighter is dead or gone: the fight is over (unless despawns are off).
+      if (BossManager.allFightersDown(server, fight.participants)) {
+         despawn(server, level, boss, fight, "every fighter has fallen!");
+         return;
+      }
 
       // 2) Arrival: he is lowered on his own strings.
       if (fight.riseTicks > 0) {
@@ -4362,6 +4367,8 @@ public final class PuppeteerManager {
       if (length < 0.001) {
          return;
       }
+      // Modded clients: a live linked thread; vanilla clients: the old dotted line.
+      Fx.link(level, ParticleTypes.END_ROD, from, to, 3, 0xC86BFF);
       Vec3 unit = dir.normalize();
       double stepSize = Math.max(0.25, length / Math.max(1, count));
       for (double d = 0.0; d < length; d += stepSize) {

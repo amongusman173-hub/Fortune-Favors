@@ -497,6 +497,11 @@ public final class ScarletDevilManager {
          tickDeath(level, boss, fight);
          return;
       }
+      // Every fighter is dead or gone: the fight is over (unless despawns are off).
+      if (BossManager.allFightersDown(server, fight.participants)) {
+         despawn(level, boss, fight, "every fighter has fallen!");
+         return;
+      }
 
       // 2) Arrival: she climbs out of the blood pool.
       if (fight.riseTicks > 0) {

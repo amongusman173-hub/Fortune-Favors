@@ -205,6 +205,8 @@ public final class DrownedSovereignManager {
    private static final int GLARE_COOLDOWN = 380;
 
    private static final int DEATH_CEREMONY_TICKS = 90;
+   /** Maelstrom: 15 seconds of a growing whirlpool before he can die. */
+   private static final int FINAL_TICKS = 300;
    /**
     * How long his body may be unfindable before the fight is called over - the same ten seconds,
     * for the same reason, as {@code EmeraldSovereignManager.MISSING_GRACE_TICKS}: a body in a chunk
@@ -289,6 +291,9 @@ public final class DrownedSovereignManager {
       double riseFloorY;
       boolean dying;
       int deathTicks;
+      /** Maelstrom, the last stand: ticks left, and whether it has already run. */
+      int finalTicks;
+      boolean finalDone;
       /** Where he stood when the killing blow landed - the body is put back here before it goes. */
       double deathFloorY;
       /** Consecutive ticks the body could not be found, and where it was last standing. */
@@ -660,6 +665,13 @@ public final class DrownedSovereignManager {
          return null;
       }
       ServerLevel level = (ServerLevel)boss.level();
+      if (fight.finalTicks > 0) {
+         return Boolean.FALSE;
+      }
+      if (!fight.finalDone) {
+         startMaelstrom(level, boss, fight);
+         return Boolean.FALSE;
+      }
       fight.dying = true;
       fight.deathTicks = DEATH_CEREMONY_TICKS;
       fight.deathFloorY = boss.getY();
@@ -709,6 +721,15 @@ public final class DrownedSovereignManager {
 
       if (fight.dying) {
          tickDeath(server, boss, fight);
+         return;
+      }
+      if (fight.finalTicks > 0) {
+         tickMaelstrom(level, boss, fight);
+         return;
+      }
+      // Every fighter is dead or gone: the fight is over (unless despawns are off).
+      if (BossManager.allFightersDown(server, fight.participants)) {
+         shutDown(server, fight);
          return;
       }
 
@@ -1946,6 +1967,93 @@ public final class DrownedSovereignManager {
     * the end, and the last tick is one burst - a flash, a starburst, a geyser the height of a
     * house and a shockwave across the arena - before the body goes.
     */
+   /**
+    * <b>Maelstrom</b>, his last stand. At what should be the killing blow he holds at one heart,
+    * cannot be hurt, and turns the sea around him into a whirlpool that starts as a swirl and grows
+    * for fifteen seconds. Everyone nearby is dragged slowly toward his eye, and the eye grinds
+    * whoever reaches it every half second, so the fight is running against the current. A player
+    * the whirlpool kills is replaced by a drowned wearing their name. When it ends he is exposed,
+    * and the next blow kills him.
+    */
+   private static void startMaelstrom(ServerLevel level, Mob boss, Fight fight) {
+      fight.finalTicks = FINAL_TICKS;
+      fight.pending.clear();
+      fight.strikes.clear();
+      boss.setHealth(1.0F);
+      boss.setInvulnerable(true);
+      boss.setNoAi(true);
+      boss.setDeltaMovement(Vec3.ZERO);
+      Fx.whirlpool(level, ParticleTypes.BUBBLE, boss.position(), 3.0, 20, TIDE);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.HOSTILE, 2.0F, 0.5F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.CONDUIT_ACTIVATE, SoundSource.HOSTILE, 2.0F, 0.4F);
+      announce(level, SAY + "\u00a77\u201c\u00a7fThen we all go down together.\u00a77\u201d");
+      announce(level, "\u00a73\u00a7lMAELSTROM \u00a78- \u00a77the sea turns. \u00a7fRun from the eye.");
+   }
+
+   private static void tickMaelstrom(ServerLevel level, Mob boss, Fight fight) {
+      int left = --fight.finalTicks;
+      double t = 1.0 - left / (double)FINAL_TICKS;
+      Vec3 eye = boss.position();
+      double radius = 3.0 + t * 15.0;
+      double core = 2.0 + t * 2.0;
+      boss.setDeltaMovement(Vec3.ZERO);
+      fight.bar.setProgress((float)(1.0 - t));
+      // Redrawn every half second, a little wider and denser each time: small swirl to maelstrom.
+      if (left % 10 == 0) {
+         Fx.whirlpool(level, ParticleTypes.SPLASH, eye, radius, 12, t > 0.6 ? ABYSS : TIDE);
+         Fx.vanillaOnly(() -> vDisc(level, eye, radius, ParticleTypes.BUBBLE, 0.05));
+         if (t > 0.3) {
+            Fx.whirlpool(level, ParticleTypes.BUBBLE, eye, radius * 0.55, 12, FOAM);
+         }
+         level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.BUBBLE_COLUMN_WHIRLPOOL_AMBIENT, SoundSource.HOSTILE, 1.4F + (float)t, 0.6F);
+      }
+      if (left % 40 == 0) {
+         Fx.tentacle(level, ParticleTypes.SPLASH, eye.add((RANDOM.nextDouble() - 0.5) * radius, 0.0, (RANDOM.nextDouble() - 0.5) * radius), 5.0 + t * 4.0, 30, TIDE);
+      }
+      for (ServerPlayer p : level.getPlayers(q -> q.isAlive() && !q.isSpectator() && !q.isCreative() && q.distanceToSqr(eye) < (radius + 2.0) * (radius + 2.0))) {
+         Vec3 in = eye.subtract(p.position());
+         double d = Math.sqrt(in.horizontalDistanceSqr());
+         if (d > 0.3) {
+            // A slow drag: walking away still works, standing still does not.
+            double pull = 0.025 + t * 0.035;
+            p.push(in.x / d * pull, 0.0, in.z / d * pull);
+            p.hurtMarked = true;
+         }
+         if (d < core && left % 10 == 0) {
+            p.invulnerableTime = 0;
+            p.hurtServer(level, level.damageSources().drown(), 3.0F + (float)t * 3.0F);
+            if (!p.isAlive()) {
+               drownedTakesPlace(level, p, fight);
+            }
+         }
+      }
+      if (left <= 0) {
+         fight.finalDone = true;
+         boss.setInvulnerable(false);
+         boss.setNoAi(false);
+         boss.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.GLOWING, 400, 0));
+         fight.bar.setProgress(0.02F);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, eye, Vec3.ZERO, 8.0, 0.0, FOAM);
+         level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.GENERIC_SPLASH, SoundSource.HOSTILE, 2.0F, 0.5F);
+         announce(level, "\u00a73The whirlpool collapses. \u00a7fThe Sovereign is exposed - finish him.");
+      }
+   }
+
+   /** A body the Maelstrom took: a drowned rises where they went under, wearing their name. */
+   private static void drownedTakesPlace(ServerLevel level, ServerPlayer victim, Fight fight) {
+      Mob d = (Mob)EntityTypes.DROWNED.create(level, EntitySpawnReason.MOB_SUMMONED);
+      if (d == null) {
+         return;
+      }
+      d.setPos(victim.getX(), victim.getY(), victim.getZ());
+      d.setCustomName(net.minecraft.network.chat.Component.literal("\u00a73Drowned " + victim.getName().getString()));
+      d.setCustomNameVisible(true);
+      d.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.TRIDENT));
+      level.addFreshEntity(d);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.BUBBLE, victim.position(), Vec3.ZERO, 3.0, 0.0, ABYSS);
+      announce(level, "\u00a73" + victim.getName().getString() + "\u00a77 went under. \u00a7fSomething else came back up.");
+   }
+
    private static void tickDeath(MinecraftServer server, Mob boss, Fight fight) {
       ServerLevel level = (ServerLevel)boss.level();
       fight.deathTicks--;

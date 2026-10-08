@@ -76,7 +76,7 @@ public final class PuppeteerGear {
 
    /** The Empty Mask's escape: how long it holds, and how long it takes to recharge. */
    private static final int ESCAPE_TICKS = 100;
-   private static final long EMPTY_MASK_COOLDOWN = 3600L;
+   private static final long EMPTY_MASK_COOLDOWN = 4000L;
    /** Health the mask leaves you on. It is a window, not a heal. */
    private static final float ESCAPE_HEALTH = 6.0F;
    /** How often hostile mobs re-consider whether they can see you at all. */

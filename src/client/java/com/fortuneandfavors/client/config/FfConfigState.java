@@ -25,6 +25,9 @@ public final class FfConfigState {
       public boolean swordBlockPose = true;
       public boolean goldenAppleFlash = true;
       public boolean deadeyeFlash = true;
+      public boolean realmSnow = true;
+      /** Custom VFX amount: 0 low, 1 medium, 2 high. */
+      public int vfxDensity = 2;
    }
 
    public static class ServerCategory {

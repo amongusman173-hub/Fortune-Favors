@@ -16,5 +16,6 @@
 	"tag.item.fortuneandfavors.ff_damage_weapons": "Melee Weapons",
 	"tag.item.fortuneandfavors.ff_impaling_weapons": "Impaling Weapons",
 	"tag.item.fortuneandfavors.ff_infinity_weapons": "Infinity Weapons",
-	"tag.item.fortuneandfavors.ff_breach_weapons": "Breach Weapons"
+	"tag.item.fortuneandfavors.ff_breach_weapons": "Breach Weapons",
+	"key.fortuneandfavors.settings": "Fortune & Favors Settings"
 }

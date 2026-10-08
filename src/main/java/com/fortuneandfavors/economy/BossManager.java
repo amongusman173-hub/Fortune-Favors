@@ -4632,7 +4632,8 @@ public final class BossManager {
                         double dx = mob.getX() - fromx[0];
                         double dz = mob.getZ() - fromx[1];
                         double len = Math.max(0.1, Math.sqrt(dx * dx + dz * dz));
-                        mob.setDeltaMovement(mob.getDeltaMovement().add(dx / len * 0.12, 0.0, dz / len * 0.12));
+                        // A steady flee, not a per-tick add: adding 0.12 every tick kept accelerating them.
+                        mob.setDeltaMovement(dx / len * 0.22, mob.getDeltaMovement().y, dz / len * 0.22);
                         if (mob.onGround() && mob.getDeltaMovement().horizontalDistanceSqr() > 0.01) {
                            mob.setSprinting(true);
                         }
@@ -5684,6 +5685,20 @@ public final class BossManager {
       }
    }
 
+   /** True when boss despawns are on and no fighter of this fight is alive and online. */
+   public static boolean allFightersDown(MinecraftServer server, java.util.Collection<UUID> fighters) {
+      if ("never".equals(ModConfig.bossDespawn()) || fighters.isEmpty()) {
+         return false;
+      }
+      for (UUID id : fighters) {
+         ServerPlayer p = server.getPlayerList().getPlayer(id);
+         if (p != null && p.isAlive()) {
+            return false;
+         }
+      }
+      return true;
+   }
+
    private static String despawnReason(MinecraftServer server, ActiveBoss b) {
       // A sealed boss realm must never outlive its fight. Once she has pulled
       // everyone in and nobody is left inside (a killing blow throws you out,
@@ -5705,22 +5720,12 @@ public final class BossManager {
       }
 
       ServerPlayer summoner = server.getPlayerList().getPlayer(b.summoner);
-      if (summoner != null && !summoner.isAlive()) {
-         if ("summoner".equals(mode)) {
-            return "its summoner has fallen!";
-         }
-
-         for (UUID id : b.participants) {
-            ServerPlayer p = server.getPlayerList().getPlayer(id);
-            if (p != null && p.isAlive()) {
-               return null;
-            }
-         }
-
-         return "every fighter has fallen!";
-      } else {
-         return null;
+      if ("summoner".equals(mode) && summoner != null && !summoner.isAlive()) {
+         return "its summoner has fallen!";
       }
+      java.util.Set<UUID> fighters = new java.util.HashSet<>(b.participants);
+      fighters.add(b.summoner);
+      return allFightersDown(server, fighters) ? "every fighter has fallen!" : null;
    }
 
    /** Makes sure the frozen realm actually has a floor. Called once at server

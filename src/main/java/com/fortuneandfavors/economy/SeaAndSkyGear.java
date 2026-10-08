@@ -83,13 +83,13 @@ public final class SeaAndSkyGear {
    private static final int GALE = 0xDDE8F0;
 
    /** How far the claw can reach to haul something in. */
-   private static final double GRASP_REACH = 9.0;
+   private static final double GRASP_REACH = 14.0;
    private static final double GRASP_PULL = 1.25;
    /** Inside this range Grasp becomes Crush - there is no point pulling a body that is already here. */
    private static final double CRUSH_RANGE = 3.4;
    private static final float CRUSH_DAMAGE = 13.0F;
    private static final double CRUSH_SLAM = -1.15;
-   private static final long GRASP_COOLDOWN_TICKS = 30L;
+   private static final long GRASP_COOLDOWN_TICKS = 140L;
    /**
     * The passive: knockback grows as the target's health falls.
     *
@@ -222,6 +222,39 @@ public final class SeaAndSkyGear {
    private static final Map<UUID, Integer> SPRINT_TICKS = new HashMap<>();
    private static final Map<UUID, Long> TAILWIND_UNTIL = new HashMap<>();
    private static final Map<UUID, Long> SECOND_WIND_UNTIL = new HashMap<>();
+   private static final List<Grip> GRIPS = new java.util.ArrayList<>();
+   private static final List<Grip> SURGES = new java.util.ArrayList<>();
+   private static final Map<UUID, Map<UUID, Integer>> PRESSURE = new HashMap<>();
+   private static final Map<UUID, Integer> GALE_CHARGE = new HashMap<>();
+   private static final int GRIP_TICKS = 40;
+   private static final float GRIP_SQUEEZE = 2.0F;
+   private static final long DEPTHS_COOLDOWN_TICKS = 240L;
+   private static final double DEPTHS_RADIUS = 5.0;
+   private static final float DEPTHS_DAMAGE = 9.0F;
+   private static final long SURGE_COOLDOWN_TICKS = 120L;
+   private static final double SURGE_POWER = 1.7;
+   private static final int SURGE_TICKS = 10;
+   private static final float SURGE_DAMAGE = 6.0F;
+   private static final int EYE_TICKS = 60;
+   private static final int SAW_TICKS = 40;
+
+   /** A held body (Leviathan's Maw), or a Riptide Surge in flight (target null, anchor = heading). */
+   private static final class Grip {
+      final UUID owner;
+      final UUID target;
+      final ServerLevel level;
+      final Vec3 anchor;
+      final Set<UUID> hit = new HashSet<>();
+      int ticks;
+
+      Grip(UUID owner, UUID target, ServerLevel level, Vec3 anchor, int ticks) {
+         this.owner = owner;
+         this.target = target;
+         this.level = level;
+         this.anchor = anchor;
+         this.ticks = ticks;
+      }
+   }
 
    /** One rolling wave: a point that walks forward and pays whatever it overlaps. */
    private static final class Wave {
@@ -269,6 +302,8 @@ public final class SeaAndSkyGear {
       final ServerLevel level;
       Vec3 forward;
       final boolean cyclone;
+      /** Sawstorm: ticks left grinding at the far end before the return. */
+      int hover;
       final Set<UUID> hit = new HashSet<>();
       Vec3 at;
       double travelled;
@@ -316,90 +351,126 @@ public final class SeaAndSkyGear {
          return null;
       }
       if (player.isShiftKeyDown()) {
-         return openVortex(player, level);
+         if (cooldown(player, "depths", DEPTHS_COOLDOWN_TICKS)) {
+            return null;
+         }
+         depthCharge(level, player);
+         return null;
       }
-      LivingEntity target = pickTarget(player, level, GRASP_REACH);
+      LivingEntity target = rayTarget(player, level, GRASP_REACH);
       if (target == null) {
-         bar(player, "&7Nothing in reach to grasp &8- &7get closer.");
+         bar(player, "&7Nothing in your sights &8- &7look at a body.");
          return null;
       }
       if (cooldown(player, "grasp", GRASP_COOLDOWN_TICKS)) {
          return null;
       }
-      double distance = Math.sqrt(player.distanceToSqr(target));
-      if (distance <= CRUSH_RANGE) {
-         crush(level, player, target);
-      } else {
-         grasp(level, player, target);
-      }
+      seize(level, player, target);
       return null;
    }
 
-   /** The haul: a body pulled off its feet and toward the claw. */
-   private static void grasp(ServerLevel level, ServerPlayer player, LivingEntity target) {
-      Vec3 toward = player.position().subtract(target.position()).normalize();
-      double heft = heft(target);
-      target.setDeltaMovement(toward.x * GRASP_PULL * heft, 0.34 * heft, toward.z * GRASP_PULL * heft);
-      target.hurtMarked = true;
-      target.hurtServer(level, level.damageSources().playerAttack(player), 4.5F);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.DRIPPING_WATER, target.position().add(0.0, 1.0, 0.0), player.getEyePosition(), 0.0, 0.0, TIDE);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.BUBBLE_POP, target.position().add(0.0, 0.35, 0.0), Vec3.ZERO, 1.5, 0.0, FOAM);
-      level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.TRIDENT_THROW, SoundSource.PLAYERS, 0.9F, 0.7F);
-      bar(player, "&3Grasp &8- &7hauled in &f" + target.getName().getString() + "&7.");
+   /**
+    * <b>Leviathan's Maw.</b> A tentacle of seawater erupts under the target and holds it two
+    * blocks up for two seconds, wringing it every half second, then slams it into the floor.
+    * Heavy bodies (bosses) are wrung but not lifted.
+    */
+   private static void seize(ServerLevel level, ServerPlayer player, LivingEntity target) {
+      Vec3 floor = target.position();
+      GRIPS.add(new Grip(player.getUUID(), target.getUUID(), level, floor.add(0.0, heft(target) >= 0.5 ? 2.0 : 0.0, 0.0), GRIP_TICKS));
+      Fx.tentacle(level, ParticleTypes.SPLASH, floor, 3.5, GRIP_TICKS, TIDE);
+      Fx.whirlpool(level, ParticleTypes.BUBBLE, floor.add(0.0, 0.05, 0.0), 2.2, GRIP_TICKS, ABYSS);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, floor, Vec3.ZERO, 3.0, 0.0, FOAM);
+      level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.ELDER_GUARDIAN_HURT, SoundSource.PLAYERS, 1.0F, 0.6F);
+      level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.GENERIC_SPLASH, SoundSource.PLAYERS, 1.2F, 0.7F);
+      bar(player, "&3Leviathan's Maw &8- &7it has &f" + target.getName().getString() + "&7.");
    }
 
-   /** The Crush: a body already inside the claw's reach is driven into the floor instead. */
-   private static void crush(ServerLevel level, ServerPlayer player, LivingEntity target) {
-      target.hurtServer(level, level.damageSources().playerAttack(player), CRUSH_DAMAGE);
-      target.setDeltaMovement(target.getDeltaMovement().x * 0.2, CRUSH_SLAM, target.getDeltaMovement().z * 0.2);
-      target.hurtMarked = true;
-      // The claw closes and the floor answers with a column of water.
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, target.position(), Vec3.ZERO, 3.5, 0.0, TIDE);
-      Fx.shockwave(level, ParticleTypes.SPLASH, target.position(), 2.8, FOAM);
-      level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.PLAYERS, 1.2F, 0.85F);
-      bar(player, "&3Crush &8- &f" + target.getName().getString() + "&7 met the floor.");
+   private static void tickGrips(MinecraftServer server) {
+      for (Iterator<Grip> it = GRIPS.iterator(); it.hasNext();) {
+         Grip g = it.next();
+         ServerPlayer owner = server.getPlayerList().getPlayer(g.owner);
+         if (!(g.level.getEntity(g.target) instanceof LivingEntity target) || !target.isAlive() || owner == null) {
+            it.remove();
+            continue;
+         }
+         g.ticks--;
+         if (g.ticks > 0) {
+            if (heft(target) >= 0.5) {
+               Vec3 to = g.anchor.subtract(target.position());
+               target.setDeltaMovement(to.scale(0.35));
+               target.fallDistance = 0.0F;
+               target.hurtMarked = true;
+            }
+            if (g.ticks % 10 == 0) {
+               target.invulnerableTime = 0;
+               target.hurtServer(g.level, g.level.damageSources().playerAttack(owner), GRIP_SQUEEZE);
+               Fx.shape(g.level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.BUBBLE_POP, target.position().add(0.0, target.getBbHeight() * 0.5, 0.0), Vec3.ZERO, 1.2, 0.0, FOAM);
+               g.level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_HURT_DROWN, SoundSource.PLAYERS, 0.8F, 0.8F);
+            }
+            continue;
+         }
+         it.remove();
+         target.invulnerableTime = 0;
+         target.hurtServer(g.level, g.level.damageSources().playerAttack(owner), CRUSH_DAMAGE);
+         target.setDeltaMovement(0.0, CRUSH_SLAM, 0.0);
+         target.hurtMarked = true;
+         Vec3 floor = new Vec3(target.getX(), g.anchor.y - (heft(target) >= 0.5 ? 2.0 : 0.0), target.getZ());
+         Fx.shockwave(g.level, ParticleTypes.SPLASH, floor, 3.5, TIDE);
+         Fx.shape(g.level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, floor, Vec3.ZERO, 4.0, 0.0, FOAM);
+         Fx.pulseWave(g.level, ParticleTypes.SPLASH, floor, 4.0, 10, TIDE);
+         g.level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.PLAYERS, 1.3F, 0.8F);
+         bar(owner, "&3Crush &8- &f" + target.getName().getString() + "&7 met the seabed.");
+      }
    }
 
-   /** A landed Grasp blow: the passive, and the jump-strike slam. */
+   /** <b>Depth Charge</b>: four tentacles burst up round you and throw everything close into the air. */
+   private static void depthCharge(ServerLevel level, ServerPlayer player) {
+      Vec3 at = player.position();
+      for (int i = 0; i < 4; i++) {
+         double a = i * Math.PI / 2.0 + player.getYRot() * Math.PI / 180.0;
+         Fx.tentacle(level, ParticleTypes.SPLASH, at.add(Math.cos(a) * 3.0, 0.0, Math.sin(a) * 3.0), 4.5, 24, i % 2 == 0 ? TIDE : ABYSS);
+      }
+      Fx.whirlpool(level, ParticleTypes.BUBBLE, at.add(0.0, 0.05, 0.0), DEPTHS_RADIUS, 24, TIDE);
+      Fx.pulseWave(level, ParticleTypes.SPLASH, at, DEPTHS_RADIUS + 1.0, 12, FOAM);
+      int hits = 0;
+      for (LivingEntity e : enemiesNear(player, level, at, DEPTHS_RADIUS)) {
+         if (e.distanceToSqr(at) > DEPTHS_RADIUS * DEPTHS_RADIUS) {
+            continue;
+         }
+         e.hurtServer(level, level.damageSources().playerAttack(player), DEPTHS_DAMAGE);
+         Vec3 away = flatAway(at, e);
+         e.setDeltaMovement(away.x * 0.6 * heft(e), 0.9 * heft(e), away.z * 0.6 * heft(e));
+         e.hurtMarked = true;
+         hits++;
+      }
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.ELDER_GUARDIAN_CURSE, SoundSource.PLAYERS, 0.8F, 1.2F);
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.GENERIC_SPLASH, SoundSource.PLAYERS, 1.5F, 0.6F);
+      bar(player, "&3Depth Charge &8- &7the sea threw &f" + hits + "&7.");
+   }
+
+   /** Every third hit on the same body calls a geyser under it and drags it to you. */
    public static void onGraspHit(ServerPlayer hitter, LivingEntity victim) {
       ServerLevel level = levelOf(hitter);
       if (level == null) {
          return;
       }
-      if (!hitter.onGround() && hitter.getDeltaMovement().y < 0.0) {
-         // Depth Breaker: a blow landed out of the air comes down with a water shockwave.
-         victim.hurtServer(level, level.damageSources().playerAttack(hitter), 8.0F);
-         victim.setDeltaMovement(0.0, CRUSH_SLAM, 0.0);
-         victim.hurtMarked = true;
-         Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.SPLASH, victim.position().add(0.0, 0.2, 0.0), Vec3.ZERO, 4.4, 0.0, TIDE);
-         Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, victim.position(), Vec3.ZERO, 4.0, 0.0, FOAM);
-         level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.PLAYERS, 1.3F, 0.7F);
-         bar(hitter, "&3Depth Breaker &8- &7the drop did the rest.");
+      int n = PRESSURE.computeIfAbsent(hitter.getUUID(), k -> new HashMap<>()).merge(victim.getUUID(), 1, Integer::sum);
+      Fx.halo(level, ParticleTypes.BUBBLE, victim.position().add(0.0, victim.getBbHeight() + 0.3, 0.0), 0.3 + n * 0.15, 20, TIDE);
+      if (n < 3) {
          return;
       }
-      // The passive drags the target *in*, and drags harder the closer it is to death.
-      //
-      // It threw them away instead, and that was the one thing the weapon could not afford: the
-      // Grasp is a claw whose whole kit is closing distance - the haul, the crush, the vortex at
-      // your feet - so a passive that paid the player in distance fought every other move it had.
-      // A body the claw has been beating on is a body the sea is already pulling under.
+      PRESSURE.get(hitter.getUUID()).remove(victim.getUUID());
+      victim.invulnerableTime = 0;
+      victim.hurtServer(level, level.damageSources().playerAttack(hitter), 6.0F);
       double drag = graspDrag(victim.getHealth(), victim.getMaxHealth());
-      Vec3 toward = hitter.position().subtract(victim.position());
-      if (toward.lengthSqr() < 1.0E-4) {
-         toward = hitter.getLookAngle().scale(-1.0);
-      }
-      Vec3 flat = new Vec3(toward.x, 0.0, toward.z).normalize();
-      victim.push(flat.x * drag, 0.2, flat.z * drag);
+      Vec3 flat = flatAway(victim.position(), hitter).scale(-1.0);
+      victim.push(-flat.x * drag, 0.5, -flat.z * drag);
       victim.hurtMarked = true;
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, victim.position(), Vec3.ZERO, 3.5, 0.0, FOAM);
+      level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.PLAYERS, 1.2F, 0.8F);
+      bar(hitter, "&3Pressure &8- &7the deep pulls it under.");
    }
 
-   /**
-    * The Grasp's passive, as a pure function of how hurt the target is.
-    *
-    * <p>Kept public and side-effect free so the self-test can assert the shape rather than a number
-    * someone read off one fight: full health is the floor, empty is the ceiling, and it is monotone
-    * between them. The magnitude is a pull toward the bearer - see {@link #onGraspHit}.
-    */
    public static double graspDrag(float health, float maxHealth) {
       if (maxHealth <= 0.0F) {
          return GRASP_DRAG_AT_FULL;
@@ -424,6 +495,13 @@ public final class SeaAndSkyGear {
       if (level == null) {
          return null;
       }
+      if (player.isShiftKeyDown()) {
+         if (cooldown(player, "surge", SURGE_COOLDOWN_TICKS)) {
+            return null;
+         }
+         riptideSurge(level, player);
+         return null;
+      }
       if (cooldown(player, "wave", WAVE_COOLDOWN_TICKS)) {
          return null;
       }
@@ -440,6 +518,54 @@ public final class SeaAndSkyGear {
    // ---------------------------------------------------------------- the sea: Abyssal Chain
 
    /** Right-click the Chain: pull a body in, pull yourself to a wall, or open a vortex. */
+   /**
+    * <b>Riptide Surge</b> (sneak): you ride a breaking wave forward. Anything you pass through is
+    * bowled aside and hurt once, and the wave breaks where you stop.
+    */
+   private static void riptideSurge(ServerLevel level, ServerPlayer player) {
+      Vec3 look = flatLook(player);
+      player.setDeltaMovement(look.x * SURGE_POWER, 0.35, look.z * SURGE_POWER);
+      player.hurtMarked = true;
+      player.fallDistance = 0.0F;
+      SURGES.add(new Grip(player.getUUID(), null, level, look, SURGE_TICKS));
+      Fx.tideWave(level, ParticleTypes.SPLASH, player.position(), look, 9.0, SURGE_TICKS, TIDE);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, player.position(), Vec3.ZERO, 2.0, 0.0, FOAM);
+      level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIDENT_RIPTIDE_3, SoundSource.PLAYERS, 1.3F, 1.0F);
+      bar(player, "&3Riptide Surge &8- &7ride it.");
+   }
+
+   private static void tickSurges(MinecraftServer server) {
+      for (Iterator<Grip> it = SURGES.iterator(); it.hasNext();) {
+         Grip g = it.next();
+         ServerPlayer owner = server.getPlayerList().getPlayer(g.owner);
+         if (owner == null || !owner.isAlive() || owner.level() != g.level) {
+            it.remove();
+            continue;
+         }
+         owner.fallDistance = 0.0F;
+         Fx.vanilla(g.level, ParticleTypes.SPLASH, owner.getX(), owner.getY() + 0.2, owner.getZ(), 6, 0.4, 0.1, 0.4, 0.1);
+         if (owner.tickCount % 2 == 0) {
+            Fx.shape(g.level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.BUBBLE_POP, owner.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.4, 0.0, FOAM);
+         }
+         for (LivingEntity e : enemiesNear(owner, g.level, owner.position(), 2.2)) {
+            if (!g.hit.add(e.getUUID())) {
+               continue;
+            }
+            e.hurtServer(g.level, g.level.damageSources().playerAttack(owner), SURGE_DAMAGE);
+            Vec3 side = new Vec3(-g.anchor.z, 0.0, g.anchor.x);
+            double sign = side.dot(e.position().subtract(owner.position())) >= 0.0 ? 1.0 : -1.0;
+            e.push(side.x * sign * 0.9, 0.45, side.z * sign * 0.9);
+            e.hurtMarked = true;
+         }
+         if (--g.ticks <= 0) {
+            it.remove();
+            Fx.shockwave(g.level, ParticleTypes.SPLASH, owner.position(), 3.0, TIDE);
+            Fx.shape(g.level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, owner.position(), Vec3.ZERO, 3.0, 0.0, FOAM);
+            g.level.playSound(null, owner.getX(), owner.getY(), owner.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.PLAYERS, 1.2F, 0.9F);
+         }
+      }
+   }
+
    public static String useChain(ServerPlayer player, ItemStack held) {
       ServerLevel level = levelOf(player);
       if (level == null) {
@@ -451,7 +577,8 @@ public final class SeaAndSkyGear {
       if (cooldown(player, "chain", CHAIN_COOLDOWN_TICKS)) {
          return null;
       }
-      LivingEntity target = pickTarget(player, level, CHAIN_REACH);
+      // One ray: a body in the crosshair before any block is pulled; otherwise the block hooks you.
+      LivingEntity target = rayTarget(player, level, CHAIN_REACH);
       if (target != null) {
          chainPull(level, player, target);
          return null;
@@ -567,14 +694,17 @@ public final class SeaAndSkyGear {
          if (cooldown(player, "break", BREAK_COOLDOWN_TICKS)) {
             return null;
          }
-         player.setDeltaMovement(player.getDeltaMovement().x, BREAK_LEAP, player.getDeltaMovement().z);
+         // Eye of the Storm: you hang in the air at the centre of a storm that cuts at everything
+         // around you, then drops you gently.
+         player.setDeltaMovement(player.getDeltaMovement().x * 0.2, 0.6, player.getDeltaMovement().z * 0.2);
          player.hurtMarked = true;
          player.fallDistance = 0.0F;
-         SLAMS.add(new SkySlam(player.getUUID(), level, BREAK_FALL_TICKS));
-         Fx.gust(level, ParticleTypes.GUST, player.position(), new Vec3(0.0, 1.0, 0.0), 6.0, GALE);
-         Fx.vanillaOnly(() -> BossVfx.at(level, player.position(), 0.0, ParticleTypes.GUST, 18, 0.5, 0.3, 0.5, 0.12));
-         level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_JUMP, SoundSource.PLAYERS, 1.3F, 0.9F);
-         bar(player, "&fBreak the Sky &8- &7come down on all of it.");
+         SLAMS.add(new SkySlam(player.getUUID(), level, EYE_TICKS));
+         Fx.stormCell(level, ParticleTypes.ELECTRIC_SPARK, player.position(), 6.0, EYE_TICKS, GALE);
+         Fx.featherStorm(level, ParticleTypes.GUST, player.position().add(0.0, 1.0, 0.0), 5.0, EYE_TICKS, 0xFFFFFF);
+         level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_JUMP, SoundSource.PLAYERS, 1.3F, 0.7F);
+         level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIDENT_THUNDER, SoundSource.PLAYERS, 0.8F, 1.4F);
+         bar(player, "&fEye of the Storm &8- &7everything near you is in the wind now.");
          return null;
       }
       if (cooldown(player, "slash", SLASH_COOLDOWN_TICKS)) {
@@ -587,7 +717,6 @@ public final class SeaAndSkyGear {
    private static void windSlash(ServerLevel level, ServerPlayer player) {
       Vec3 look = flatLook(player);
       Vec3 side = new Vec3(-look.z, 0.0, look.x);
-      Vec3 eye = player.getEyePosition();
       int hits = 0;
       for (LivingEntity e : enemiesNear(player, level, player.position().add(0.0, 1.0, 0.0), SLASH_REACH)) {
          Vec3 offset = e.position().subtract(player.position());
@@ -602,49 +731,49 @@ public final class SeaAndSkyGear {
          e.hurtServer(level, level.damageSources().playerAttack(player), SLASH_DAMAGE);
          e.push(look.x * SLASH_LAUNCH, UPDRAFT_VICTIM, look.z * SLASH_LAUNCH);
          e.hurtMarked = true;
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, e.position().add(0.0, e.getBbHeight() * 0.6, 0.0), look, 0.0, 0.0, GALE);
          hits++;
       }
-      // One crescent of wind down the whole line, edged on both sides. The old blade was drawn as
-      // seventy-two separate particle calls, every swing.
-      Fx.crescent(level, ParticleTypes.SWEEP_ATTACK, player.position(), look, SLASH_REACH, GALE);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.GUST, eye.add(side.scale(SLASH_HALF_WIDTH)), eye.add(look.scale(SLASH_REACH)).add(side.scale(SLASH_HALF_WIDTH)), 0.0, 0.0, GALE);
-      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.GUST, eye.subtract(side.scale(SLASH_HALF_WIDTH)), eye.add(look.scale(SLASH_REACH)).subtract(side.scale(SLASH_HALF_WIDTH)), 0.0, 0.0, GALE);
+      // The slash travels: three crescents laid down the line, widening, then a burst of wind
+      // where it runs out.
+      Vec3 base = player.position().add(0.0, 0.9, 0.0);
+      for (int i = 0; i < 3; i++) {
+         Fx.crescent(level, ParticleTypes.SWEEP_ATTACK, base.add(look.scale(i * SLASH_REACH / 3.0)), look, 3.0 + i * 1.2, i == 1 ? 0xFFFFFF : GALE);
+      }
+      Fx.gust(level, ParticleTypes.GUST, base, look, SLASH_REACH, GALE);
+      Fx.pulseWave(level, ParticleTypes.GUST, player.position().add(look.scale(SLASH_REACH)), 2.5, 8, 0xFFFFFF);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_SHOOT, SoundSource.PLAYERS, 1.2F, 1.15F);
+      level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 1.0F, 0.7F);
       bar(player, hits == 0 ? "&7Wind Slash &8- &7it found nothing." : "&fWind Slash &8- &7caught &f" + hits + "&7.");
    }
 
-   /** A landed Skybreaker blow: Momentum, Updraft, and Downforce on an airborne body. */
+   /** Every fourth hit lets the stored wind go: a cyclone bursts off the target. */
    public static void onSkybreakerHit(ServerPlayer hitter, LivingEntity victim) {
       ServerLevel level = levelOf(hitter);
       if (level == null) {
          return;
       }
-      float bonus = momentumBonus(horizontalSpeed(hitter));
-      if (bonus > 0.0F) {
-         victim.hurtServer(level, level.damageSources().playerAttack(hitter), bonus);
-      }
-      if (!victim.onGround()) {
-         // Downforce: a body already in the air is driven into the ground instead of lifted.
-         victim.hurtServer(level, level.damageSources().playerAttack(hitter), DOWNFORCE_DAMAGE);
-         victim.setDeltaMovement(victim.getDeltaMovement().x * 0.3, DOWNFORCE_SLAM, victim.getDeltaMovement().z * 0.3);
-         victim.hurtMarked = true;
-         Fx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.GUST, victim.position().add(0.0, 0.3, 0.0), Vec3.ZERO, 3.2, 0.0, GALE);
-         level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.BREEZE_LAND, SoundSource.PLAYERS, 1.2F, 0.8F);
-         bar(hitter, "&fDownforce &8- &7back to the floor.");
+      int charge = GALE_CHARGE.merge(hitter.getUUID(), 1, Integer::sum);
+      if (charge < 4) {
+         Fx.halo(level, ParticleTypes.GUST, hitter.position().add(0.0, 0.2, 0.0), 0.5 + charge * 0.25, 30, GALE);
          return;
       }
-      victim.push(0.0, UPDRAFT_VICTIM, 0.0);
-      hitter.push(0.0, UPDRAFT_SELF, 0.0);
-      victim.hurtMarked = true;
-      hitter.hurtMarked = true;
+      GALE_CHARGE.remove(hitter.getUUID());
+      Vec3 at = victim.position();
+      for (LivingEntity e : enemiesNear(hitter, level, at, 4.0)) {
+         e.invulnerableTime = 0;
+         e.hurtServer(level, level.damageSources().playerAttack(hitter), DOWNFORCE_DAMAGE);
+         Vec3 away = flatAway(at, e);
+         e.push(away.x * 1.1, 0.55, away.z * 1.1);
+         e.hurtMarked = true;
+      }
+      Fx.featherStorm(level, ParticleTypes.GUST, at.add(0.0, 1.0, 0.0), 3.5, 20, 0xFFFFFF);
+      Fx.pulseWave(level, ParticleTypes.GUST, at, 4.5, 10, GALE);
+      Fx.helix(level, ParticleTypes.CLOUD, at, 4.0, 20, GALE);
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.PLAYERS, 1.4F, 0.9F);
+      bar(hitter, "&fCyclone &8- &7the wind you stored let go.");
    }
 
-   /**
-    * Momentum, as a pure function of how fast the wielder was already moving.
-    *
-    * <p>Horizontal speed only: falling is not momentum, and a weapon that paid for its own gravity
-    * would pay best for standing on a cliff.
-    */
    public static float momentumBonus(double horizontalSpeed) {
       double t = Math.max(0.0, Math.min(1.0, horizontalSpeed / MOMENTUM_FULL_SPEED));
       return (float)(t * MOMENTUM_MAX_BONUS);
@@ -666,25 +795,18 @@ public final class SeaAndSkyGear {
       if (cooldown(player, "chakram", CHAKRAM_COOLDOWN_TICKS)) {
          return null;
       }
-      boolean cyclone = RANDOM.nextFloat() < CYCLONE_CHANCE;
-      Chakram thrown = new Chakram(player.getUUID(), level, player.getEyePosition(), flatLook(player), cyclone);
+      // Sneak-throw: Sawstorm - it parks at the end of its flight and grinds before coming home.
+      boolean saw = player.isShiftKeyDown();
+      Chakram thrown = new Chakram(player.getUUID(), level, player.getEyePosition(), flatLook(player), false);
+      thrown.hover = saw ? SAW_TICKS : 0;
       thrown.display = spawnChakramBody(level, thrown.at);
       CHAKRAMS.add(thrown);
+      Fx.crescent(level, ParticleTypes.SWEEP_ATTACK, player.getEyePosition(), flatLook(player), 2.5, 0xFFFFFF);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_WHIRL, SoundSource.PLAYERS, 1.1F, 1.3F);
-      if (cyclone) {
-         bar(player, "&fCyclone Return &8- &7it is not coming straight home.");
-      } else {
-         bar(player, player.isShiftKeyDown() ? "&fWindcurve &8- &7thrown wide." : "&fChakram out &8- &7it comes back.");
-      }
+      bar(player, saw ? "&fSawstorm &8- &7it holds the far end." : "&fChakram out &8- &7catch it on the way back.");
       return null;
    }
 
-   /**
-    * Razor Current: the knockback of a hit, by how many it is in a row on the same body.
-    *
-    * <p>Pure so the ramp can be asserted instead of described - it rises with every consecutive hit
-    * and it has a ceiling, which is the difference between a combo and a launch pad.
-    */
    public static double razorPush(int consecutiveHits) {
       int n = Math.max(1, consecutiveHits);
       return Math.min(RAZOR_MAX, CHAKRAM_PUSH + RAZOR_STEP * (n - 1));
@@ -714,6 +836,14 @@ public final class SeaAndSkyGear {
       player.hurtMarked = true;
       if (player.level() instanceof ServerLevel level) {
          Fx.vanillaOnly(() -> BossVfx.ring(level, player.position().add(0.0, 0.4, 0.0), 4.0, 30, ParticleTypes.GUST, 0.0));
+         // Second Wind throws back everything close as it lifts you.
+         Fx.featherStorm(level, ParticleTypes.GUST, player.position().add(0.0, 1.0, 0.0), 4.0, 24, 0xFFFFFF);
+         Fx.pulseWave(level, ParticleTypes.GUST, player.position(), 5.0, 10, GALE);
+         for (LivingEntity e : enemiesNear(player, level, player.position(), 5.0)) {
+            Vec3 away = flatAway(player.position(), e);
+            e.push(away.x * 1.2, 0.5, away.z * 1.2);
+            e.hurtMarked = true;
+         }
          Fx.vanillaOnly(() -> BossVfx.at(level, player.position(), 0.0, ParticleTypes.GUST_EMITTER_SMALL, 4, 1.2, 0.6, 1.2, 0.0));
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.PLAYERS, 1.6F, 1.0F);
       }
@@ -740,6 +870,8 @@ public final class SeaAndSkyGear {
       tickVortexes();
       tickChakrams(server);
       tickSlams(server);
+      tickGrips(server);
+      tickSurges(server);
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
          Safe.run("sea and sky mantle tick", () -> tickMantle(p));
       }
@@ -793,6 +925,9 @@ public final class SeaAndSkyGear {
             player.setDeltaMovement(player.getDeltaMovement().x, MANTLE_UPDRAFT, player.getDeltaMovement().z);
             player.hurtMarked = true;
             if (player.level() instanceof ServerLevel level) {
+               // A cloud step under your feet.
+               Fx.pulseWave(level, ParticleTypes.CLOUD, player.position(), 2.0, 8, 0xFFFFFF);
+               Fx.gust(level, ParticleTypes.GUST, player.position(), new Vec3(0.0, 1.0, 0.0), 3.0, GALE);
                Fx.vanillaOnly(() -> BossVfx.at(level, player.position(), 0.0, ParticleTypes.GUST, 14, 0.4, 0.5, 0.4, 0.1));
                level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_CHARGE, SoundSource.PLAYERS, 0.9F, 1.4F);
             }
@@ -811,6 +946,9 @@ public final class SeaAndSkyGear {
       }
       if (now < TAILWIND_UNTIL.getOrDefault(id, 0L)) {
          player.addEffect(new MobEffectInstance(MobEffects.SPEED, 12, TAILWIND_AMPLIFIER, false, false));
+         if (player.tickCount % 6 == 0 && player.level() instanceof ServerLevel level && horizontalSpeed(player) > 0.1) {
+            Fx.gust(level, ParticleTypes.CLOUD, player.position().add(0.0, 0.2, 0.0), flatLook(player).scale(-1.0), 1.5, 0xFFFFFF);
+         }
       }
    }
 
@@ -827,6 +965,14 @@ public final class SeaAndSkyGear {
       player.setDeltaMovement(look.x * WINDSTEP_POWER, Math.max(0.18, player.getDeltaMovement().y), look.z * WINDSTEP_POWER);
       player.hurtMarked = true;
       if (player.level() instanceof ServerLevel level) {
+         // The step cuts: anything in the four blocks ahead is clipped by the wind you leave.
+         for (LivingEntity e : enemiesNear(player, level, player.position().add(look.scale(2.0)), 2.2)) {
+            e.hurtServer(level, level.damageSources().playerAttack(player), 4.0F);
+            e.push(look.x * 0.5, 0.3, look.z * 0.5);
+            e.hurtMarked = true;
+         }
+         Fx.gust(level, ParticleTypes.GUST, player.position().add(0.0, 0.8, 0.0), look, 5.0, GALE);
+         Fx.crescent(level, ParticleTypes.SWEEP_ATTACK, player.position().add(0.0, 0.8, 0.0), look, 3.0, 0xFFFFFF);
          Fx.vanillaOnly(() -> BossVfx.beam(level, player.position(), player.position().add(look.scale(3.0)), 0.2, ParticleTypes.CLOUD));
          Fx.vanillaOnly(() -> BossVfx.at(level, player.position(), 0.0, ParticleTypes.SMALL_GUST, 16, 0.5, 0.2, 0.5, 0.08));
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_SLIDE, SoundSource.PLAYERS, 1.0F, 1.2F);
@@ -956,6 +1102,10 @@ public final class SeaAndSkyGear {
                      Fx.vanillaOnly(() -> BossVfx.at(chakram.level, owner.position(), 0.0, ParticleTypes.GUST, 14, 0.4, 0.4, 0.4, 0.1));
                   }
                   Fx.vanillaOnly(() -> BossVfx.at(chakram.level, chakram.at, 0.0, ParticleTypes.CLOUD, 10, 0.3, 0.3, 0.3, 0.02));
+                  // A clean catch: the throw is ready again almost at once.
+                  setCooldown(owner.getUUID(), "chakram", ServerClock.clock(owner.level()) + 6L);
+                  Fx.flare(chakram.level, ParticleTypes.END_ROD, chakram.at, 0.8, 0xFFFFFF);
+                  chakram.level.playSound(null, owner.getX(), owner.getY(), owner.getZ(), SoundEvents.TRIDENT_RETURN, SoundSource.PLAYERS, 1.0F, 1.3F);
                   discardChakramBody(chakram);
                   it.remove();
                   continue;
@@ -974,8 +1124,25 @@ public final class SeaAndSkyGear {
             }
             chakram.travelled += CHAKRAM_SPEED;
             if (chakram.travelled >= CHAKRAM_REACH) {
-               chakram.returning = true;
-               chakram.hit.clear();
+               chakram.travelled = CHAKRAM_REACH;
+               if (chakram.hover > 0) {
+                  // Parked: it grinds in place, pulling bodies in and cutting again every 8 ticks.
+                  chakram.at = chakram.at.subtract(chakram.forward.scale(CHAKRAM_SPEED)).subtract(side.scale(bend));
+                  chakram.hover--;
+                  if (chakram.hover % 8 == 0) {
+                     chakram.hit.clear();
+                     Fx.pulseWave(chakram.level, ParticleTypes.GUST, chakram.at.subtract(0.0, 0.8, 0.0), 3.5, 8, GALE);
+                     chakram.level.playSound(null, chakram.at.x, chakram.at.y, chakram.at.z, SoundEvents.BREEZE_WHIRL, SoundSource.PLAYERS, 0.9F, 1.6F);
+                  }
+                  for (LivingEntity e : enemiesNear(owner, chakram.level, chakram.at, 3.5)) {
+                     Vec3 in = chakram.at.subtract(e.position());
+                     e.push(in.x * 0.04, 0.0, in.z * 0.04);
+                     e.hurtMarked = true;
+                  }
+               } else {
+                  chakram.returning = true;
+                  chakram.hit.clear();
+               }
             }
          }
          moveChakramBody(chakram);
@@ -1044,6 +1211,8 @@ public final class SeaAndSkyGear {
    }
 
    private static void drawChakram(Chakram chakram) {
+      // Modded clients: a spinning white halo with a gale-coloured ring of motes trailing it.
+      Fx.halo(chakram.level, ParticleTypes.CLOUD, chakram.at, 0.75, 2, chakram.returning ? 0xFFFFFF : GALE);
       int points = 14;
       for (int i = 0; i < points; i++) {
          double a = i * (Math.PI * 2.0 / points);
@@ -1079,6 +1248,7 @@ public final class SeaAndSkyGear {
          e.push(away.x * push, 0.3, away.z * push);
          e.hurtMarked = true;
          Fx.vanillaOnly(() -> BossVfx.at(chakram.level, chakram.at, 0.0, ParticleTypes.GUST, 10, 0.4, 0.4, 0.4, 0.1));
+         Fx.shape(chakram.level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, e.position().add(0.0, e.getBbHeight() * 0.6, 0.0), chakram.forward, 0.0, 0.0, GALE);
          chakram.level.playSound(null, e.getX(), e.getY(), e.getZ(), SoundEvents.BREEZE_DEFLECT, SoundSource.PLAYERS, 1.0F, 1.2F);
          if (streak >= 2) {
             bar(owner, "&fRazor Current &8x&f" + streak + " &8- &7it is going further each time.");
@@ -1087,43 +1257,49 @@ public final class SeaAndSkyGear {
    }
 
    private static void tickSlams(MinecraftServer server) {
-      if (SLAMS.isEmpty()) {
-         return;
-      }
       for (Iterator<SkySlam> it = SLAMS.iterator(); it.hasNext();) {
          SkySlam slam = it.next();
-         if (--slam.fuse > 0) {
-            continue;
-         }
-         it.remove();
          ServerPlayer owner = server.getPlayerList().getPlayer(slam.owner);
          if (owner == null || !owner.isAlive() || owner.level() != slam.level) {
+            it.remove();
             continue;
          }
-         // Lands where the caster actually is, not where they jumped from: the ability is a dive,
-         // and a dive that hit the ground behind you would be a different move.
-         Vec3 at = owner.position();
-         int hits = 0;
-         for (LivingEntity e : enemiesNear(owner, slam.level, at, BREAK_RADIUS)) {
-            e.hurtServer(slam.level, slam.level.damageSources().playerAttack(owner), BREAK_DAMAGE);
-            Vec3 away = flatAway(at, e);
-            e.push(away.x * BREAK_PUSH, 0.75, away.z * BREAK_PUSH);
-            e.hurtMarked = true;
-            hits++;
+         owner.fallDistance = 0.0F;
+         if (owner.getDeltaMovement().y < 0.0) {
+            owner.setDeltaMovement(owner.getDeltaMovement().x, owner.getDeltaMovement().y * 0.3, owner.getDeltaMovement().z);
+            owner.hurtMarked = true;
          }
-         Fx.vanillaOnly(() -> BossVfx.ring(slam.level, at.add(0.0, 0.3, 0.0), BREAK_RADIUS, 46, ParticleTypes.GUST, 0.0));
-         Fx.vanillaOnly(() -> BossVfx.ring(slam.level, at.add(0.0, 0.9, 0.0), BREAK_RADIUS * 0.6, 30, ParticleTypes.CLOUD, 0.0));
-         Fx.vanillaOnly(() -> BossVfx.at(slam.level, at, 0.0, ParticleTypes.GUST_EMITTER_LARGE, 5, 1.6, 0.6, 1.6, 0.0));
-         Fx.shockwave(slam.level, ParticleTypes.GUST, at, BREAK_RADIUS, GALE);
-         Fx.gust(slam.level, ParticleTypes.GUST, at.add(0.0, 0.4, 0.0), new Vec3(0.0, 1.0, 0.0), 4.0, GALE);
-         Fx.shape(slam.level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, at, Vec3.ZERO, BREAK_RADIUS * 0.5, 0.0, 0x9AA6B4);
-         slam.level.playSound(null, at.x, at.y, at.z, SoundEvents.BREEZE_WIND_CHARGE_BURST, SoundSource.PLAYERS, 1.8F, 0.8F);
-         slam.level.playSound(null, at.x, at.y, at.z, SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.PLAYERS, 1.4F, 1.1F);
-         bar(owner, "&fBreak the Sky &8- &7the ring caught &f" + hits + "&7.");
+         if (--slam.fuse <= 0) {
+            it.remove();
+            continue;
+         }
+         if (slam.fuse % 15 != 0) {
+            continue;
+         }
+         Vec3 eye = owner.position().add(0.0, 1.0, 0.0);
+         List<LivingEntity> near = new java.util.ArrayList<>(enemiesNear(owner, slam.level, owner.position(), BREAK_RADIUS + 2.5));
+         near.sort(java.util.Comparator.comparingDouble(e -> e.distanceToSqr(owner)));
+         int cuts = 0;
+         for (LivingEntity e : near) {
+            if (cuts >= 3) {
+               break;
+            }
+            Vec3 at = e.position().add(0.0, e.getBbHeight() * 0.5, 0.0);
+            e.invulnerableTime = 0;
+            e.hurtServer(slam.level, slam.level.damageSources().playerAttack(owner), BREAK_DAMAGE / 3.0F);
+            Vec3 in = owner.position().subtract(e.position());
+            Vec3 flat = new Vec3(in.x, 0.0, in.z).normalize();
+            e.push(flat.x * 0.4, 0.2, flat.z * 0.4);
+            e.hurtMarked = true;
+            Fx.lightning(slam.level, ParticleTypes.ELECTRIC_SPARK, eye, at, 0xFFFFFF);
+            Fx.crescent(slam.level, ParticleTypes.SWEEP_ATTACK, at, at.subtract(eye), 2.0, GALE);
+            cuts++;
+         }
+         Fx.pulseWave(slam.level, ParticleTypes.GUST, owner.position(), BREAK_RADIUS, 10, GALE);
+         slam.level.playSound(null, eye.x, eye.y, eye.z, SoundEvents.BREEZE_SHOOT, SoundSource.PLAYERS, 1.0F, 1.4F);
       }
    }
 
-   // ---------------------------------------------------------------- the vortex both sea weapons share
 
    private static String openVortex(ServerPlayer player, ServerLevel level) {
       if (cooldown(player, "vortex", VORTEX_COOLDOWN_TICKS)) {
@@ -1146,6 +1322,23 @@ public final class SeaAndSkyGear {
    }
 
    /** The nearest living body in front of the player, out to {@code reach}. */
+   /** The living body under the crosshair, stopped by the first solid block; null when none. */
+   private static LivingEntity rayTarget(ServerPlayer player, ServerLevel level, double reach) {
+      Vec3 eye = player.getEyePosition();
+      Vec3 end = eye.add(player.getLookAngle().scale(reach));
+      HitResult block = level.clip(new net.minecraft.world.level.ClipContext(eye, end,
+         net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, player));
+      if (block.getType() != HitResult.Type.MISS) {
+         end = block.getLocation();
+      }
+      net.minecraft.world.phys.EntityHitResult hit = net.minecraft.world.entity.projectile.ProjectileUtil.getEntityHitResult(
+         level, player, eye, end, player.getBoundingBox().expandTowards(end.subtract(eye)).inflate(1.0),
+         e -> e instanceof LivingEntity l && l.isAlive() && !l.isSpectator() && !(e instanceof ServerPlayer o && ScarletGear.isAlly(player, o)),
+         0.4F
+      );
+      return hit != null && hit.getEntity() instanceof LivingEntity l ? l : null;
+   }
+
    private static LivingEntity pickTarget(ServerPlayer player, ServerLevel level, double reach) {
       Vec3 look = flatLook(player);
       Vec3 eye = player.getEyePosition();
@@ -1293,6 +1486,10 @@ public final class SeaAndSkyGear {
       VORTEXES.clear();
       CHAKRAMS.clear();
       SLAMS.clear();
+      GRIPS.clear();
+      SURGES.clear();
+      PRESSURE.clear();
+      GALE_CHARGE.clear();
    }
 
    /** The number of effects still in flight, for the self-test. */

@@ -205,7 +205,7 @@ public final class SovereignGear {
          } else if (e instanceof Villager villager && villager.isAlive()) {
             // Royal subjects: the village answers its own bell - and it answers
             // with pitchforks, not just with buffs (see tickSubjects).
-            villager.addEffect(new MobEffectInstance(MobEffects.SPEED, 400, 1, false, true, true));
+            villager.addEffect(new MobEffectInstance(MobEffects.SPEED, 400, 0, false, true, true));
             villager.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 400, 0, false, true, true));
             villager.addEffect(new MobEffectInstance(MobEffects.STRENGTH, 400, 0, false, true, true));
             SUBJECTS.put(villager.getUUID(), now + SUBJECT_TICKS);
@@ -264,7 +264,7 @@ public final class SovereignGear {
          }
          // Walk at it. Villagers do have pathfinding, they just have nothing to
          // use it on in vanilla.
-         villager.getNavigation().moveTo(foe, 1.2);
+         villager.getNavigation().moveTo(foe, 0.8);
          if (villager.distanceToSqr(foe) > 6.25) {
             continue;
          }

@@ -153,7 +153,7 @@ public final class FfVfxClient {
    }
 
    private static void tick(Minecraft mc) {
-      room = TICK_BUDGET;
+      room = TICK_BUDGET * (1 + Math.max(0, Math.min(2, com.fortuneandfavors.client.config.FfConfigState.get().client.vfxDensity))) / 3;
       ClientLevel level = mc.level;
       if (level == null) {
          LIVE.clear();
@@ -254,7 +254,8 @@ public final class FfVfxClient {
                case FxKinds.TIDE_WAVE, FxKinds.SONIC_RING -> start(level, c, Math.max(8, Math.min(80, (int)c.b())), true);
                // Templates 128-137.
                case FxKinds.BLOOD_MOON, FxKinds.CRIMSON_SIGIL, FxKinds.WHIRLPOOL, FxKinds.TENTACLE, FxKinds.STORM_CELL,
-                  FxKinds.FEATHER_STORM, FxKinds.GEM_RAIN, FxKinds.STAR_TRAIL, FxKinds.SOUL_PILLAR ->
+                  FxKinds.FEATHER_STORM, FxKinds.GEM_RAIN, FxKinds.STAR_TRAIL, FxKinds.SOUL_PILLAR,
+                  FxKinds.LINK, FxKinds.HALO, FxKinds.HELIX, FxKinds.PULSE_WAVE ->
                   start(level, c, Math.max(6, Math.min(400, (int)c.b())), true);
                case FxKinds.COG_BURST -> cogBurst(level, c);
                case FxKinds.GUST -> start(level, c, 16, true);
@@ -314,7 +315,7 @@ public final class FfVfxClient {
          case FfVfx.RESONANCE -> resonance(level, l);
          case FfVfx.SCULK_AURA -> sculkAura(level, l);
          case FfVfx.ROD_ORBIT -> rodOrbit(level, l);
-         case FxKinds.SPIRAL -> spiral(level, l);
+         case FxKinds.HELIX -> helix(level, l);
          case FxKinds.DOME -> dome(level, l);
          case FxKinds.VORTEX -> funnel(level, l);
          case FxKinds.RUNE_CIRCLE -> runeCircle(level, l);
@@ -346,6 +347,10 @@ public final class FfVfxClient {
          case FxKinds.GEM_RAIN -> gemRain(level, l);
          case FxKinds.STAR_TRAIL -> starTrail(level, l);
          case FxKinds.SOUL_PILLAR -> soulPillar(level, l);
+         case FxKinds.LINK -> link(level, l);
+         case FxKinds.HALO -> halo(level, l);
+         case FxKinds.SPIRAL -> spiral(level, l);
+         case FxKinds.PULSE_WAVE -> pulseWave(level, l);
          default -> {
          }
       }
@@ -1745,7 +1750,7 @@ public final class FfVfxClient {
 
    /** Heavy snow round the camera whenever this client is standing in her realm. No server traffic. */
    private static void realmSnow(Minecraft mc, ClientLevel level) {
-      if (mc.player == null || !level.dimension().identifier().getPath().equals("snow_queen_realm")) {
+      if (!com.fortuneandfavors.client.config.FfConfigState.get().client.realmSnow || mc.player == null || !level.dimension().identifier().getPath().equals("snow_queen_realm")) {
          return;
       }
       RandomSource r = level.getRandom();
@@ -2214,6 +2219,65 @@ public final class FfVfxClient {
       }
       if (l.age % 5 == 0) {
          p(level, Tex.RING, c.color(), c.x(), c.y() + (l.age % 20) / 20.0 * h, c.z(), 0.0, 0.0, 0.0, 1.0F, 6, 1.4F, 0.0F, 1.0F, 0.7F);
+      }
+   }
+
+   /** LINK: a slightly sagging thread from (x,y,z) to aux, bright nodes at both ends, pulses running down it. */
+   private static void link(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      double dx = c.ax() - c.x(), dy = c.ay() - c.y(), dz = c.az() - c.z();
+      double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (len < 0.1 || far(c.x(), c.y(), c.z())) {
+         return;
+      }
+      int n = Math.min(24, (int)(len * 2.0) + 2);
+      double sag = Math.min(0.6, len * 0.04) * (0.8 + 0.2 * Math.sin(l.age * 0.4));
+      for (int i = 0; i <= n; i++) {
+         double t = i / (double)n;
+         double y = c.y() + dy * t - sag * 4.0 * t * (1.0 - t);
+         p(level, Tex.THREAD, c.color(), c.x() + dx * t, y, c.z() + dz * t, 0.0, 0.0, 0.0, 0.09F, 3, 1.0F, 0.0F, 1.0F, 0.8F);
+      }
+      // Two pulses travel the line toward aux: the "signal" of the link.
+      for (int k = 0; k < 2; k++) {
+         double t = ((l.age * 0.12) + k * 0.5) % 1.0;
+         double y = c.y() + dy * t - sag * 4.0 * t * (1.0 - t);
+         p(level, Tex.GLOW, WHITE, c.x() + dx * t, y, c.z() + dz * t, 0.0, 0.0, 0.0, 0.22F, 3, 0.6F, 0.0F, 1.0F, 1.0F);
+      }
+      if (l.age % 4 == 0) {
+         p(level, Tex.RING, c.color(), c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, 0.35F, 6, 1.6F, 0.0F, 1.0F, 0.8F);
+         p(level, Tex.RING, c.color(), c.ax(), c.ay(), c.az(), 0.0, 0.0, 0.0, 0.35F, 6, 1.6F, 0.0F, 1.0F, 0.8F);
+      }
+   }
+
+   /** HALO: motes orbiting a ring of radius a over (x,y,z). */
+   private static void halo(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      double r = Math.max(0.3, c.a());
+      for (int i = 0; i < 6; i++) {
+         double ang = l.age * 0.25 + i * Math.PI / 3.0;
+         p(level, Tex.MOTE, i == 0 ? WHITE : c.color(), c.x() + Math.cos(ang) * r, c.y(), c.z() + Math.sin(ang) * r, 0.0, 0.0, 0.0, 0.15F, 4, 0.5F, 0.0F, 1.0F, 1.0F);
+      }
+   }
+
+   /** HELIX: two strands winding up a column of height a. */
+   private static void helix(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      double h = Math.max(1.0, c.a());
+      double t = (l.age % 20) / 20.0;
+      for (int k = 0; k < 2; k++) {
+         double ang = l.age * 0.5 + k * Math.PI;
+         p(level, Tex.SPARK, k == 0 ? WHITE : c.color(), c.x() + Math.cos(ang) * 0.8, c.y() + t * h, c.z() + Math.sin(ang) * 0.8, 0.0, 0.02, 0.0, 0.18F, 10, 0.4F, 0.2F, 0.95F, 1.0F);
+      }
+   }
+
+   /** PULSE_WAVE: a ground ring expanding to radius a over its life. */
+   private static void pulseWave(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      double r = Math.max(0.5, c.a()) * (l.age + 1) / (double)Math.max(1, l.life);
+      int n = Math.min(40, (int)(r * 6.0) + 8);
+      for (int i = 0; i < n; i++) {
+         double ang = i * Math.PI * 2.0 / n;
+         p(level, Tex.ARC, c.color(), c.x() + Math.cos(ang) * r, c.y() + 0.1, c.z() + Math.sin(ang) * r, 0.0, 0.0, 0.0, 0.2F, 3, 1.0F, 0.0F, 1.0F, 0.8F);
       }
    }
 

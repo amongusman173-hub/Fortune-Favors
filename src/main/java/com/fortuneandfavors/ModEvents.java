@@ -1487,8 +1487,8 @@ public final class ModEvents {
             if (kbRes != null && kbRes.hasModifier(kbId)) {
                kbRes.removeModifier(kbId);
             }
-
-            player.removeEffect(MobEffects.RESISTANCE);
+            // No removeEffect here: Stoneheart's Resistance lasts 2 ticks and runs out on its
+            // own. Removing it every tick stripped every other Resistance (potions, beacons, realm).
          }
 
          if ((player.level().getGameTime() & 7L) == 0L && player.level() instanceof ServerLevel sl) {

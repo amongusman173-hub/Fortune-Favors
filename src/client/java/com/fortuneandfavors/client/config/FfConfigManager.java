@@ -74,7 +74,7 @@ public final class FfConfigManager {
     *  then shows no config button instead of crashing). */
    public static Screen configScreen(Screen parent) {
       if (!clothAvailable()) {
-         return null;
+         return new FfSettingsScreen(parent);
       }
       return safely("Cloth Config screen", () -> ClothBridge.screen(parent), null);
    }

@@ -608,6 +608,11 @@ public final class VoidShaperManager {
          tickDeath(server, boss, fight);
          return;
       }
+      // Every fighter is dead or gone: the fight is over (unless despawns are off).
+      if (BossManager.allFightersDown(server, fight.participants)) {
+         shutDown(server, fight);
+         return;
+      }
 
       fight.bar.setProgress(Math.max(0.0F, Math.min(1.0F, boss.getHealth() / boss.getMaxHealth())));
       fight.bar.setName(Component.literal(barName(fight)));

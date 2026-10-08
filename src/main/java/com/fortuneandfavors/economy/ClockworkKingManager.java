@@ -772,6 +772,11 @@ public final class ClockworkKingManager {
          tickDeath(server, boss, fight);
          return;
       }
+      // Every fighter is dead or gone: the fight is over (unless despawns are off).
+      if (BossManager.allFightersDown(server, fight.participants)) {
+         shutDown(server, fight, true);
+         return;
+      }
 
       // His health bar is driven by hand. He carries an ordinary iron golem's
       // entity, and vanilla only writes bar progress for its own boss mobs - so

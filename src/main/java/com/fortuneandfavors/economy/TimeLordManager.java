@@ -1045,6 +1045,11 @@ public final class TimeLordManager {
          tickDeath(level, boss, fight, now);
          return;
       }
+      // Every fighter is dead or gone: the fight is over (unless despawns are off).
+      if (BossManager.allFightersDown(server, fight.participants)) {
+         despawn(server, level, boss, fight, "every fighter has fallen!");
+         return;
+      }
 
       // 2) Arrival: the rift finishes opening and he rises out of it.
       if (fight.riseTicks > 0) {

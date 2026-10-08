@@ -825,6 +825,11 @@ public final class GaleWardenManager {
          tickDeath(server, boss, fight);
          return;
       }
+      // Every fighter is dead or gone: the fight is over (unless despawns are off).
+      if (BossManager.allFightersDown(server, fight.participants)) {
+         shutDown(server, fight);
+         return;
+      }
 
       int phase = phaseFor(boss);
       if (phase != fight.phase) {

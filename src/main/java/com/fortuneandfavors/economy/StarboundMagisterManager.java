@@ -615,6 +615,11 @@ public final class StarboundMagisterManager {
          tickDeath(server, boss, fight);
          return;
       }
+      // Every fighter is dead or gone: the fight is over (unless despawns are off).
+      if (BossManager.allFightersDown(server, fight.participants)) {
+         shutDown(server, fight);
+         return;
+      }
       if (fight.arrivalTicks > 0) {
          tickArrival(level, boss, fight);
          return;
@@ -855,31 +860,7 @@ public final class StarboundMagisterManager {
       // cooldown and it puts her back inside her own casting band rather than out of
       // it, so it is a way to stop being in melee, not a way to leave the fight: a
       // player who sprints after her is on top of her again in under two seconds.
-      if (dist <= BLINK_RANGE && now >= fight.nextBlink) {
-         fight.nextBlink = now + BLINK_COOLDOWN;
-         blink(level, boss, target);
-      }
-   }
-
-   private static void blink(ServerLevel level, Mob boss, ServerPlayer target) {
-      double angle = RANDOM.nextDouble() * Math.PI * 2.0;
-      double dist = PREFERRED_RANGE - 1.0 + RANDOM.nextDouble() * 3.0;
-      double x = target.getX() + Math.cos(angle) * dist;
-      double z = target.getZ() + Math.sin(angle) * dist;
-      // Blink onto the ground, not into the sky. Landing two to four blocks up
-      // made every reposition a free escape from melee.
-      double y = BossGrounding.groundY(level, x, z, target.getY());
-      Vec3 from = boss.position();
-      Vec3 to = new Vec3(x, y, z);
-      wormhole(level, from.add(0.0, 1.0, 0.0), false, NEBULA);
-      Fx.lightning(level, ParticleTypes.ELECTRIC_SPARK, from.add(0.0, 1.0, 0.0), to.add(0.0, 1.0, 0.0), STARLIGHT);
-      boss.setPos(x, y, z);
-      boss.setDeltaMovement(Vec3.ZERO);
-      boss.hurtMarked = true;
-      wormhole(level, to.add(0.0, 1.0, 0.0), true, NEBULA);
-      Fx.flare(level, ParticleTypes.END_ROD, to.add(0.0, 1.0, 0.0), 1.4, STARLIGHT);
-      Fx.ring(level, ParticleTypes.END_ROD, to.add(0.0, 0.1, 0.0), 2.0, NEBULA);
-      level.playSound(null, x, y, z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.2F, 1.6F);
+      // No blink: she used to teleport away whenever you closed in. She stands and fights now.
    }
 
    // --------------------------------------------------------------------- moves
@@ -971,8 +952,6 @@ public final class StarboundMagisterManager {
     */
    private static void addMark(ServerLevel level, Fight fight, Mark mark) {
       fight.marks.add(mark);
-      Fx.runeCircle(level, ParticleTypes.END_ROD, mark.pos.add(0.0, 0.05, 0.0), mark.radius, mark.fuse, mark.hue);
-      Fx.starfall(level, ParticleTypes.END_ROD, mark.pos, mark.radius, mark.fuse, mark.hue);
    }
 
    // ----------------------------------------------------------- new: constellation
@@ -1005,16 +984,14 @@ public final class StarboundMagisterManager {
       for (int i = 0; i + 1 < nodes; i++) {
          fight.strikes.add(new Strike(Strike.LINE, stars[i], stars[i + 1], land, land + CONSTELLATION_BURN,
             CONSTELLATION_WIDTH, CONSTELLATION_DAMAGE, hit, i == 0));
-         Fx.chains(level, ParticleTypes.ENCHANT, stars[i].add(0.0, 0.15, 0.0), stars[i + 1].add(0.0, 0.15, 0.0), NEBULA);
       }
       for (Vec3 star : stars) {
-         Fx.runeCircle(level, ParticleTypes.END_ROD, star.add(0.0, 0.05, 0.0), 1.1, CONSTELLATION_WARN, SOLAR);
          Fx.flare(level, ParticleTypes.END_ROD, star.add(0.0, 0.6, 0.0), 0.6, STARLIGHT);
       }
       Fx.aura(level, ParticleTypes.ENCHANT, boss.position(), 2.4, CONSTELLATION_WARN, NEBULA);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.HOSTILE, 1.6F, 1.0F);
       announce(level, SAY + "\"\u00a7fConnect the dots.\"");
-      announceNear(level, boss, 64.0, "&8Lines on the ground. &7Step off, or jump the last chime.");
+      announceNear(level, boss, 64.0, "&8Starlines. &7Keep moving.");
    }
 
    /** The next star of a constellation: four to six blocks on, turned up to 50 degrees either way. */
@@ -1043,13 +1020,11 @@ public final class StarboundMagisterManager {
       fight.strikes.add(new Strike(Strike.ECLIPSE, center, center, land, land, ECLIPSE_SAFE, ECLIPSE_DAMAGE, new HashSet<>(), true));
       fight.holdUntil = land;
       fight.nextBlink = Math.max(fight.nextBlink, land + 40L);
-      Fx.dome(level, ParticleTypes.END_ROD, center, ECLIPSE_SAFE, ECLIPSE_WARN, STARLIGHT);
-      Fx.runeCircle(level, ParticleTypes.ENCHANT, center.add(0.0, 0.05, 0.0), ECLIPSE_SAFE, ECLIPSE_WARN, SOLAR);
       Fx.emberRain(level, ParticleTypes.REVERSE_PORTAL, center, 22.0, ECLIPSE_WARN, NEBULA);
       level.playSound(null, center.x, center.y, center.z, SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 2.0F, 0.5F);
       level.playSound(null, center.x, center.y, center.z, SoundEvents.BEACON_POWER_SELECT, SoundSource.HOSTILE, 1.4F, 0.6F);
       announce(level, SAY + "\"\u00a7fLights out.\"");
-      announceNear(level, boss, 72.0, "&8The sky goes dark outside her circle. &7Get inside it.");
+      announceNear(level, boss, 72.0, "&8The sky goes dark. &7Get close to her.");
    }
 
    /** Runs the pending Constellation lines and Eclipse circles: warn, then land. */
@@ -1060,7 +1035,6 @@ public final class StarboundMagisterManager {
       for (Iterator<Strike> it = fight.strikes.iterator(); it.hasNext();) {
          Strike s = it.next();
          if (now < s.landAt) {
-            warnStrike(level, s, now);
             continue;
          }
          if (s.kind == Strike.ECLIPSE) {
@@ -1084,22 +1058,6 @@ public final class StarboundMagisterManager {
          if (now >= s.endAt) {
             it.remove();
          }
-      }
-   }
-
-   /** The tell while a strike waits: the faint line redrawn, and the chimes that time the jump. */
-   private static void warnStrike(ServerLevel level, Strike s, long now) {
-      long left = s.landAt - now;
-      if (s.kind == Strike.LINE) {
-         if (left % 8 == 0) {
-            Fx.beam(level, ParticleTypes.ENCHANT, s.a.add(0.0, 0.12, 0.0), s.b.add(0.0, 0.12, 0.0), NEBULA);
-         }
-         if (s.leader && left <= 15 && left % 5 == 0) {
-            level.playSound(null, s.a.x, s.a.y, s.a.z, SoundEvents.NOTE_BLOCK_PLING, SoundSource.HOSTILE, 1.6F, 1.0F + (15 - left) / 15.0F);
-         }
-      } else if (s.leader && left % 10 == 0) {
-         Fx.ring(level, ParticleTypes.END_ROD, s.a.add(0.0, 0.1, 0.0), s.radius, SOLAR);
-         level.playSound(null, s.a.x, s.a.y, s.a.z, SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 1.6F, 1.2F);
       }
    }
 
@@ -1194,7 +1152,6 @@ public final class StarboundMagisterManager {
       fight.judgementTo = aim + JUDGEMENT_SWEEP;
       fight.judgementTell = JUDGEMENT_TELL;
       fight.judgementHits.clear();
-      Fx.runeCircle(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.05, 0.0), 2.5, JUDGEMENT_TELL + JUDGEMENT_BEAM, SOLAR);
       Fx.aura(level, ParticleTypes.END_ROD, boss.position(), 2.6, JUDGEMENT_TELL, SOLAR);
       Fx.crescent(level, ParticleTypes.ENCHANT, boss.position(), new Vec3(Math.cos(aim), 0.0, Math.sin(aim)), 9.0, NEBULA);
       announce(level, SAY + "\"\u00a7cSix. \u00a7fStay off the line.\"");
@@ -1282,8 +1239,6 @@ public final class StarboundMagisterManager {
       double heat = 1.0 - (double)fight.judgementTell / JUDGEMENT_TELL;
       Vec3 start = new Vec3(Math.cos(fight.judgementFrom), 0.0, Math.sin(fight.judgementFrom));
       Vec3 end = new Vec3(Math.cos(fight.judgementTo), 0.0, Math.sin(fight.judgementTo));
-      Fx.beam(level, ParticleTypes.END_ROD, floor, floor.add(start.scale(beamReach(level, hand, start))), heat > 0.5 ? SOLAR : STARLIGHT);
-      Fx.beam(level, ParticleTypes.ENCHANT, floor, floor.add(end.scale(beamReach(level, hand, end))), NEBULA);
    }
 
    /**
@@ -1328,7 +1283,6 @@ public final class StarboundMagisterManager {
       fight.wellCenter = new Vec3(target.getX(), BossGrounding.groundY(level, target.getX(), target.getZ(), target.getY()), target.getZ());
       fight.wellTicks = 70;
       Fx.vortex(level, ParticleTypes.REVERSE_PORTAL, fight.wellCenter, 6.0, fight.wellTicks, NEBULA);
-      Fx.runeCircle(level, ParticleTypes.ENCHANT, fight.wellCenter.add(0.0, 0.05, 0.0), WELL_BLAST_RADIUS, fight.wellTicks, NEBULA);
       announce(level, SAY + "\"\u00a7fCome here.\"");
       announceNear(level, boss, 64.0, "&5Gravity Well &8- &7sprint out of the ring.");
       level.playSound(null, fight.wellCenter.x, fight.wellCenter.y, fight.wellCenter.z, SoundEvents.ENDER_DRAGON_FLAP, SoundSource.HOSTILE, 1.2F, 0.7F);

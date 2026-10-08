@@ -25,6 +25,14 @@ public class FortuneFavorsModClient implements ClientModInitializer {
 
    public void onInitializeClient() {
       registerCreativeTab();
+      // O opens the client settings screen (rebindable in Controls).
+      net.minecraft.client.KeyMapping settingsKey = net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper.registerKeyMapping(
+         new net.minecraft.client.KeyMapping("key.fortuneandfavors.settings", org.lwjgl.glfw.GLFW.GLFW_KEY_O, net.minecraft.client.KeyMapping.Category.MISC));
+      ClientTickEvents.END_CLIENT_TICK.register(client -> {
+         while (settingsKey.consumeClick()) {
+            client.gui.setScreen(new com.fortuneandfavors.client.config.FfSettingsScreen(client.gui.screen()));
+         }
+      });
       BackpackMusic.init();
       // Self-healing boombox: if the engine ever drops a song we still want
       // (sound reload, level change), it is started again instead of going

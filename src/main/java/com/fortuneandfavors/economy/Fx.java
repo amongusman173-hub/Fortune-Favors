@@ -198,8 +198,8 @@ public final class Fx {
 
    // ------------------------------------------------------------------ the newer templates
 
-   public static void spiral(ServerLevel level, ParticleOptions p, Vec3 base, double height, int ticks, int color) {
-      shape(level, FxKinds.SPIRAL, p, base, Vec3.ZERO, height, ticks, color);
+   public static void helix(ServerLevel level, ParticleOptions p, Vec3 base, double height, int ticks, int color) {
+      shape(level, FxKinds.HELIX, p, base, Vec3.ZERO, height, ticks, color);
    }
 
    public static void shockwave(ServerLevel level, ParticleOptions p, Vec3 center, double radius, int color) {
@@ -505,5 +505,21 @@ public final class Fx {
 
    public static void soulPillar(ServerLevel level, ParticleOptions p, Vec3 base, double height, int ticks, int color) {
       shape(level, FxKinds.SOUL_PILLAR, p, base, Vec3.ZERO, height, ticks, color);
+   }
+
+   public static void link(ServerLevel level, ParticleOptions p, Vec3 from, Vec3 to, int ticks, int color) {
+      shape(level, FxKinds.LINK, p, from, to, 0.0, ticks, color);
+   }
+
+   public static void halo(ServerLevel level, ParticleOptions p, Vec3 at, double radius, int ticks, int color) {
+      shape(level, FxKinds.HALO, p, at, Vec3.ZERO, radius, ticks, color);
+   }
+
+   public static void spiral(ServerLevel level, ParticleOptions p, Vec3 base, double height, int ticks, int color) {
+      shape(level, FxKinds.SPIRAL, p, base, Vec3.ZERO, height, ticks, color);
+   }
+
+   public static void pulseWave(ServerLevel level, ParticleOptions p, Vec3 at, double radius, int ticks, int color) {
+      shape(level, FxKinds.PULSE_WAVE, p, at, Vec3.ZERO, radius, ticks, color);
    }
 }
