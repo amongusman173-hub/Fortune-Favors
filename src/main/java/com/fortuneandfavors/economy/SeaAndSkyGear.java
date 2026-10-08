@@ -73,6 +73,15 @@ public final class SeaAndSkyGear {
 
    // ---------------------------------------------------------------- the sea: Leviathan's Grasp
 
+   /** Sea-green, for the Grasp and the Tidecaller. */
+   private static final int TIDE = 0x2FA8C8;
+   /** White water, for the crest of every splash. */
+   private static final int FOAM = 0xD8F4FF;
+   /** The deep's teal, for the Abyssal Chain. */
+   private static final int ABYSS = 0x0E6A70;
+   /** Pale wind, for the sky set. */
+   private static final int GALE = 0xDDE8F0;
+
    /** How far the claw can reach to haul something in. */
    private static final double GRASP_REACH = 9.0;
    private static final double GRASP_PULL = 1.25;
@@ -329,11 +338,12 @@ public final class SeaAndSkyGear {
    /** The haul: a body pulled off its feet and toward the claw. */
    private static void grasp(ServerLevel level, ServerPlayer player, LivingEntity target) {
       Vec3 toward = player.position().subtract(target.position()).normalize();
-      target.setDeltaMovement(toward.x * GRASP_PULL, 0.34, toward.z * GRASP_PULL);
+      double heft = heft(target);
+      target.setDeltaMovement(toward.x * GRASP_PULL * heft, 0.34 * heft, toward.z * GRASP_PULL * heft);
       target.hurtMarked = true;
       target.hurtServer(level, level.damageSources().playerAttack(player), 4.5F);
-      BossVfx.beam(level, target.position().add(0.0, 1.0, 0.0), player.getEyePosition(), 0.16, ParticleTypes.DRIPPING_WATER);
-      BossVfx.ring(level, target.position().add(0.0, 0.35, 0.0), 1.5, 10, ParticleTypes.BUBBLE_POP, 0.0);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.DRIPPING_WATER, target.position().add(0.0, 1.0, 0.0), player.getEyePosition(), 0.0, 0.0, TIDE);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.BUBBLE_POP, target.position().add(0.0, 0.35, 0.0), Vec3.ZERO, 1.5, 0.0, FOAM);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.TRIDENT_THROW, SoundSource.PLAYERS, 0.9F, 0.7F);
       bar(player, "&3Grasp &8- &7hauled in &f" + target.getName().getString() + "&7.");
    }
@@ -343,8 +353,9 @@ public final class SeaAndSkyGear {
       target.hurtServer(level, level.damageSources().playerAttack(player), CRUSH_DAMAGE);
       target.setDeltaMovement(target.getDeltaMovement().x * 0.2, CRUSH_SLAM, target.getDeltaMovement().z * 0.2);
       target.hurtMarked = true;
-      BossVfx.ring(level, target.position().add(0.0, 0.15, 0.0), 2.6, 22, ParticleTypes.SPLASH, 0.0);
-      BossVfx.at(level, target.position().add(0.0, 0.2, 0.0), 0.0, ParticleTypes.FALLING_WATER, 26, 0.9, 0.3, 0.9, 0.12);
+      // The claw closes and the floor answers with a column of water.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, target.position(), Vec3.ZERO, 3.5, 0.0, TIDE);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.SPLASH, target.position().add(0.0, 0.15, 0.0), Vec3.ZERO, 2.6, 0.0, FOAM);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.PLAYERS, 1.2F, 0.85F);
       bar(player, "&3Crush &8- &f" + target.getName().getString() + "&7 met the floor.");
    }
@@ -360,8 +371,8 @@ public final class SeaAndSkyGear {
          victim.hurtServer(level, level.damageSources().playerAttack(hitter), 8.0F);
          victim.setDeltaMovement(0.0, CRUSH_SLAM, 0.0);
          victim.hurtMarked = true;
-         BossVfx.ring(level, victim.position().add(0.0, 0.2, 0.0), 4.4, 30, ParticleTypes.SPLASH, 0.0);
-         BossVfx.at(level, victim.position().add(0.0, 0.3, 0.0), 0.0, ParticleTypes.FALLING_WATER, 34, 1.6, 0.4, 1.6, 0.18);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.SPLASH, victim.position().add(0.0, 0.2, 0.0), Vec3.ZERO, 4.4, 0.0, TIDE);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, victim.position(), Vec3.ZERO, 4.0, 0.0, FOAM);
          level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.PLAYERS, 1.3F, 0.7F);
          bar(hitter, "&3Depth Breaker &8- &7the drop did the rest.");
          return;
@@ -454,14 +465,16 @@ public final class SeaAndSkyGear {
 
    private static void chainPull(ServerLevel level, ServerPlayer player, LivingEntity target) {
       Vec3 toward = player.position().subtract(target.position()).normalize();
-      target.setDeltaMovement(toward.x * CHAIN_PULL, 0.22, toward.z * CHAIN_PULL);
+      double heft = heft(target);
+      target.setDeltaMovement(toward.x * CHAIN_PULL * heft, 0.22 * heft, toward.z * CHAIN_PULL * heft);
       target.hurtMarked = true;
       // It pays damage for the pull. A weapon that only decides *where* a body is cannot win a
       // fight, and the Chain has the reach, the cooldown and the hook to be a weapon rather than a
       // lever - the drag is what the damage is for.
       target.hurtServer(level, level.damageSources().playerAttack(player), CHAIN_PULL_DAMAGE);
       markTarget(player, target);
-      BossVfx.beam(level, target.position().add(0.0, 1.0, 0.0), player.getEyePosition(), 0.1, ParticleTypes.SCULK_SOUL);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.SCULK_SOUL, target.position().add(0.0, 1.0, 0.0), player.getEyePosition(), 0.0, 0.0, ABYSS);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, target.position().add(0.0, target.getBbHeight() * 0.6, 0.0), toward, 0.0, 0.0, ABYSS);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.CHAIN_BREAK, SoundSource.PLAYERS, 1.0F, 0.7F);
       bar(player, "&3Chain Pull &8- &f" + target.getName().getString() + "&7 came to you.");
    }
@@ -477,7 +490,8 @@ public final class SeaAndSkyGear {
       player.hurtMarked = true;
       player.fallDistance = 0.0F;
       DEEP_STRIKE.put(player.getUUID(), ServerClock.clock(player.level()) + DEEP_STRIKE_WINDOW_TICKS);
-      BossVfx.beam(level, player.getEyePosition(), to, 0.1, ParticleTypes.SCULK_SOUL);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.SCULK_SOUL, player.getEyePosition(), to, 0.0, 0.0, ABYSS);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.SCULK_SOUL, to, Vec3.ZERO, 0.8, 0.0, ABYSS);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.CHAIN_FALL, SoundSource.PLAYERS, 1.0F, 1.3F);
       bar(player, "&3Abyssal Hook &8- &7the chain brought you instead.");
    }
@@ -493,7 +507,8 @@ public final class SeaAndSkyGear {
       if (until != null && now <= until) {
          DEEP_STRIKE.remove(hitter.getUUID());
          victim.hurtServer(level, level.damageSources().playerAttack(hitter), DEEP_STRIKE_DAMAGE);
-         BossVfx.at(level, victim.position().add(0.0, 1.0, 0.0), 0.0, ParticleTypes.SCULK_SOUL, 20, 0.5, 0.6, 0.5, 0.08);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RESONANCE, ParticleTypes.SCULK_SOUL, victim.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 14.0, 0.0, ABYSS);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, 1.0, 0.0), hitter.getLookAngle(), 0.0, 0.0, ABYSS);
          level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.SCULK_CATALYST_BLOOM, SoundSource.PLAYERS, 1.0F, 0.8F);
          bar(hitter, "&3Deep Strike &8- &7it was still moving when it landed.");
       }
@@ -578,19 +593,19 @@ public final class SeaAndSkyGear {
          if (forward < 0.0 || forward > SLASH_REACH || lateral > SLASH_HALF_WIDTH + e.getBbWidth() * 0.5) {
             continue;
          }
+         if (!visible(level, player, e)) {
+            continue;
+         }
          e.hurtServer(level, level.damageSources().playerAttack(player), SLASH_DAMAGE);
          e.push(look.x * SLASH_LAUNCH, UPDRAFT_VICTIM, look.z * SLASH_LAUNCH);
          e.hurtMarked = true;
          hits++;
       }
-      int points = 24;
-      for (int i = 0; i < points; i++) {
-         double d = (i / (double)points) * SLASH_REACH;
-         Vec3 p = eye.add(look.scale(d));
-         BossVfx.at(level, p, 0.0, ParticleTypes.GUST, 3, 0.1, 0.3, 0.1, 0.0);
-         BossVfx.at(level, p.add(side.scale(SLASH_HALF_WIDTH)), 0.0, ParticleTypes.SMALL_GUST, 1, 0.0, 0.0, 0.0, 0.0);
-         BossVfx.at(level, p.subtract(side.scale(SLASH_HALF_WIDTH)), 0.0, ParticleTypes.SMALL_GUST, 1, 0.0, 0.0, 0.0, 0.0);
-      }
+      // One crescent of wind down the whole line, edged on both sides. The old blade was drawn as
+      // seventy-two separate particle calls, every swing.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SLASH, ParticleTypes.SWEEP_ATTACK, player.position(), look, SLASH_REACH, 0.0, GALE);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.GUST, eye.add(side.scale(SLASH_HALF_WIDTH)), eye.add(look.scale(SLASH_REACH)).add(side.scale(SLASH_HALF_WIDTH)), 0.0, 0.0, GALE);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.GUST, eye.subtract(side.scale(SLASH_HALF_WIDTH)), eye.add(look.scale(SLASH_REACH)).subtract(side.scale(SLASH_HALF_WIDTH)), 0.0, 0.0, GALE);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_SHOOT, SoundSource.PLAYERS, 1.2F, 1.15F);
       bar(player, hits == 0 ? "&7Wind Slash &8- &7it found nothing." : "&fWind Slash &8- &7caught &f" + hits + "&7.");
    }
@@ -610,7 +625,7 @@ public final class SeaAndSkyGear {
          victim.hurtServer(level, level.damageSources().playerAttack(hitter), DOWNFORCE_DAMAGE);
          victim.setDeltaMovement(victim.getDeltaMovement().x * 0.3, DOWNFORCE_SLAM, victim.getDeltaMovement().z * 0.3);
          victim.hurtMarked = true;
-         BossVfx.ring(level, victim.position().add(0.0, 0.3, 0.0), 3.2, 22, ParticleTypes.GUST, 0.0);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.GUST, victim.position().add(0.0, 0.3, 0.0), Vec3.ZERO, 3.2, 0.0, GALE);
          level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.BREEZE_LAND, SoundSource.PLAYERS, 1.2F, 0.8F);
          bar(hitter, "&fDownforce &8- &7back to the floor.");
          return;
@@ -1131,6 +1146,10 @@ public final class SeaAndSkyGear {
          if (forward < -1.0) {
             continue;
          }
+         // The Grasp and the Chain reach for what the bearer can see, not through the wall beside them.
+         if (!visible(level, player, e)) {
+            continue;
+         }
          double score = offset.length() - forward * 0.5;
          if (score < bestScore) {
             bestScore = score;
@@ -1150,6 +1169,31 @@ public final class SeaAndSkyGear {
             && !e.isSpectator()
             && !(e instanceof ServerPlayer other && ScarletGear.isAlly(caster, other))
       );
+   }
+
+   /** A clear line from the player's eyes to the middle of the body. */
+   private static boolean visible(ServerLevel level, ServerPlayer player, LivingEntity e) {
+      Vec3 centre = e.position().add(0.0, e.getBbHeight() * 0.5, 0.0);
+      return level.clip(new net.minecraft.world.level.ClipContext(player.getEyePosition(), centre,
+         net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, player
+      )).getType() == net.minecraft.world.phys.HitResult.Type.MISS;
+   }
+
+   /**
+    * How much of a pull a body takes: less for anything that resists knockback, and a quarter at
+    * most for a boss. The Grasp and the Chain used to haul a boss exactly as far as a zombie, which
+    * made them a way to drag a fight out of its arena.
+    */
+   private static double heft(LivingEntity e) {
+      double weight = 1.0;
+      try {
+         weight = 1.0 - Math.max(0.0, Math.min(1.0, e.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE)));
+      } catch (Throwable ignored) {
+      }
+      if (BossManager.isMarkedBoss(e)) {
+         weight = Math.min(weight, 0.25);
+      }
+      return Math.max(0.15, weight);
    }
 
    private static AABB boxAround(Vec3 center, double horizontal, double vertical) {
