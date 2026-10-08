@@ -991,9 +991,9 @@ public final class ModEvents {
                // per tick burns System.currentTimeMillis/LocalDate on the hot
                // path for nothing; 1s resolution is still 60x finer than any
                // of their intervals.
+               Safe.run("player raid tick", () -> PlayerRaidManager.tick(server));
                if (server.getTickCount() % 20L == 0L) {
                   Safe.run("contracts tick", () -> DynamicContractsManager.tick(server));
-                  Safe.run("player raid tick", () -> PlayerRaidManager.tick(server));
                   Safe.run("lottery tick", () -> com.fortuneandfavors.economy.LotteryManager.tick(server));
                   Safe.run("bank interest tick", () -> com.fortuneandfavors.economy.BankManager.tick(server));
                   // The exchange runs on the wall clock, so nothing here advances a price - this is

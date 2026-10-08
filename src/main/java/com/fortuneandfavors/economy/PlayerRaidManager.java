@@ -194,7 +194,7 @@ public final class PlayerRaidManager {
       st.omenLevel = omen;
       st.announced = true;
       st.wave = 0;
-      st.nextWaveTick = level.getGameTime() - 1L; // first wave spawns immediately
+      st.nextWaveTick = ServerClock.clock(level) - 1L; // first wave spawns immediately
       tracked.put(key, st);
       playerRaidKeys.add(key);
       if (banner != null && !player.getAbilities().instabuild) {
@@ -326,6 +326,29 @@ public final class PlayerRaidManager {
       tickWaves(server);
       tickBossPhases(server);
       tickHud(server);
+      tickTestOffers(server);
+   }
+
+   /**
+    * Ends a /ff test betrayal run ten seconds after its choice. The stand-in raid it creates
+    * used to live forever: tickWaves took it for a real raid and spawned wave 1 on the admin,
+    * and an accepted test left them an "active betrayer" for the rest of the session - every
+    * player glowing, a champion bar nobody removed, raid mobs refusing to touch them and PvP
+    * protection off.
+    */
+   private static void tickTestOffers(MinecraftServer server) {
+      for (Entry<String, RaidState> e : new ArrayList<>(tracked.entrySet())) {
+         RaidState st = e.getValue();
+         if (st == null || !st.test || st.testEndsAt < 0L || ServerClock.clock(server) < st.testEndsAt) {
+            continue;
+         }
+         ServerLevel level = server.getLevel(st.dimension);
+         st.settled = true;
+         if (level != null && st.betrayJoined) {
+            clearRaidGlows(level);
+         }
+         cleanupRaid(e.getKey());
+      }
    }
 
    /**
@@ -351,8 +374,11 @@ public final class PlayerRaidManager {
          if (level == null) {
             continue;
          }
-         long now = level.getGameTime();
-         if (now % 20L != 0L) {
+         long now = ServerClock.clock(level);
+         // A deadline, not "now % 20 == 0": while this manager was ticked once a second
+         // from ModEvents, a modulus test sampled on that cadence either always or never
+         // matched - and the readout simply never appeared on most servers.
+         if (state.test || !state.due("hud", now, 20L, true)) {
             continue;
          }
          String key = e.getKey();
@@ -392,7 +418,8 @@ public final class PlayerRaidManager {
    private static void tickWaves(MinecraftServer server) {
       for (Map.Entry<String, RaidState> e : new ArrayList<>(tracked.entrySet())) {
          RaidState state = e.getValue();
-         if (state == null || state.settled || state.warlordSpawned) {
+         // A /ff test betrayal stand-in is not a raid: it has no waves to spawn.
+         if (state == null || state.settled || state.warlordSpawned || state.test) {
             continue;
          }
          String key = e.getKey();
@@ -400,7 +427,13 @@ public final class PlayerRaidManager {
          if (level == null) {
             continue;
          }
-         long now = level.getGameTime();
+         long now = ServerClock.clock(level);
+         // The wave phase runs once a second, as it always has: it scans a 192-block box
+         // for the wave's raiders and drives the chat, bars and straggler herding, none of
+         // which gains anything from running every tick. Every timer in it is a deadline.
+         if (!state.due("waveTick", now, 20L, true)) {
+            continue;
+         }
          // Abandonment: nobody alive near the fight for 60s -> the raid is lost.
          if (aliveNearbyPlayers(level, state.center) == 0) {
             if (state.noPlayersSince < 0L) {
@@ -429,34 +462,43 @@ public final class PlayerRaidManager {
             continue;
          }
          state.noPlayersSince = -1L;
-         if (now % 10L == 0L && state.wave > 0) {
+         // Every cadence below is a deadline on the shared clock (see RaidState.due);
+         // the old "now % N == 0" tests never matched when sampled once a second.
+         if (state.wave > 0 && state.due("waveBar", now, 10L, true)) {
             updateWaveBar(level, key, state);
          }
          // Participation credit for anyone fighting the waves.
-         if (now % 100L == 0L) {
+         if (state.due("participation", now, 100L, true)) {
             trackParticipation(level, state);
          }
          // Ambient VFX + horn during the wave phase.
-         if (now % 60L == 0L) {
+         if (state.due("ambient", now, 60L, true)) {
             raidAmbientVfx(level, state.center);
          }
-         if (now % 600L == 0L) {
+         if (state.due("horn", now, 600L, false)) {
             playRaidHorn(level, state.center);
          }
          // First wave: fire as soon as the raid starts.
          if (state.wave == 0) {
             state.wave = 1;
             state.nextWaveTick = now - 1L;
+            state.waveStartedAt = now;
             announceWaveStart(level, state, 1);
             spawnPlayerRaidWave(level, state);
             continue;
          }
          // Only spawn the next wave when the current one is cleared AND the
          // inter-wave delay has passed.
-         if (now < state.nextWaveTick || livingWaveRaiders(level, key) > 0) {
+         int alive = livingWaveRaiders(level, key);
+         if (alive > 0) {
+            state.waveClearedAt = -1L;
+            herdStragglers(level, key, state, now);
             continue;
          }
-         int totalWaves = 3 + Math.min(3, state.omenLevel); // 4-6 waves
+         if (now < state.nextWaveTick) {
+            continue;
+         }
+         int totalWaves = 3 + Math.min(3, state.omenLevel); // 3-6 waves
          if (state.wave >= totalWaves) {
             // Final wave cleared -> the custom minibosses descend.
             state.warlordSpawned = true;
@@ -467,50 +509,194 @@ public final class PlayerRaidManager {
             bossPhases.putIfAbsent(key, new BossPhase(state.dimension));
             continue;
          }
-         waveClearReward(level, state);
+         // Cleared: pay the wave out once, then a real breather before the next one
+         // drops. (The old 6s "breather" was measured from the wave's SPAWN, so it had
+         // always run out long before the wave was cleared and never paused anything.)
+         if (state.waveClearedAt < 0L) {
+            state.waveClearedAt = now;
+            if (state.rewardedWave != state.wave) {
+               state.rewardedWave = state.wave;   // a straggler wandering back can't re-pay it
+               waveClearReward(level, state);
+            }
+            continue;
+         }
+         if (now - state.waveClearedAt < WAVE_BREATHER_TICKS) {
+            continue;
+         }
+         state.waveClearedAt = -1L;
          waveSize.remove(key);
          state.wave++;
-         state.nextWaveTick = now + 120L; // 6s breather between waves
+         state.nextWaveTick = now;
+         state.waveStartedAt = now;
          announceWaveStart(level, state, state.wave);
          spawnPlayerRaidWave(level, state);
       }
    }
 
+   /**
+    * Hard ceiling on the raiders one wave may field, riders included. The waves grow with the
+    * party, and a five-player Bad Omen III wave 6 would otherwise drop ~100 pathfinding illagers
+    * on one spot. Past the cap the extra players still face TOUGHER raiders (the HP scale keeps
+    * climbing), just not more of them. Ravagers and the specialists are spawned first, so the cap
+    * trims foot soldiers, never the wave's heavy hitters.
+    */
+   public static final int WAVE_MOB_CAP = 45;
+   /** Ticks of quiet between a cleared wave and the next one dropping. */
+   private static final long WAVE_BREATHER_TICKS = 120L;
+
+   /** How many more bodies a wave fields per extra defender: +50% each, up to 3x at 5+ players. */
+   public static double waveCountScale(int players) {
+      return 1.0 + 0.5 * Math.min(4, Math.max(0, players - 1));
+   }
+
+   // Solo base counts per wave. The opener used to be four pillagers and one vindicator - a
+   // warm-up, not a raid - and ravagers did not show up until wave 3. Now wave 1 already has a
+   // ravager with a rider on its back, and every wave after it fields more of everything.
+
+   /** Pillagers in wave {@code w}, solo: 6, 8, 10, 12, 14, 16. */
+   public static int wavePillagers(int w) {
+      return 4 + 2 * w;
+   }
+
+   /** Vindicators in wave {@code w}, solo: 3, 4, 5, 6, 7, 8. */
+   public static int waveVindicators(int w) {
+      return 2 + w;
+   }
+
+   /** Ravagers in wave {@code w}, solo: 1, 1, 2, 2, 3, 3. */
+   public static int waveRavagers(int w) {
+      return 1 + Math.max(0, w - 1) / 2;
+   }
+
+   /** How many of those ravagers carry a rider: the first two waves' one, then all but one. */
+   public static int waveRavagerRiders(int w) {
+      return w <= 2 ? 1 : waveRavagers(w) - 1;
+   }
+
    /** Spawns one wave of raiders around the raid center. The composition scales
-    *  with wave number, Bad Omen level, and how many players are fighting. */
+    *  with wave number and how many players are fighting, under {@link #WAVE_MOB_CAP}. */
    private static void spawnPlayerRaidWave(ServerLevel level, RaidState state) {
       int w = state.wave;
-      double playerScale = dynamicPlayerScale(level, state.center);
+      double countScale = waveCountScale(Math.max(1, aliveNearbyPlayers(level, state.center)));
       ServerPlayer target = nearestFighter(level, state);
-      // Wave 1: Pillagers + Vindicators (classic raid opener)
-      spawnWaveRaider(level, state, EntityTypes.PILLAGER, (int)Math.round((3 + w) * playerScale));
-      spawnWaveRaider(level, state, EntityTypes.VINDICATOR, (int)Math.round((1 + w / 2) * playerScale));
-      // Wave 2+: Add witches for healing
+      int[] budget = {Math.max(0, WAVE_MOB_CAP - livingWaveRaiders(level, stateWaveKey(state)))};
+      // Ravagers first, each with its rider (alternating pillager / vindicator), so the
+      // cap can never strip the wave of the beasts that make it a raid.
+      int ravagers = (int)Math.round(waveRavagers(w) * countScale);
+      int riders = Math.min(ravagers, (int)Math.round(waveRavagerRiders(w) * countScale));
+      for (int i = 0; i < ravagers && budget[0] > 0; i++) {
+         Mob beast = spawnWaveRaider(level, state, EntityTypes.RAVAGER);
+         if (beast == null) {
+            continue;
+         }
+         budget[0]--;
+         if (i < riders && budget[0] > 0) {
+            Mob rider = spawnWaveRaiderAt(level, state, i % 2 == 0 ? EntityTypes.PILLAGER : EntityTypes.VINDICATOR,
+               beast.getX(), beast.getY(), beast.getZ(), false);
+            if (rider != null) {
+               budget[0]--;
+               rider.startRiding(beast);
+            }
+         }
+      }
+      // Wave 2+: witches heal the line (not party-scaled - more healers only drags it out).
       if (w >= 2) {
-         spawnWaveRaider(level, state, EntityTypes.WITCH, Math.max(1, w / 2));
+         spawnWaveRaiders(level, state, EntityTypes.WITCH, 1 + (w - 2) / 2, budget);
       }
-      // Wave 3+: Ravagers charge in
-      if (w >= 3) {
-         spawnWaveRaider(level, state, EntityTypes.RAVAGER, Math.max(1, (w - 1) / 2));
-      }
-      // Wave 4+: Illusioners create chaos with clones
+      // Wave 4+: illusioners create chaos with clones
       if (w >= 4) {
-         spawnWaveRaider(level, state, EntityTypes.ILLUSIONER, 1 + (w - 4) / 2);
+         spawnWaveRaiders(level, state, EntityTypes.ILLUSIONER, 1 + (w - 4) / 2, budget);
       }
-      // Wave 5+: Evokers summon vexes and fangs
+      // Wave 5+: evokers summon vexes and fangs
       if (w >= 5) {
-         spawnWaveRaider(level, state, EntityTypes.EVOKER, 1 + (w - 5) / 2);
+         spawnWaveRaiders(level, state, EntityTypes.EVOKER, 1 + (w - 5) / 2, budget);
       }
-      // Wave 6+: Full raid escalation
-      if (w >= 6) {
-         spawnWaveRaider(level, state, EntityTypes.RAVAGER, 1 + (w - 6) / 2);
-         spawnWaveRaider(level, state, EntityTypes.VINDICATOR, 1 + (w - 6) / 2);
-         spawnWaveRaider(level, state, EntityTypes.PILLAGER, 2 + (w - 6) / 2);
-      }
+      // The line itself, scaled by the party and trimmed by whatever budget is left.
+      spawnWaveRaiders(level, state, EntityTypes.VINDICATOR, (int)Math.round(waveVindicators(w) * countScale), budget);
+      spawnWaveRaiders(level, state, EntityTypes.PILLAGER, (int)Math.round(wavePillagers(w) * countScale), budget);
       if (target != null) {
          com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, target.getX(), target.getY() + 2.0, target.getZ(), 25, 2.0, 1.5, 2.0, 0.05);
       }
       applyWaveTwist(level, state, target);
+   }
+
+   /** Spawns up to {@code count} raiders of one type, spending the wave's shared budget. */
+   private static void spawnWaveRaiders(ServerLevel level, RaidState state, EntityType<? extends Mob> type, int count, int[] budget) {
+      for (int i = 0; i < count && budget[0] > 0; i++) {
+         if (spawnWaveRaider(level, state, type) != null) {
+            budget[0]--;
+         }
+      }
+   }
+
+   /** Raiders a wave has fielded this long start to glow, so the last few can be found. */
+   private static final long STRAGGLER_GLOW_AFTER = 45L * 20L;
+   /** ...after this long, any still far from every defender are pulled back into the fight. */
+   private static final long STRAGGLER_PULL_AFTER = 90L * 20L;
+   /** ...and after this long a handful of unreachable stragglers flee rather than stall the raid. */
+   private static final long STRAGGLER_GIVE_UP_AFTER = 240L * 20L;
+
+   /**
+    * Keeps a wave from stalling. A wave only ends when every raider in it is dead, and one
+    * pillager perched on a tree, a witch bobbing in a lake or a vindicator stuck in a ravine used
+    * to hold the whole raid hostage forever - no next wave, no Warlord, no offer. Now the last
+    * raiders glow after 45s, anyone far from the defenders is dragged back into the fight after
+    * 90s, and after four minutes three or fewer stragglers simply flee.
+    */
+   private static void herdStragglers(ServerLevel level, String key, RaidState state, long now) {
+      if (state.waveStartedAt < 0L) {
+         state.waveStartedAt = now;
+      }
+      long age = now - state.waveStartedAt;
+      if (age < STRAGGLER_GLOW_AFTER || !state.due("stragglers", now, 100L, true)) {
+         return;
+      }
+      List<Raider> left = new ArrayList<>();
+      for (Raider r : level.getEntitiesOfClass(Raider.class, waveBox(state.center))) {
+         if (isTagged(r, WAVE_TAG, key)) {
+            left.add(r);
+         }
+      }
+      if (age >= STRAGGLER_GIVE_UP_AFTER && left.size() <= 3) {
+         for (Raider r : left) {
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, r.getX(), r.getY() + 1.0, r.getZ(), 12, 0.4, 0.6, 0.4, 0.02);
+            r.discard();
+         }
+         notifyNear(level, state, "\u00a77The last stragglers of wave \u00a7f" + state.wave + "\u00a77 lose their nerve and flee.");
+         return;
+      }
+      ServerPlayer target = nearestFighter(level, state);
+      boolean pulled = false;
+      for (Raider r : left) {
+         r.setGlowingTag(true);
+         if (age < STRAGGLER_PULL_AFTER || target == null || r.isPassenger()) {
+            continue;
+         }
+         if (r.distanceToSqr(target) < 24.0 * 24.0 && Math.abs(r.getY() - target.getY()) < 6.0) {
+            continue;
+         }
+         double a = RANDOM.nextDouble() * Math.PI * 2.0, d = 8.0 + RANDOM.nextDouble() * 4.0;
+         double x = target.getX() + Math.cos(a) * d, z = target.getZ() + Math.sin(a) * d;
+         double y = feetY(level, x, z, target.getBlockY());
+         if (Double.isNaN(y)) {
+            continue;
+         }
+         r.teleportTo(x, y, z);
+         r.setTarget(target);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, x, y + 1.0, z, 16, 0.4, 0.8, 0.4, 0.2);
+         pulled = true;
+      }
+      if (pulled && state.strayNoticeWave != state.wave) {
+         state.strayNoticeWave = state.wave;
+         notifyNear(level, state, "\u00a7c\u2694 \u00a77The stragglers of wave \u00a7f" + state.wave + "\u00a77 are driven back into the fight!");
+      }
+   }
+
+   /** A chat line for every player inside the raid's 128-block bubble. */
+   private static void notifyNear(ServerLevel level, RaidState state, String line) {
+      for (ServerPlayer p : level.getPlayers(pl -> pl.distanceToSqr(state.center.getX(), state.center.getY(), state.center.getZ()) < 128.0 * 128.0)) {
+         Chat.raw(p, line);
+      }
    }
 
    private static final String BOUNTY_TAG = "ff_raid_bounty";
@@ -559,6 +745,9 @@ public final class PlayerRaidManager {
                   // AMBUSH: half the wave comes out of the ground round the nearest fighter.
                   twist = "§c§lAMBUSH §7- they were waiting for you.";
                   for (int i = 0; i < wave.size(); i += 2) {
+                     if (wave.get(i).isPassenger()) {
+                        continue;   // a ravager's rider comes with its ravager, not on its own
+                     }
                      double a = RANDOM.nextDouble() * Math.PI * 2.0, r = 7.0 + RANDOM.nextDouble() * 4.0;
                      double x = target.getX() + Math.cos(a) * r, z = target.getZ() + Math.sin(a) * r;
                      double y = feetY(level, x, z, target.getBlockY());
@@ -603,6 +792,10 @@ public final class PlayerRaidManager {
          if (state.betrayJoined && state.betrayerId != null && state.betrayerId.equals(p.getUUID())) {
             continue;
          }
+         // A corpse or a spectator is not a target: raiders sent after one just stood still.
+         if (!p.isAlive() || p.isSpectator()) {
+            continue;
+         }
          double d = p.distanceToSqr(state.center.getX(), state.center.getY(), state.center.getZ());
          if (d < bestDist) {
             bestDist = d;
@@ -612,11 +805,13 @@ public final class PlayerRaidManager {
       return best;
    }
 
-   /** Spawns {@code count} raiders of the given type on the surface near the
-    *  raid center, tagged so the wave phase can track them, and tells them to
-    *  hunt the player. */
-   private static void spawnWaveRaider(ServerLevel level, RaidState state, EntityType<? extends Mob> type, int count) {
-      for (int i = 0; i < count; i++) {
+   /** Spawns one raider of the given type on the surface near the raid center,
+    *  tagged so the wave phase can track it, and tells it to hunt the player.
+    *  Null when no honest floor was found or the type would not create. */
+   private static Mob spawnWaveRaider(ServerLevel level, RaidState state, EntityType<? extends Mob> type) {
+      // A few tries for a floor: a ravine or a lake on one side of the raid used
+      // to quietly cost the wave a raider per miss.
+      for (int attempt = 0; attempt < 3; attempt++) {
          double a = RANDOM.nextDouble() * Math.PI * 2.0;
          double r = 14.0 + RANDOM.nextDouble() * 18.0;
          int x = state.center.getX() + (int)Math.round(Math.cos(a) * r);
@@ -626,58 +821,67 @@ public final class PlayerRaidManager {
          // hills and 2x1 holes on uneven terrain), and the spot must have open
          // air - never spawn inside blocks, ravines or underground.
          double y = feetY(level, x + 0.5, z + 0.5, state.center.getY());
-         if (Double.isNaN(y)) {
-            continue;   // no honest floor here - better one raider fewer than one in a wall
+         if (!Double.isNaN(y)) {
+            return spawnWaveRaiderAt(level, state, type, x + 0.5, y, z + 0.5, true);
          }
-         Mob raider = type.create(level, EntitySpawnReason.EVENT);
-         if (raider == null) {
-            continue;
-         }
-         raider.setPos(x + 0.5, y, z + 0.5);
-         raider.setPersistenceRequired();
-         // EntityType.create() doesn't give default equipment - add weapons manually
-         if (type == EntityTypes.PILLAGER) {
-            // 20% chance: tank pillager with armor + shield + sword instead of crossbow
-            if (RANDOM.nextInt(5) == 0) {
-               raider.setCustomName(Component.literal("§6§l⚔ Tank Pillager"));
-               raider.setCustomNameVisible(true);
-               raider.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET));
-               raider.setItemSlot(EquipmentSlot.CHEST, new ItemStack(Items.IRON_CHESTPLATE));
-               raider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_SWORD));
-               raider.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
-               // Tank has 2x HP
-               AttributeInstance tankHp = raider.getAttribute(Attributes.MAX_HEALTH);
-               if (tankHp != null) tankHp.setBaseValue(tankHp.getBaseValue() * 2.0);
-               raider.setHealth(raider.getMaxHealth());
-               // A pillager without a crossbow has no attack goal at all - give
-               // the tank real melee AI so it actually fights.
-               if (raider instanceof MobGoalAccessor acc && raider instanceof PathfinderMob pm) {
-                  acc.fortuneandfavors$goalSelector().addGoal(2, new MeleeAttackGoal(pm, 1.1, false));
-               }
-            } else {
-               raider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.CROSSBOW));
-            }
-         } else if (type == EntityTypes.VINDICATOR) {
-            raider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
-         } else if (type == EntityTypes.ILLUSIONER) {
-            // Illusioners are archers - give them a real bow.
-            raider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
-         }
-         disjoinFromRaid(raider);
-         tagMob(raider, WAVE_TAG, stateWaveKey(state));
-         double hpMult = (1.0 + 0.2 * state.wave) * dynamicPlayerScale(level, state.center);
-         AttributeInstance hp = raider.getAttribute(Attributes.MAX_HEALTH);
-         if (hp != null) {
-            hp.setBaseValue(hp.getBaseValue() * hpMult);
-         }
-         raider.setHealth(raider.getMaxHealth());
-         level.addFreshEntity(raider);
-         ServerPlayer target = nearestFighter(level, state);
-         if (target != null) {
-            raider.setTarget(target);
-         }
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.FLAME, raider.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 0.5, 0.0, 0x8A1020);
       }
+      return null;   // no honest floor here - better one raider fewer than one in a wall
+   }
+
+   /** Spawns one tagged, equipped, wave-scaled raider at an exact spot. A ravager's
+    *  rider passes {@code allowTank} false: the shield-and-sword tank is a foot soldier. */
+   private static Mob spawnWaveRaiderAt(ServerLevel level, RaidState state, EntityType<? extends Mob> type, double x, double y, double z, boolean allowTank) {
+      Mob raider = type.create(level, EntitySpawnReason.EVENT);
+      if (raider == null) {
+         return null;
+      }
+      raider.setPos(x, y, z);
+      raider.setPersistenceRequired();
+      // EntityType.create() doesn't give default equipment - add weapons manually
+      if (type == EntityTypes.PILLAGER) {
+         // 20% chance: tank pillager with armor + shield + sword instead of crossbow
+         if (allowTank && RANDOM.nextInt(5) == 0) {
+            raider.setCustomName(Component.literal("§6§l⚔ Tank Pillager"));
+            raider.setCustomNameVisible(true);
+            raider.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET));
+            raider.setItemSlot(EquipmentSlot.CHEST, new ItemStack(Items.IRON_CHESTPLATE));
+            raider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_SWORD));
+            raider.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+            // Tank has 2x HP
+            AttributeInstance tankHp = raider.getAttribute(Attributes.MAX_HEALTH);
+            if (tankHp != null) tankHp.setBaseValue(tankHp.getBaseValue() * 2.0);
+            raider.setHealth(raider.getMaxHealth());
+            // A pillager without a crossbow has no attack goal at all - give
+            // the tank real melee AI so it actually fights.
+            if (raider instanceof MobGoalAccessor acc && raider instanceof PathfinderMob pm) {
+               acc.fortuneandfavors$goalSelector().addGoal(2, new MeleeAttackGoal(pm, 1.1, false));
+            }
+         } else {
+            raider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.CROSSBOW));
+         }
+      } else if (type == EntityTypes.VINDICATOR) {
+         raider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
+      } else if (type == EntityTypes.ILLUSIONER) {
+         // Illusioners are archers - give them a real bow.
+         raider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+      }
+      disjoinFromRaid(raider);
+      tagMob(raider, WAVE_TAG, stateWaveKey(state));
+      double hpMult = (1.0 + 0.2 * state.wave) * dynamicPlayerScale(level, state.center);
+      AttributeInstance hp = raider.getAttribute(Attributes.MAX_HEALTH);
+      if (hp != null) {
+         hp.setBaseValue(hp.getBaseValue() * hpMult);
+      }
+      raider.setHealth(raider.getMaxHealth());
+      if (!level.addFreshEntity(raider)) {
+         return null;
+      }
+      ServerPlayer target = nearestFighter(level, state);
+      if (target != null) {
+         raider.setTarget(target);
+      }
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.FLAME, raider.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 0.5, 0.0, 0x8A1020);
+      return raider;
    }
 
    /**
@@ -731,7 +935,7 @@ public final class PlayerRaidManager {
    /** Counts living wave raiders tagged for this raid key. */
    private static int livingWaveRaiders(ServerLevel level, String key) {
       BlockPos center = stateCenterFor(level, key);
-      List<Raider> raiders = level.getEntitiesOfClass(Raider.class, boxAround(center, 48, 16));
+      List<Raider> raiders = level.getEntitiesOfClass(Raider.class, waveBox(center));
       int count = 0;
       for (Raider raider : raiders) {
          if (isTagged(raider, WAVE_TAG, key)) {
@@ -746,6 +950,16 @@ public final class PlayerRaidManager {
       return s != null ? s.center : BlockPos.ZERO;
    }
 
+   /**
+    * The volume a wave is counted, herded and cleaned up in. It used to be 48 blocks across and
+    * 16 high for counting but 64 for cleanup, so a raider who chased a defender 50 blocks out
+    * stopped counting (the next wave dropped on top of it) and was then never discarded either -
+    * a named, persistent illager left wandering the countryside after every raid.
+    */
+   private static AABB waveBox(BlockPos center) {
+      return boxAround(center, 96, 40);
+   }
+
    private static AABB boxAround(BlockPos center, int horiz, int vert) {
       return new AABB(
          net.minecraft.world.phys.Vec3.atBottomCenterOf(center.offset(-horiz, -vert, -horiz)),
@@ -755,7 +969,7 @@ public final class PlayerRaidManager {
 
    /** Removes any remaining wave raiders (called when the boss phase begins). */
    private static void discardWaveRaiders(ServerLevel level, String key) {
-      List<Raider> raiders = level.getEntitiesOfClass(Raider.class, boxAround(stateCenterFor(level, key), 64, 16));
+      List<Raider> raiders = level.getEntitiesOfClass(Raider.class, waveBox(stateCenterFor(level, key)));
       for (Raider raider : raiders) {
          if (isTagged(raider, WAVE_TAG, key)) {
             raider.discard();
@@ -785,12 +999,17 @@ public final class PlayerRaidManager {
             bossPhases.remove(key);
             continue;
          }
+         long now = ServerClock.clock(level);
+         // Every cadence here is a deadline (RaidState.due), not "gameTime % N == K": when this
+         // manager was ticked once a second those modulus tests sampled the same residue every
+         // call, and most of them - the vexes, the clones, the skeletons, the volley - never
+         // fired. Deadlines behave the same at any tick rate.
          // Evoker vex summoning every 15 seconds (300 ticks)
-         if (level.getGameTime() % 300L == 0L) {
+         if (state.due("vex", now, 300L, false)) {
             summonVexReinforcements(level, key);
          }
          // Illusioner's illusion clones - fragile, but they actually attack
-         if (level.getGameTime() % 200L == 40L) {
+         if (state.due("clones", now, 200L, false)) {
             illusionerSpawnClones(level, key);
          }
          // Spawn necromancer once when boss phase starts
@@ -801,10 +1020,10 @@ public final class PlayerRaidManager {
          // Necromancer: summon wither skeletons every 12s + lifesteal every 3s
          Mob necroMob = mobAlive(level, necromancerIds, key);
          if (necroMob != null && necroMob.isAlive()) {
-            if (level.getGameTime() % 240L == 0L) {
+            if (state.due("skeletons", now, 240L, false)) {
                necromancerSummonWitherSkeletons(level, key);
             }
-            if (level.getGameTime() % 60L == 40L) {
+            if (state.due("lifesteal", now, 60L, false)) {
                necromancerLifesteal(level, key);
             }
          }
@@ -826,18 +1045,25 @@ public final class PlayerRaidManager {
                state.warlordPhase = stage;
                announceWarlordPhase(level, warlordMob, stage);
             }
-            warlordTick(level, key, state, warlordMob, stage, level.getGameTime());
+            // The Warlord's own clock is the shared ServerClock: every deadline his moves set
+            // (slam, wind-up, charge, hold-the-line, the ring and heartbeat tells) is set and
+            // read off this one argument, and it keeps running outside the overworld, where
+            // the level's game time is frozen and a wound-up slam would never have landed.
+            // This part runs every tick - the wind-up is the fight's telegraph.
+            warlordTick(level, key, state, warlordMob, stage, ServerClock.clock(level));
          }
          // === SECOND PHASE: THE WARLORD'S OFFER (multiplayer only, once per raid) ===
+         // Asked of the Warlord's health and of who can actually take the offer: two or more
+         // LIVING defenders. The flag is only set when an offer was really made, so a moment
+         // with one defender dead (or the betrayal roll finding nobody) no longer burns the
+         // raid's one offer for nothing.
          if (warlordMob != null && warlordMob.isAlive() && !state.betrayalTriggered
-               && warlordMob.getHealth() < warlordMob.getMaxHealth() * 0.4F
-               && nearbyPlayers(level, state.center) >= 2) {
-            state.betrayalTriggered = true;
-            triggerBetrayal(level, key, state);
+               && warlordMob.getHealth() < warlordMob.getMaxHealth() * BETRAYAL_AT
+               && betrayalCandidates(level, state).size() >= 2) {
+            state.betrayalTriggered = triggerBetrayal(level, key, state);
          }
-         // Betrayer health shown as a boss bar while they fight for the Warlord
-         updateBetrayerBar(level, key, state);
-         // Bosses never target the player who joined the Warlord
+         // Bosses never target the player who joined the Warlord (every tick: a boss that
+         // re-acquired the betrayer must not get a swing in before it is called off).
          if (state.betrayJoined && state.betrayerId != null) {
             for (Mob b : allBossMobs(level, key)) {
                if (b != null && b.getTarget() != null && b.getTarget().getUUID().equals(state.betrayerId)) {
@@ -845,10 +1071,19 @@ public final class PlayerRaidManager {
                }
             }
          }
+         // Everything below - the bars, the abandonment / betrayal-victory / defeat / victory
+         // bookkeeping - is once a second, exactly the cadence it had when this whole manager
+         // was ticked from ModEvents' once-a-second block. The Warlord above, the offer check
+         // and the deadline-driven summons run every tick now.
+         if (!state.due("bossBookkeeping", now, 20L, true)) {
+            continue;
+         }
+         // Betrayer health shown as a boss bar while they fight for the Warlord
+         updateBetrayerBar(level, key, state);
 
          // Captain rapid fire every 4 seconds
          Mob captainMob = mobAlive(level, captainIds, key);
-         if (captainMob != null && captainMob.isAlive() && level.getGameTime() % 80L == 60L) {
+         if (captainMob != null && captainMob.isAlive() && state.due("volley", now, 80L, false)) {
             captainRapidFire(level, captainMob, state);
          }
          // Update boss bar with combined HP
@@ -857,11 +1092,13 @@ public final class PlayerRaidManager {
          // grace period to come back, then the champions overrun the village.
          if (aliveNearbyPlayers(level, state.center) == 0) {
             if (state.noPlayersSince < 0L) {
-               state.noPlayersSince = level.getGameTime();
+               state.noPlayersSince = now;
                for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-                  Chat.raw(p, "§c⚔ §7All fighters have fallen! The champions will claim the loot in §f60s§7 unless someone returns!");
+                  if (p.level().dimension().equals(level.dimension())) {
+                     Chat.raw(p, "§c⚔ §7All fighters have fallen! The champions will claim the loot in §f60s§7 unless someone returns!");
+                  }
                }
-            } else if (level.getGameTime() - state.noPlayersSince >= 1200L) {
+            } else if (now - state.noPlayersSince >= 1200L) {
                state.settled = true;
                raidDefeatVfx(level, state.center);
                removeBossBar(key);
@@ -900,10 +1137,10 @@ public final class PlayerRaidManager {
          if (state.betrayJoined && state.betrayerId != null
                && betrayerAlive && otherParticipantsDeadOrGone(level, state)) {
             if (state.villainSince < 0L) {
-               state.villainSince = level.getGameTime();
+               state.villainSince = now;
                level.getServer().getPlayerList().broadcastSystemMessage(
                   Component.literal(Chat.colorize("§7The last defender has fallen... the Warlord's champion stands alone.")), false);
-            } else if (level.getGameTime() - state.villainSince >= 200L) {
+            } else if (now - state.villainSince >= 200L) {
                state.settled = true;
                settleBetrayalVictory(level, state);
                cleanupRaid(key);
@@ -916,8 +1153,8 @@ public final class PlayerRaidManager {
          // === PLAYER RAID LOSS: EVERY PARTICIPANT DIED ===
          if (!state.settled && !state.betrayJoined && participantsAllDead(level, state)) {
             if (state.allDeadSince < 0L) {
-               state.allDeadSince = level.getGameTime();
-            } else if (level.getGameTime() - state.allDeadSince >= 200L) {
+               state.allDeadSince = now;
+            } else if (now - state.allDeadSince >= 200L) {
                state.settled = true;
                settleDefeatAllFell(level, key, state);
                cleanupRaid(key);
@@ -932,6 +1169,7 @@ public final class PlayerRaidManager {
                state.settled = true;
                removeBossBar(key);
                removeBetrayerBar(key);
+               discardRaidSummons(level, key);
                settleVictory(level, state);
                cleanupRaid(key);
                raidDifficulty = 0;
@@ -979,7 +1217,24 @@ public final class PlayerRaidManager {
       int total = 3 + Math.min(3, state.omenLevel);
       bar.setName(Component.literal("§c§l⚔ RAID §7- Wave §f" + state.wave + "§7/" + total + " §8· §f" + alive + " §7raiders"));
       bar.setProgress(size == 0 ? 0.0F : Math.min(1.0F, alive / (float)size));
-      for (ServerPlayer p : level.getPlayers(pl -> pl.distanceToSqr(state.center.getX(), state.center.getY(), state.center.getZ()) < 128.0 * 128.0)) {
+      syncBarViewers(level, bar, state.center);
+   }
+
+   /**
+    * Shows a raid bar to everyone inside the fight's 128-block bubble and takes it back from
+    * anyone who has left it (or the dimension). The boss bar was handed out once, at the moment
+    * the bosses spawned, so a defender who respawned or arrived late fought without it; and the
+    * wave bar was never taken back, so a player who walked off kept a raid bar on screen until
+    * the raid ended somewhere they could no longer see.
+    */
+   private static void syncBarViewers(ServerLevel level, ServerBossEvent bar, BlockPos center) {
+      for (ServerPlayer p : new ArrayList<>(bar.getPlayers())) {
+         if (!p.level().dimension().equals(level.dimension())
+               || p.distanceToSqr(center.getX(), center.getY(), center.getZ()) > 160.0 * 160.0) {
+            bar.removePlayer(p);
+         }
+      }
+      for (ServerPlayer p : level.getPlayers(pl -> pl.distanceToSqr(center.getX(), center.getY(), center.getZ()) < 128.0 * 128.0)) {
          bar.addPlayer(p);
       }
    }
@@ -1210,7 +1465,7 @@ public final class PlayerRaidManager {
     */
    private static void warlordTick(ServerLevel level, String key, RaidState state, Mob warlord, int phase, long now) {
       if (phase == WARLORD_PHASE_LINE) {
-         warlordHoldTheLine(level, key, warlord, now);
+         warlordHoldTheLine(level, key, state, warlord, now);
          state.warlordNextSlam = now + warlordSlamCooldown(phase);
          state.warlordNextCharge = now + warlordChargeCooldown(phase);
          return;
@@ -1218,7 +1473,7 @@ public final class PlayerRaidManager {
       // Mid wind-up: keep painting the ring, then land it.
       if (state.warlordSlamLands >= 0L) {
          if (now < state.warlordSlamLands) {
-            warlordSlamTell(level, warlord, phase);
+            warlordSlamTell(level, state, warlord, phase, now);
          } else {
             state.warlordSlamLands = -1L;
             warlordGroundSlam(level, warlord, phase);
@@ -1231,7 +1486,7 @@ public final class PlayerRaidManager {
       if (now >= state.warlordNextSlam && warlordHasTargetWithin(level, warlord, warlordSlamRadius(phase))) {
          state.warlordSlamLands = now + warlordSlamWindup(phase);
          state.warlordNextSlam = now + warlordSlamCooldown(phase);
-         warlordSlamTell(level, warlord, phase);
+         warlordSlamTell(level, state, warlord, phase, now);
          return;
       }
       if (warlordUsesFire(phase)) {
@@ -1245,7 +1500,7 @@ public final class PlayerRaidManager {
       }
       if (phase >= WARLORD_PHASE_LAST_STAND && !state.lastStandCalled) {
          state.lastStandCalled = true;
-         warlordCallReinforcements(level, warlord);
+         warlordCallReinforcements(level, key, warlord);
       }
    }
 
@@ -1256,8 +1511,11 @@ public final class PlayerRaidManager {
     * along - so a raid cannot be short-cut by ignoring the room and pouring everything into the one
     * big health bar, which is what the old fight was.
     */
-   private static void warlordHoldTheLine(ServerLevel level, String key, Mob warlord, long now) {
-      if (now % 100L != 0L) {
+   private static void warlordHoldTheLine(ServerLevel level, String key, RaidState state, Mob warlord, long now) {
+      // A deadline on the Warlord's clock: "now % 100 == 0" sampled once a second (as this
+      // manager used to be) matched only when the clock happened to land on that residue, so
+      // on most servers the line never armoured him at all.
+      if (!state.due("hold", now, 100L, true)) {
          return;
       }
       warlord.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 120, 1, false, false, true));
@@ -1269,9 +1527,9 @@ public final class PlayerRaidManager {
    }
 
    /** The ring on the floor that says where not to be, and the heartbeat under it. */
-   private static void warlordSlamTell(ServerLevel level, Mob warlord, int phase) {
+   private static void warlordSlamTell(ServerLevel level, RaidState state, Mob warlord, int phase, long now) {
       double r = warlordSlamRadius(phase);
-      if (level.getGameTime() % 5L == 0L) {
+      if (state.due("slamRing", now, 5L, true)) {
          com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIT, warlord.position().add(0.0, 0.15, 0.0), Vec3.ZERO, r, 0.0, WAR_RED);
       }
       com.fortuneandfavors.net.FfVfx.enter();   // the crit ring below is the vanilla clients' tell
@@ -1290,7 +1548,7 @@ public final class PlayerRaidManager {
          );
       }
       com.fortuneandfavors.net.FfVfx.exit();
-      if (level.getGameTime() % 6L == 0L) {
+      if (state.due("heartbeat", now, 6L, true)) {
          level.playSound(null, warlord.blockPosition(), SoundEvents.WARDEN_HEARTBEAT, SoundSource.HOSTILE, 1.4F, 0.7F);
       }
    }
@@ -1306,7 +1564,7 @@ public final class PlayerRaidManager {
    }
 
    /** The last stand's reinforcements: two of his own guard, called once. */
-   private static void warlordCallReinforcements(ServerLevel level, Mob warlord) {
+   private static void warlordCallReinforcements(ServerLevel level, String key, Mob warlord) {
       for (int i = 0; i < 2; i++) {
          Mob guard = EntityTypes.VINDICATOR.create(level, EntitySpawnReason.EVENT);
          if (guard == null) {
@@ -1321,6 +1579,7 @@ public final class PlayerRaidManager {
          guard.setDropChance(EquipmentSlot.MAINHAND, 0.0F);
          disjoinFromRaid(guard);
          guard.setPersistenceRequired();
+         tagMob(guard, SUMMON_TAG, key);
          level.addFreshEntity(guard);
          com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, guard.getX(), guard.getY() + 1, guard.getZ(), 12, 0.3, 0.5, 0.3, 0.05);
       }
@@ -1400,6 +1659,7 @@ public final class PlayerRaidManager {
          ws.setCustomName(Component.literal("§4§l⚔ Undead"));
          ws.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.STONE_SWORD));
          ws.setPersistenceRequired();
+         tagMob(ws, SUMMON_TAG, key);
          level.addFreshEntity(ws);
          com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, ws.getX(), ws.getY(), ws.getZ(), 8, 0.3, 0.5, 0.3, 0.05);
       }
@@ -1491,6 +1751,7 @@ public final class PlayerRaidManager {
 
       // Update title to show remaining bosses
       bar.setName(Component.literal("§c§l⚔ Raid Bosses §7(" + aliveCount + " remaining)"));
+      syncBarViewers(level, bar, state.center);
    }
 
    private static void removeBossBar(String key) {
@@ -1502,29 +1763,52 @@ public final class PlayerRaidManager {
 
    // === SECOND PHASE: THE WARLORD'S OFFER ===
 
-   /** The Warlord "brings away" one random nearby player for a private offer.
-    *  Only triggers once, in multiplayer, when the Warlord is below 40% HP. */
-   private static void triggerBetrayal(ServerLevel level, String key, RaidState state) {
+   /**
+    * Warlord health fraction under which he makes his offer. Deliberately above the last
+    * stand's third: the offer is the turn of the fight, and it has to land while there is still
+    * a fight left for a betrayer to change.
+    */
+   public static final float BETRAYAL_AT = 0.4F;
+
+   /**
+    * Who the Warlord may make his offer to: living, non-spectating players inside the raid's
+    * 128-block bubble. The offer needs two of them - it is a betrayal of somebody, and a solo
+    * player who accepted would be "the last one standing" the instant they knelt and walk off
+    * with the Villain's hoard for nothing (see otherParticipantsDeadOrGone).
+    */
+   private static List<ServerPlayer> betrayalCandidates(ServerLevel level, RaidState state) {
       List<ServerPlayer> candidates = new ArrayList<>();
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (p.level().dimension().equals(level.dimension())
+         if (p.level().dimension().equals(level.dimension()) && p.isAlive() && !p.isSpectator()
                && p.distanceToSqr(state.center.getX(), state.center.getY(), state.center.getZ()) < 128.0 * 128.0) {
             candidates.add(p);
          }
       }
-      if (candidates.isEmpty()) {
-         return;
+      return candidates;
+   }
+
+   /** The Warlord "brings away" one random nearby player for a private offer.
+    *  Only triggers once, in multiplayer, when the Warlord is below 40% HP.
+    *  Returns whether an offer was actually made. */
+   private static boolean triggerBetrayal(ServerLevel level, String key, RaidState state) {
+      List<ServerPlayer> candidates = betrayalCandidates(level, state);
+      if (candidates.size() < 2) {
+         return false;
       }
       ServerPlayer chosen = candidates.get(RANDOM.nextInt(candidates.size()));
       state.betrayerId = chosen.getUUID();
 
-      // "Brings them away" - yank them to the edge of the fight with heavy VFX.
+      // "Brings them away" - yank them to the edge of the fight with heavy VFX. The
+      // landing is a real floor near the fight's height (it used to be the column's
+      // top block, which put the chosen player on a treetop or into the sea).
       double a = RANDOM.nextDouble() * Math.PI * 2.0;
       double r = 16.0 + RANDOM.nextDouble() * 4.0;
-      int tx = state.center.getX() + (int)Math.round(Math.cos(a) * r);
-      int tz = state.center.getZ() + (int)Math.round(Math.sin(a) * r);
-      int ty = level.getHeight(Types.MOTION_BLOCKING, tx, tz);
-      chosen.teleportTo(tx + 0.5, ty + 1.0, tz + 0.5);
+      double tx = state.center.getX() + 0.5 + Math.cos(a) * r;
+      double tz = state.center.getZ() + 0.5 + Math.sin(a) * r;
+      double ty = feetY(level, tx, tz, surfaceY(level, state.center));
+      if (!Double.isNaN(ty)) {
+         chosen.teleportTo(tx, ty, tz);
+      }
       com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL_FIRE_FLAME, chosen.getX(), chosen.getY() + 1.0, chosen.getZ(), 40, 1.2, 1.0, 1.2, 0.08);
       com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, chosen.getX(), chosen.getY() + 1.0, chosen.getZ(), 30, 1.0, 1.2, 1.0, 0.2);
       level.playSound(null, chosen.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1.2F, 0.7F);
@@ -1546,6 +1830,7 @@ public final class PlayerRaidManager {
       Chat.raw(chosen, "§7Choose your fate...");
       Chat.raw(chosen, "");
       BetrayalMenu.open(chosen);
+      return true;
    }
 
    /** True if the player is currently joined to the Warlord in an active raid. */
@@ -1590,7 +1875,7 @@ public final class PlayerRaidManager {
             }
             if (tag.contains(WAVE_TAG) || tag.contains(WARLORD_TAG) || tag.contains(ELDER_EVOKER_TAG)
                   || tag.contains(ILLUSIONER_TAG) || tag.contains(CAPTAIN_TAG)
-                  || tag.contains(LIEUTENANT_TAG) || tag.contains(NECROMANCER_TAG)) {
+                  || tag.contains(LIEUTENANT_TAG) || tag.contains(NECROMANCER_TAG) || tag.contains(SUMMON_TAG)) {
                return true;
             }
          }
@@ -1625,9 +1910,11 @@ public final class PlayerRaidManager {
             st = new RaidState();
             st.dimension = level.dimension();
             st.center = player.blockPosition();
+            st.test = true;
             tracked.put(key, st);
          }
          // Reset any previous test so it can be re-run.
+         st.testEndsAt = -1L;
          st.settled = false;
          st.betrayJoined = false;
          st.betrayDenied = false;
@@ -1649,6 +1936,9 @@ public final class PlayerRaidManager {
          }
          String key = e.getKey();
          ServerLevel level = player.level() instanceof ServerLevel sl ? sl : null;
+         if (st.test) {
+            st.testEndsAt = ServerClock.clock(player.level()) + 200L;
+         }
          if (accept) {
             st.betrayJoined = true;
             if (level != null) {
@@ -1660,7 +1950,7 @@ public final class PlayerRaidManager {
                      b.setTarget(null);
                   }
                }
-               for (Raider raider : level.getEntitiesOfClass(Raider.class, boxAround(st.center, 64, 16))) {
+               for (Raider raider : level.getEntitiesOfClass(Raider.class, waveBox(st.center))) {
                   if (isTagged(raider, WAVE_TAG, key) && raider.getTarget() != null
                         && raider.getTarget().getUUID().equals(player.getUUID())) {
                      raider.setTarget(null);
@@ -1816,7 +2106,7 @@ public final class PlayerRaidManager {
       if (warlordAlive(level, key) == null && livingLieutenants(level, key).isEmpty()
             && mobAlive(level, elderEvokerIds, key) == null && mobAlive(level, illusionerIds, key) == null
             && mobAlive(level, captainIds, key) == null && mobAlive(level, necromancerIds, key) == null
-            && level.getGameTime() % 200L == 0L) {
+            && state.due("betrayerReminder", ServerClock.clock(level), 200L, true)) {
          for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
             if (p.level().dimension().equals(level.dimension())) {
                Chat.raw(p, "§c⚠ The Warlord is dead, but §f" + betrayer.getName().getString() + "§c still fights for him! Slay the betrayer to end the raid!");
@@ -2277,12 +2567,37 @@ public final class PlayerRaidManager {
       }
    }
 
+   /**
+    * Tag on the persistent help the bosses call in mid-fight - the Warlord's last-stand guard
+    * and the Necromancer's wither skeletons - so a raid that ends takes them with it. They were
+    * untagged and persistent, so every raid left its named "Undead" and "Warlord's Guard" mobs
+    * standing in the field forever.
+    */
+   public static final String SUMMON_TAG = "ff_raid_summon";
+
+   /** Discards the bosses' summoned help for a key (see {@link #SUMMON_TAG}). */
+   private static void discardRaidSummons(ServerLevel level, String key) {
+      RaidState st = tracked.get(key);
+      BlockPos center = st != null ? st.center : null;
+      if (center == null) {
+         return;
+      }
+      for (Mob m : level.getEntitiesOfClass(Mob.class, waveBox(center))) {
+         if (isTagged(m, SUMMON_TAG, key)) {
+            m.discard();
+         }
+      }
+   }
+
    /** Discards every remaining raid boss for a key (abandoned boss phase). */
    private static void despawnBosses(ServerLevel level, String key) {
+      discardRaidSummons(level, key);
       discardIfPresent(level, warlordIds.get(key));
       discardIfPresent(level, elderEvokerIds.get(key));
       discardIfPresent(level, illusionerIds.get(key));
       discardIfPresent(level, captainIds.get(key));
+      // The Necromancer was missing from this list, so a lost raid left him standing.
+      discardIfPresent(level, necromancerIds.get(key));
       List<UUID> lts = lieutenantIds.get(key);
       if (lts != null) {
          for (UUID id : new ArrayList<>(lts)) {
@@ -2294,6 +2609,7 @@ public final class PlayerRaidManager {
       illusionerIds.remove(key);
       captainIds.remove(key);
       lieutenantIds.remove(key);
+      necromancerIds.remove(key);
    }
 
    private static void discardIfPresent(ServerLevel level, UUID id) {
@@ -2358,9 +2674,9 @@ public final class PlayerRaidManager {
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
          if (p.level().dimension().equals(level.dimension()) && p.distanceToSqr(center.getX(), center.getY(), center.getZ()) < 128.0 * 128.0) {
             String waveDesc = switch (Math.min(wave, 6)) {
-               case 1 -> "§7Pillagers & Vindicators charge in!";
+               case 1 -> "§7Pillagers, Vindicators and a ridden §cRavager§7 charge in!";
                case 2 -> "§7Witches join the assault with potions!";
-               case 3 -> "§7Ravagers breach the defenses!";
+               case 3 -> "§7More §cRavagers§7 breach the defenses - riders on their backs!";
                case 4 -> "§7§9Illusioners§7 create clones - find the real one!";
                case 5 -> "§7§5Evokers§7 summon vexes and fangs!";
                default -> "§7§4FULL RAID ESCALATION§7 - everything attacks!";
@@ -2417,7 +2733,7 @@ public final class PlayerRaidManager {
          Chat.raw(p, "§8§m═══════════════════════════§r");
          Chat.raw(p, "  §c§l⚔ PLAYER RAID!§r §7The raiders are coming for §c§lYOU§7!");
          Chat.raw(p, "  §7Location: §f" + center.getX() + ", " + center.getZ());
-         Chat.raw(p, "  §7Survive " + (3 + Math.min(3, state.omenLevel)) + " waves of §cpillagers§7, §dvindicators§7, §9illusioners§7 & §5evokers§7!");
+         Chat.raw(p, "  §7Survive " + (3 + Math.min(3, state.omenLevel)) + " waves of §cpillagers§7, §dvindicators§7, §4ravagers§7, §9illusioners§7 & §5evokers§7!");
          Chat.raw(p, "  §7Then slay the §c§lWarlord§7 for §6massive cash§7 + §53 gems§7 + §flegendary loot§7!");
          if (raidDifficulty > 0) {
             Chat.raw(p, "  §4Difficulty: §f" + raidDifficulty + "x §7(from Bad Omen)");
@@ -2861,6 +3177,42 @@ public final class PlayerRaidManager {
       int warlordPhase = 0;
       /** The last stand's reinforcements have been called. */
       boolean lastStandCalled = false;
+      /** A /ff test betrayal stand-in: no waves, no HUD, and it ends itself after the choice. */
+      boolean test = false;
+      /** Clock reading a test stand-in is cleaned up at (-1 until its choice is made). */
+      long testEndsAt = -1L;
+      /** Clock reading the current wave dropped at (straggler timers count from here). */
+      long waveStartedAt = -1L;
+      /** Clock reading the current wave was found cleared at (-1 while it still fights). */
+      long waveClearedAt = -1L;
+      /** The last wave whose clear was paid out. */
+      int rewardedWave = 0;
+      /** The wave the "stragglers pulled back" notice was last sent for. */
+      int strayNoticeWave = -1;
+      /** Next clock reading each named cadence may fire at - see {@link #due}. */
+      final Map<String, Long> nextAt = new HashMap<>();
+
+      /**
+       * Whether the named cadence is due, and if so books its next firing {@code period} ticks
+       * on. These replace "gameTime % period == k" tests, which only work when called on every
+       * tick: PlayerRaidManager.tick used to run once a second, and a modulus sampled on that
+       * cadence read the same residue every time and either always or never fired. A deadline
+       * fires on the same schedule whatever the caller's cadence. {@code fireFirst}
+       * says whether the very first ask fires at once or waits one period.
+       */
+      boolean due(String what, long now, long period, boolean fireFirst) {
+         Long next = nextAt.get(what);
+         if (next == null) {
+            nextAt.put(what, now + period);
+            return fireFirst;
+         }
+         // A clock that went backwards (another session's deadline) re-books rather than stalls.
+         if (now < next && next - now <= period) {
+            return false;
+         }
+         nextAt.put(what, now + period);
+         return true;
+      }
    }
 
    /** A boss phase running independently of the vanilla raid lifecycle. */

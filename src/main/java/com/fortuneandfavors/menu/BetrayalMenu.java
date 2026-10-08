@@ -204,17 +204,19 @@ public class BetrayalMenu extends ChestMenu {
       this.owner.closeContainer();
    }
 
+   /**
+    * Only the two choices respond. Every other click used to fall through to the chest's own
+    * handling, which let the player lift the display items straight out of the window - the
+    * title is a real Wither Skeleton Skull, so every offer handed out a free one - and drag or
+    * double-click-collect items between the offer and their inventory.
+    */
    public void clicked(int slotId, int button, ContainerInput input, Player player) {
-      if (player instanceof ServerPlayer sp) {
+      if (player instanceof ServerPlayer) {
          if (slotId == ACCEPT) {
             this.resolve(true);
          } else if (slotId == DENY) {
             this.resolve(false);
-         } else {
-            super.clicked(slotId, button, input, sp);
          }
-      } else {
-         super.clicked(slotId, button, input, player);
       }
    }
 

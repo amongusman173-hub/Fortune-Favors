@@ -1442,7 +1442,7 @@ tasks.register('ffAuditSources') {
 		//      the raid's, the phase has to be asked of the escort and the health, and the slam has
 		//      to be wound up in the open - a telegraph that is deleted is a fight with no answer.
 		[
-			['economy/PlayerRaidManager.java', /warlordTick\(level, key, state, warlordMob, stage, level\.getGameTime\(\)\)/, 'PlayerRaidManager: the Warlord is no longer driven by his own clock, so the fight is a metronome again'],
+			['economy/PlayerRaidManager.java', /warlordTick\(level, key, state, warlordMob, stage, ServerClock\.clock\(level\)\)/, 'PlayerRaidManager: the Warlord is no longer driven by his own clock, so the fight is a metronome again'],
 			['economy/PlayerRaidManager.java', /state\.warlordSlamLands = now \+ warlordSlamWindup\(phase\)/, 'PlayerRaidManager: the slam is no longer wound up before it lands, so the fight has no answer'],
 			['economy/PlayerRaidManager.java', /warlordHasTargetWithin\(level, warlord, warlordSlamRadius\(phase\)\)/, 'PlayerRaidManager: the slam no longer asks whether anybody is in its ring, so an empty field can eat the fight\'s one telegraph'],
 			['economy/PlayerRaidManager.java', /int stage = warlordPhase\(escort, fraction\)/, 'PlayerRaidManager: the Warlord\'s phase is no longer read off the escort and his health, so killing the escort changes nothing about the fight']
@@ -3078,7 +3078,7 @@ tasks.register('ffAuditSources') {
 			'BossManager', 'PuppeteerManager', 'TimeLordManager', 'ClockworkKingManager',
 			'ScarletDevilManager', 'VoidShaperManager', 'StarboundMagisterManager',
 			'DrownedSovereignManager', 'EmeraldSovereignManager', 'GaleWardenManager',
-			'WitherReworkManager'
+			'WitherReworkManager', 'PlayerRaidManager'
 		]
 		def clockChecked = 0
 		def clockStrays = 0
