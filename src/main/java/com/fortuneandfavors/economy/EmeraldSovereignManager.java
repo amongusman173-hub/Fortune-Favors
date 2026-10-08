@@ -14,7 +14,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ColorParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -57,11 +56,18 @@ import net.minecraft.world.phys.Vec3;
  *
  * <h2>Phases</h2>
  * <ul>
- *   <li><b>I - Court</b>: Bell Toll, Emerald Volley, Royal Decree (guards).</li>
+ *   <li><b>I - Court</b>: Bell Toll, Emerald Volley, Royal Decree (guards), Crownfall,
+ *       Royal Tribute, <b>Kneel</b> (jump the third bell) and <b>Appraisal</b> (break
+ *       line of sight).</li>
  *   <li><b>II - The Throne</b> (50%): he stops holding back. Guards arrive in
  *       numbers, he empowers them, and <b>Sovereign's Judgement</b> - a green beam
- *       that has to be walked out of - joins the rotation.</li>
+ *       that has to be walked out of - joins the rotation with the Wheel and the Coffin.</li>
  * </ul>
+ *
+ * <h2>Arrival and abdication</h2>
+ * He comes down out of the air onto a turning sigil, untouchable until his feet are on
+ * the floor, and only then does the court assemble. He dies the same way he fought: the
+ * bell tolls for him, his guards kneel one by one, and the crown goes last.
  */
 public final class EmeraldSovereignManager {
 
@@ -110,8 +116,37 @@ public final class EmeraldSovereignManager {
    private static final int COFFIN_TELL = 26;
    private static final int COFFIN_HOLD = 50;
 
+   /** Judgement: how long the line sits on the floor before the beam fires, and how far it goes. */
+   private static final int JUDGEMENT_WARN = 30;
+   private static final double JUDGEMENT_REACH = 34.0;
+   /** The most a single Royal Tribute may heal him, however many people it catches. */
+   private static final float TRIBUTE_HEAL_CAP = 15.0F;
+
+   /**
+    * Kneel: three bells, fifteen ticks apart, and the floor slams on the third. A jump
+    * keeps a player airborne for about ten ticks, so the window is generous but real.
+    */
+   private static final int KNEEL_COOLDOWN = 420;
+   private static final int KNEEL_BEAT = 15;
+   private static final int KNEEL_WARN = KNEEL_BEAT * 3;
+   private static final double KNEEL_RADIUS = 14.0;
+   private static final float KNEEL_DAMAGE = 12.0F;
+   /** Appraisal: how long he weighs a target before the lance, and what it costs them. */
+   private static final int APPRAISAL_COOLDOWN = 320;
+   private static final int APPRAISAL_WARN = 40;
+   private static final float APPRAISAL_DAMAGE = 14.0F;
+
+   /** The arrival: how long he takes to come down, and from how high. */
+   private static final int ARRIVAL_TICKS = 50;
+   private static final double ARRIVAL_DROP = 6.0;
+
+   /** His colours: emerald for the work, gold for the crown, deep green for the shadow under it. */
+   private static final int EMERALD = 0x3BE07A;
+   private static final int CROWN_GOLD = 0xF2C94C;
+   private static final int DEEP_GREEN = 0x0E6B3A;
+
    private static final int GUARD_CAP = 6;
-   private static final int DEATH_CEREMONY_TICKS = 70;
+   private static final int DEATH_CEREMONY_TICKS = 80;
    /**
     * How long his body may be unfindable before the fight is called over.
     *
@@ -159,6 +194,17 @@ public final class EmeraldSovereignManager {
       long nextCrown;
       long nextWheel;
       long nextCoffin;
+      /** When Kneel and Appraisal may next be used. */
+      long nextKneel;
+      long nextAppraisal;
+      /** Kneels and appraisals that are marked and have not landed yet. */
+      final List<Strike> strikes = new ArrayList<>();
+      /**
+       * The arrival: ticks left of his descent, and the floor he is coming down onto.
+       * While it runs he is untouchable and does nothing but arrive.
+       */
+      int arrivalTicks;
+      Vec3 arrivalFloor;
       int judgementCharge;
       Vec3 judgementOrigin;
       Vec3 judgementDir;
@@ -203,12 +249,43 @@ public final class EmeraldSovereignManager {
       final double radius;
       final float damage;
       int fuse;
+      /** Set once the falling piece has been drawn, so it is drawn once. */
+      boolean falling;
 
       Mark(Vec3 pos, double radius, float damage, int fuse) {
          this.pos = pos;
          this.radius = radius;
          this.damage = damage;
          this.fuse = fuse;
+      }
+   }
+
+   /**
+    * A blow that is announced before it lands: a Kneel counting down under his court, or
+    * an Appraisal weighing one player. Marked first and landed later, so every one of them
+    * is a warning before it is a hit.
+    */
+   private static final class Strike {
+      static final int KNEEL = 0;
+      static final int APPRAISAL = 1;
+      final int kind;
+      final Vec3 at;
+      final long landAt;
+      final double radius;
+      final float damage;
+      /** The player an Appraisal is weighing; null for a Kneel. */
+      final UUID target;
+      /** Bells already rung for a Kneel. */
+      int beats;
+      boolean charged;
+
+      Strike(int kind, Vec3 at, long landAt, double radius, float damage, UUID target) {
+         this.kind = kind;
+         this.at = at;
+         this.landAt = landAt;
+         this.radius = radius;
+         this.damage = damage;
+         this.target = target;
       }
    }
 
@@ -328,7 +405,29 @@ public final class EmeraldSovereignManager {
       // The shared marker plus the visible-and-persistent guarantee: see
       // BossManager.markBoss for why a boss has to say so itself.
       BossManager.markBoss(boss);
-      boss.setPos(summoner.getX(), summoner.getY(), summoner.getZ());
+      // He lands a couple of blocks in front of whoever put the crown on, not inside them -
+      // unless that spot is a wall, in which case he takes their place.
+      Vec3 look = summoner.getLookAngle();
+      Vec3 flat = new Vec3(look.x, 0.0, look.z);
+      Vec3 floor = summoner.position();
+      if (flat.lengthSqr() > 1.0E-4) {
+         Vec3 ahead = floor.add(flat.normalize().scale(3.0));
+         BlockPos feet = BlockPos.containing(ahead);
+         if (level.getBlockState(feet).isAir() && level.getBlockState(feet.above()).isAir() && level.getBlockState(feet.above(2)).isAir()
+               && !level.getBlockState(feet.below()).isAir()) {
+            floor = ahead;
+         }
+      }
+      // He comes down from as high as the room allows, up to ARRIVAL_DROP.
+      double drop = 0.0;
+      BlockPos column = BlockPos.containing(floor);
+      while (drop < ARRIVAL_DROP && level.getBlockState(column.above(4 + (int) drop)).isAir()) {
+         drop += 1.0;
+      }
+      boss.setPos(floor.x, floor.y + drop, floor.z);
+      boss.setYRot(summoner.getYRot() + 180.0F);
+      // Untouchable until his feet are on the floor: the arrival is a cutscene, not a window.
+      boss.setInvulnerable(true);
       level.addFreshEntity(boss);
 
       ServerBossEvent bar = new ServerBossEvent(
@@ -341,28 +440,86 @@ public final class EmeraldSovereignManager {
 
       Fight fight = new Fight(boss.getUUID(), summoner.getUUID(), bar);
       fight.participants.add(summoner.getUUID());
-      long now = ServerClock.clock(level);
+      // Every opening timer starts after he has landed, so nothing fires mid-descent.
+      long now = ServerClock.clock(level) + ARRIVAL_TICKS;
       fight.nextBell = now + 120L;
       fight.nextVolley = now + 60L;
       fight.nextDecree = now + 200L;
       fight.nextTribute = now + 360L;
       fight.nextTaunt = now + 140L;
       fight.nextCrown = now + 180L;
+      fight.nextAppraisal = now + 260L;
+      fight.nextKneel = now + 420L;
       fight.nextCoffin = now + 520L;
       fight.nextWheel = now + 700L;
+      fight.arrivalTicks = drop > 0.0 ? ARRIVAL_TICKS : 1;
+      fight.arrivalFloor = floor;
       FIGHTS.put(boss.getUUID(), fight);
-      summonGuards(level, boss, fight, 2);
 
       announce(level, "\u00a72\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
       announce(level, "    \u00a7a\u00a7l\ud83d\udc51 THE EMERALD SOVEREIGN HOLDS COURT \ud83d\udc51");
-      announce(level, "    \u00a77A bell rings somewhere behind him.");
-      announce(level, "    \u00a78\u201c\u00a7fI do not need to kill you. I have \u00a7apeople\u00a7f for that.\u00a78\u201d");
-      announce(level, "    \u00a77\u00a7oBreak his guards - his court is his armour.");
+      announce(level, "    \u00a77A bell. Then he comes down.");
+      announce(level, "    \u00a78\u201c\u00a7fI have \u00a7apeople\u00a7f for this.\u00a78\u201d");
+      announce(level, "    \u00a78Break his guards. \u00a77His court is his armour.");
       announce(level, "\u00a72\u00a7m\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
-      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.3F, 0.9F);
-      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 1.8F, 0.7F);
+      // The throne is drawn before he reaches it: a summoning circle where he will land, a
+      // ring of gold sigils round that, a shaft of light from above and a gold helix he
+      // comes down through.
+      Fx.summonCircle(level, ParticleTypes.HAPPY_VILLAGER, floor.add(0.0, 0.05, 0.0), 4.5, ARRIVAL_TICKS, EMERALD);
+      Fx.runeCircle(level, ParticleTypes.END_ROD, floor.add(0.0, 0.08, 0.0), 6.5, ARRIVAL_TICKS + 10, CROWN_GOLD);
+      Fx.pillar(level, ParticleTypes.END_ROD, floor, drop + 8.0, EMERALD);
+      Fx.spiral(level, ParticleTypes.HAPPY_VILLAGER, floor, drop + 3.0, ARRIVAL_TICKS, CROWN_GOLD);
+      level.playSound(null, floor.x, floor.y, floor.z, ModSounds.BOSS_SPAWN, SoundSource.HOSTILE, 1.3F, 0.9F);
+      level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 1.8F, 0.7F);
+      level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 1.6F, 0.6F);
       Advancements.grant(summoner, "summon_sovereign");
       return null;
+   }
+
+   /**
+    * The descent: he comes down through the helix onto the sigil, a bell for every ten
+    * ticks of it, each one higher than the last. He is untouchable the whole way down.
+    *
+    * <p>On landing the room gets the message - a flare, a gold starburst and a shockwave
+    * that shoves anyone standing on the sigil off it without hurting them - and the court
+    * assembles round him. Only then does the fight start.
+    */
+   private static void tickArrival(ServerLevel level, Mob boss, Fight fight) {
+      fight.arrivalTicks--;
+      Vec3 floor = fight.arrivalFloor != null ? fight.arrivalFloor : boss.position();
+      double height = ARRIVAL_DROP * fight.arrivalTicks / (double) ARRIVAL_TICKS;
+      double y = Math.min(boss.getY(), floor.y + height);
+      boss.setPos(floor.x, Math.max(floor.y, y), floor.z);
+      boss.setDeltaMovement(Vec3.ZERO);
+      vanillaOnly(() -> level.sendParticles(ParticleTypes.HAPPY_VILLAGER, boss.getX(), boss.getY() + 1.4, boss.getZ(), 4, 0.6, 1.0, 0.6, 0.02));
+      if (fight.arrivalTicks > 0 && fight.arrivalTicks % 10 == 0) {
+         float pitch = 0.6F + (ARRIVAL_TICKS - fight.arrivalTicks) * 0.012F;
+         level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 1.4F, pitch);
+         Fx.ring(level, ParticleTypes.END_ROD, floor.add(0.0, 0.1, 0.0), 2.0 + fight.arrivalTicks * 0.08, CROWN_GOLD);
+      }
+      if (fight.arrivalTicks > 0) {
+         return;
+      }
+
+      boss.setPos(floor.x, floor.y, floor.z);
+      boss.setInvulnerable(false);
+      Vec3 head = floor.add(0.0, boss.getBbHeight() * 0.8, 0.0);
+      Fx.flare(level, ParticleTypes.END_ROD, head, 2.6, CROWN_GOLD);
+      Fx.starburst(level, ParticleTypes.HAPPY_VILLAGER, head, 6.5, EMERALD);
+      Fx.shockwave(level, ParticleTypes.HAPPY_VILLAGER, floor, 11.0, EMERALD);
+      Fx.nova(level, ParticleTypes.END_ROD, floor.add(0.0, 0.2, 0.0), 5.0, DEEP_GREEN);
+      level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, head.x, head.y, head.z, 50, 1.2, 1.0, 1.2, 0.25);
+      level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.HOSTILE, 1.6F, 0.7F);
+      level.playSound(null, floor.x, floor.y, floor.z, SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 1.8F, 0.8F);
+      // Off the throne: a shove, not a hit - nobody is punished for standing where he landed.
+      for (ServerPlayer p : playersNear(level, floor.x, floor.y, floor.z, 4.5)) {
+         Vec3 away = new Vec3(p.getX() - floor.x, 0.0, p.getZ() - floor.z);
+         away = away.lengthSqr() < 1.0E-4 ? new Vec3(1.0, 0.0, 0.0) : away.normalize();
+         p.push(away.x * 0.9, 0.35, away.z * 0.9);
+         p.hurtMarked = true;
+      }
+      summonGuards(level, boss, fight, 2);
+      announce(level, SAY + "\"\u00a7fCourt's in session.\"");
    }
 
    // ------------------------------------------------------------------------ tick
@@ -458,7 +615,9 @@ public final class EmeraldSovereignManager {
       ServerLevel level = (ServerLevel) boss.level();
 
       for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-         if (p.level() == level && p.isAlive() && p.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS) {
+         // Spectators and the mod's puppet bodies watch; they do not get paid for it.
+         if (p.level() == level && p.isAlive() && !p.isSpectator() && !BossManager.isFakePlayer(p)
+               && p.distanceToSqr(boss) < ARENA_RADIUS * ARENA_RADIUS) {
             fight.participants.add(p.getUUID());
          }
       }
@@ -475,6 +634,11 @@ public final class EmeraldSovereignManager {
       // The bar's art follows the phase: red is the client's cue for the throne-room bar.
       fight.bar.setColor(fight.phase >= 2 ? BossBarColor.RED : BossBarColor.GREEN);
 
+      if (fight.arrivalTicks > 0) {
+         tickArrival(level, boss, fight);
+         return;
+      }
+
       tickEmeralds(level, boss, fight);
 
       float share = boss.getHealth() / boss.getMaxHealth();
@@ -486,6 +650,8 @@ public final class EmeraldSovereignManager {
       // Crownfall keeps falling while he does other things, so its marks are ticked
       // here rather than from inside the move.
       tickMarks(level, boss, fight);
+      // So do kneels and appraisals: they are marked, and land on their own clock.
+      tickStrikes(level, boss, fight, now);
 
       if (fight.coffinTell > 0 || fight.coffinHold > 0) {
          tickCoffin(level, boss, fight);
@@ -545,12 +711,16 @@ public final class EmeraldSovereignManager {
             continue;
          }
          it.remove();
-         if (raw != null) {
-            level.sendParticles(ParticleTypes.LARGE_SMOKE, raw.getX(), raw.getY() + 0.8, raw.getZ(), 16, 0.4, 0.4, 0.4, 0.06);
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, raw.getX(), raw.getY() + 0.8, raw.getZ(), 20, 0.5, 0.5, 0.5, 0.06);
+         if (raw != null && raw.level() == level) {
+            Vec3 at = raw.position().add(0.0, 0.9, 0.0);
+            Fx.shatter(level, ParticleTypes.HAPPY_VILLAGER, at, 1.0, EMERALD);
+            Fx.ring(level, ParticleTypes.END_ROD, raw.position().add(0.0, 0.1, 0.0), 1.4, DEEP_GREEN);
+            vanillaOnly(() -> level.sendParticles(ParticleTypes.LARGE_SMOKE, at.x, at.y, at.z, 12, 0.4, 0.4, 0.4, 0.06));
             level.playSound(null, raw.getX(), raw.getY(), raw.getZ(), SoundEvents.VINDICATOR_CELEBRATE, SoundSource.HOSTILE, 1.0F, 0.8F);
          }
-         announceNear(level, boss, ARENA_RADIUS, "&a\u2694 Court thinned&7 - &f" + fight.guards.size() + "&7 guard(s) left. His armour thins with it.");
+         announceNear(level, boss, ARENA_RADIUS, fight.guards.isEmpty()
+            ? "&8The court is empty. &7He's open."
+            : "&8A guard falls. &f" + fight.guards.size() + "&7 left.");
       }
    }
 
@@ -565,11 +735,13 @@ public final class EmeraldSovereignManager {
          }
          double angle = RANDOM.nextDouble() * Math.PI * 2.0;
          double radius = 3.0 + RANDOM.nextDouble() * 3.0;
-         guard.setPos(
-            boss.getX() + Math.cos(angle) * radius,
-            boss.getY() + 0.2,
-            boss.getZ() + Math.sin(angle) * radius
-         );
+         Vec3 spot = new Vec3(boss.getX() + Math.cos(angle) * radius, boss.getY() + 0.2, boss.getZ() + Math.sin(angle) * radius);
+         // A guard is never summoned into a wall to suffocate: no room there, he stands at the throne.
+         BlockPos feet = BlockPos.containing(spot);
+         if (!level.getBlockState(feet).isAir() || !level.getBlockState(feet.above()).isAir()) {
+            spot = boss.position().add(0.0, 0.2, 0.0);
+         }
+         guard.setPos(spot.x, spot.y, spot.z);
          guard.setPersistenceRequired();
          guard.setCustomName(Component.literal("\u00a7a\u00a7l\u2694 Royal Guard"));
          guard.setCustomNameVisible(true);
@@ -585,7 +757,9 @@ public final class EmeraldSovereignManager {
          guard.setDropChance(net.minecraft.world.entity.EquipmentSlot.OFFHAND, 0.0F);
          level.addFreshEntity(guard);
          fight.guards.add(guard.getUUID());
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, guard.getX(), guard.getY() + 1.0, guard.getZ(), 16, 0.4, 0.5, 0.4, 0.05);
+         // Each guard steps out of a small green circle under a shaft of gold.
+         Fx.summonCircle(level, ParticleTypes.HAPPY_VILLAGER, guard.position().add(0.0, 0.05, 0.0), 1.2, 20, EMERALD);
+         Fx.pillar(level, ParticleTypes.END_ROD, guard.position(), 4.0, CROWN_GOLD);
       }
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.VINDICATOR_AMBIENT, SoundSource.HOSTILE, 1.4F, 0.9F);
    }
@@ -606,6 +780,17 @@ public final class EmeraldSovereignManager {
       if (fight.phase >= 2 && now >= fight.nextCoffin) {
          fight.nextCoffin = now + COFFIN_COOLDOWN;
          startCoffin(level, boss, fight);
+         return;
+      }
+      if (now >= fight.nextKneel) {
+         // On the throne the bells come round faster.
+         fight.nextKneel = now + KNEEL_COOLDOWN - (fight.phase >= 2 ? 100L : 0L);
+         startKneel(level, boss, fight, now);
+         return;
+      }
+      if (now >= fight.nextAppraisal) {
+         fight.nextAppraisal = now + APPRAISAL_COOLDOWN;
+         startAppraisal(level, boss, fight, now);
          return;
       }
       if (now >= fight.nextCrown) {
@@ -634,36 +819,29 @@ public final class EmeraldSovereignManager {
       }
    }
 
-   /** The bell: staggers players, and stirs the court to fight harder. */
+   /**
+    * The bell: staggers everyone within 22 blocks, and stirs the court to fight harder.
+    *
+    * <p>No damage, so no wind-up: the answer is distance, and the shockwave drawn out to
+    * exactly the edge of its reach is how a player learns where that is.
+    */
    private static void bellToll(ServerLevel level, Mob boss, Fight fight) {
       double x = boss.getX();
       double y = boss.getY() + 1.0;
       double z = boss.getZ();
       level.playSound(null, x, y, z, SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, 0.7F);
       level.playSound(null, x, y, z, SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 1.6F, 0.6F);
-      for (int i = 0; i < 3; i++) {
-         double r = 3.0 + i * 4.0;
-         for (int p = 0; p < 28; p++) {
-            double a = p * (Math.PI * 2.0 / 28.0);
-            level.sendParticles(
-               ColorParticleOption.create(ParticleTypes.FLASH, 0x55FF88),
-               x + Math.cos(a) * r,
-               y - 0.6,
-               z + Math.sin(a) * r,
-               1,
-               0.0,
-               0.0,
-               0.0,
-               0.0
-            );
-         }
-      }
+      Vec3 head = boss.position().add(0.0, boss.getBbHeight() * 0.85, 0.0);
+      Fx.resonance(level, ParticleTypes.NOTE, head, 20.0, CROWN_GOLD);
+      Fx.shockwave(level, ParticleTypes.HAPPY_VILLAGER, boss.position(), 22.0, EMERALD);
+      Fx.ring(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.1, 0.0), 11.0, DEEP_GREEN);
       for (ServerPlayer p : participantsNear(level, boss, 22.0)) {
          p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 80, 2, false, true, true));
          p.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 80, 0, false, true, true));
          level.sendParticles(ParticleTypes.NOTE, p.getX(), p.getY() + 2.0, p.getZ(), 10, 0.4, 0.4, 0.4, 0.1);
       }
-      announceNear(level, boss, ARENA_RADIUS, "&a&lBELL TOLL&7 - the court answers. You stumble.");
+      announce(level, SAY + "\"§fOrder.\"");
+      announceNear(level, boss, ARENA_RADIUS, "&8BELL TOLL &7- slowed. Distance beats it.");
    }
 
    private static void emeraldVolley(ServerLevel level, Mob boss, Fight fight) {
@@ -673,61 +851,71 @@ public final class EmeraldSovereignManager {
       }
       int count = 4 + fight.guards.size();
       Vec3 from = boss.position().add(0.0, boss.getBbHeight() * 0.7, 0.0);
+      Vec3 to = target.position().add(0.0, target.getBbHeight() * 0.5, 0.0);
+      Vec3 dir = to.subtract(from);
+      if (dir.lengthSqr() < 1.0E-4) {
+         dir = new Vec3(0.0, 0.0, 1.0);
+      }
+      dir = dir.normalize();
       for (int i = 0; i < count; i++) {
-         Vec3 to = target.position().add(0.0, target.getBbHeight() * 0.5, 0.0);
-         Vec3 dir = to.subtract(from);
-         if (dir.lengthSqr() < 1.0E-4) {
-            dir = new Vec3(0.0, 0.0, 1.0);
-         }
-         dir = dir.normalize();
          double spread = (i - (count - 1) / 2.0) * 0.05;
          Vec3 vel = new Vec3(dir.x + spread, dir.y + 0.08, dir.z + spread).normalize().scale(0.9);
          fight.emeralds.add(new Emerald(from, vel, 6.0F, 100));
       }
+      Fx.muzzle(level, ParticleTypes.HAPPY_VILLAGER, from, dir, EMERALD);
       level.playSound(null, from.x, from.y, from.z, SoundEvents.VILLAGER_TRADE, SoundSource.HOSTILE, 1.2F, 0.6F);
    }
 
-   /** Drags a tithe of experience and health out of you - never your items. */
+   /**
+    * Royal Tribute: drags a tithe of health out of everyone within 18 blocks - never items.
+    *
+    * <p>Each tithe is a gold chain drawn from the player to him, so it is obvious who paid
+    * and why; the answer is not to be that close when it comes round. What he banks from
+    * it is capped per cast, so a crowd standing next to him cannot out-heal itself.
+    */
    private static void royalTribute(ServerLevel level, Mob boss, Fight fight) {
       double x = boss.getX();
       double y = boss.getY() + 1.0;
       double z = boss.getZ();
+      Vec3 chest = boss.position().add(0.0, boss.getBbHeight() * 0.6, 0.0);
       int taken = 0;
+      float healed = 0.0F;
       for (ServerPlayer p : participantsNear(level, boss, 18.0)) {
-         Vec3 pull = boss.position().add(0.0, 1.0, 0.0).subtract(p.position());
-         double len = pull.length();
-         if (len < 1.0) {
+         if (p.distanceToSqr(boss) < 1.0) {
             continue;
          }
-         Vec3 unit = pull.scale(1.0 / len);
-         for (double d = 1.0; d < len; d += 1.2) {
-            Vec3 point = p.position().add(unit.scale(d));
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, point.x, point.y + 1.0, point.z, 1, 0.05, 0.05, 0.05, 0.0);
-         }
+         Fx.chains(level, ParticleTypes.HAPPY_VILLAGER, p.position().add(0.0, 1.0, 0.0), chest, CROWN_GOLD);
          // A tithe of vitality, not of property: he banks a little healing, and
-         // the player is slowed - but nothing leaves an inventory.
+         // the player goes hungry - but nothing leaves an inventory.
          p.addEffect(new MobEffectInstance(MobEffects.HUNGER, 120, 1, false, true, true));
          p.hurtServer(level, level.damageSources().mobAttack(boss), 4.0F);
-         // A modest tithe, not a lifeline: at 12 HP a head with six guards in
-         // range this move healed more than most players could out-damage.
-         boss.heal(5.0F);
+         // A modest tithe, not a lifeline: 5 a head, and never more than the cap a cast.
+         float heal = Math.min(5.0F, TRIBUTE_HEAL_CAP - healed);
+         if (heal > 0.0F) {
+            boss.heal(heal);
+            healed += heal;
+         }
          taken++;
       }
-      level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, x, y, z, 40, 1.6, 1.2, 1.6, 0.1);
+      if (taken > 0) {
+         Fx.aura(level, ParticleTypes.TOTEM_OF_UNDYING, boss.position(), boss.getBbHeight(), 30, CROWN_GOLD);
+      }
+      level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, x, y, z, 20, 1.6, 1.2, 1.6, 0.1);
       level.playSound(null, x, y, z, SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 1.4F, 1.2F);
+      announce(level, SAY + "\"§fTax day.\"");
       announceNear(level, boss, ARENA_RADIUS, taken == 0
-         ? "&a&lROYAL TRIBUTE&7 - nobody is close enough to tax."
-         : "&a&lROYAL TRIBUTE&7 - he takes a tithe of \u00a7f" + taken + "&7 subject(s).");
+         ? "&8Nobody close enough to tax."
+         : "&8He took his cut from &f" + taken + "&8. &7Stay out of reach.");
    }
 
    private static void royalDecree(ServerLevel level, Mob boss, Fight fight) {
       summonGuards(level, boss, fight, fight.phase >= 2 ? 3 : 2);
-      double x = boss.getX();
-      double y = boss.getY() + 1.0;
-      double z = boss.getZ();
-      level.sendParticles(ParticleTypes.HAPPY_VILLAGER, x, y, z, 60, 2.0, 1.0, 2.0, 0.2);
-      level.playSound(null, x, y, z, SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 1.2F, 1.6F);
-      announceNear(level, boss, ARENA_RADIUS, "&a&lROYAL DECREE&7 - he calls more of the court.");
+      Fx.runeCircle(level, ParticleTypes.HAPPY_VILLAGER, boss.position().add(0.0, 0.05, 0.0), 6.0, 30, EMERALD);
+      Fx.flare(level, ParticleTypes.END_ROD, boss.position().add(0.0, boss.getBbHeight() * 0.9, 0.0), 1.6, CROWN_GOLD);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 1.2F, 1.6F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RAID_HORN, SoundSource.HOSTILE, 0.9F, 1.2F);
+      announce(level, SAY + "\"§fGuards!\"");
+      announceNear(level, boss, ARENA_RADIUS, "&8More guards. &7Thin them out.");
    }
 
    /**
@@ -735,25 +923,33 @@ public final class EmeraldSovereignManager {
     *
     * <p>Seven impacts - six thrown around whoever is nearest, and one on himself,
     * because a king who will not stand where his crown is falling is a king who has
-    * not committed. Each one is a ring on the ground with a fuse burning under it, so
-    * the answer is movement, and the punishment for standing still is being under the
-    * crown when it lands.
+    * not committed. Each one is a ring of sigils on the ground for the length of its
+    * fuse, and the piece is seen falling for its last few ticks, so the answer is
+    * movement, and the punishment for standing still is being under it when it lands.
     */
    private static void crownfall(ServerLevel level, Mob boss, Fight fight) {
       Vec3 origin = boss.position().add(0.0, boss.getBbHeight() + 1.4, 0.0);
       ServerPlayer target = nearestPlayer(boss, ARENA_RADIUS);
-      level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, origin.x, origin.y, origin.z, 60, 0.8, 0.5, 0.8, 0.15);
+      Fx.flare(level, ParticleTypes.END_ROD, origin, 1.8, CROWN_GOLD);
+      Fx.starburst(level, ParticleTypes.TOTEM_OF_UNDYING, origin, 4.0, CROWN_GOLD);
       level.playSound(null, origin.x, origin.y, origin.z, SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 1.8F, 1.5F);
       for (int i = 0; i < 6; i++) {
          double angle = RANDOM.nextDouble() * Math.PI * 2.0;
          double dist = 3.0 + RANDOM.nextDouble() * 10.0;
          double x = (target != null ? target.getX() : boss.getX()) + Math.cos(angle) * dist;
          double z = (target != null ? target.getZ() : boss.getZ()) + Math.sin(angle) * dist;
-         double y = BossGrounding.groundY(level, x, z, boss.getY());
-         fight.marks.add(new Mark(new Vec3(x, y, z), CROWN_RADIUS, CROWN_DAMAGE, CROWN_FUSE + i * 4));
+         double y = BossGrounding.groundY(level, x, z, target != null ? target.getY() : boss.getY());
+         addMark(level, fight, new Mark(new Vec3(x, y, z), CROWN_RADIUS, CROWN_DAMAGE, CROWN_FUSE + i * 4));
       }
-      fight.marks.add(new Mark(boss.position(), CROWN_RADIUS + 0.4, CROWN_DAMAGE, CROWN_FUSE - 6));
-      announceNear(level, boss, ARENA_RADIUS, "&a&lCROWNFALL&7 - his crown breaks apart overhead. Step out of the rings!");
+      addMark(level, fight, new Mark(boss.position(), CROWN_RADIUS + 0.4, CROWN_DAMAGE, CROWN_FUSE - 6));
+      announce(level, SAY + "\"§fMind your heads.\"");
+      announceNear(level, boss, ARENA_RADIUS, "&8CROWNFALL &7- get out of the rings.");
+   }
+
+   /** Marks one piece's landing spot with a sigil that lasts exactly as long as its fuse. */
+   private static void addMark(ServerLevel level, Fight fight, Mark mark) {
+      fight.marks.add(mark);
+      Fx.runeCircle(level, ParticleTypes.HAPPY_VILLAGER, mark.pos.add(0.0, 0.05, 0.0), mark.radius, mark.fuse, CROWN_GOLD);
    }
 
    /** Runs every crown mark's fuse and lands it. */
@@ -763,36 +959,205 @@ public final class EmeraldSovereignManager {
       }
       for (Iterator<Mark> it = fight.marks.iterator(); it.hasNext();) {
          Mark mark = it.next();
-         int points = 20;
-         for (int i = 0; i < points; i++) {
-            double a = i * (Math.PI * 2.0 / points) + mark.fuse * 0.05;
-            level.sendParticles(
-               ParticleTypes.HAPPY_VILLAGER,
-               mark.pos.x + Math.cos(a) * mark.radius,
-               mark.pos.y + 0.2,
-               mark.pos.z + Math.sin(a) * mark.radius,
-               1,
-               0.0,
-               0.0,
-               0.0,
-               0.0
-            );
+         // The rune circle is the warning for modded clients; everyone else gets the ring
+         // in plain particles, every other tick.
+         if (mark.fuse % 2 == 0) {
+            vanillaOnly(() -> {
+               int points = 16;
+               for (int i = 0; i < points; i++) {
+                  double a = i * (Math.PI * 2.0 / points) + mark.fuse * 0.05;
+                  level.sendParticles(ParticleTypes.HAPPY_VILLAGER, mark.pos.x + Math.cos(a) * mark.radius, mark.pos.y + 0.2,
+                     mark.pos.z + Math.sin(a) * mark.radius, 1, 0.0, 0.0, 0.0, 0.0);
+               }
+            });
          }
-         level.sendParticles(ParticleTypes.END_ROD, mark.pos.x, mark.pos.y + 1.0, mark.pos.z, 2, 0.2, 0.3, 0.2, 0.02);
          mark.fuse--;
+         if (!mark.falling && mark.fuse <= 6) {
+            mark.falling = true;
+            Fx.comet(level, ParticleTypes.END_ROD, mark.pos.add(0.0, 14.0, 0.0), mark.pos.add(0.0, 0.5, 0.0), Math.max(1, mark.fuse), CROWN_GOLD);
+         }
          if (mark.fuse > 0) {
             continue;
          }
-         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, mark.pos.x, mark.pos.y + 0.5, mark.pos.z, 2, 0.4, 0.2, 0.4, 0.0);
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, mark.pos.x, mark.pos.y + 0.5, mark.pos.z, 40, 1.0, 0.8, 1.0, 0.2);
+         Fx.shockwave(level, ParticleTypes.HAPPY_VILLAGER, mark.pos, mark.radius + 0.6, EMERALD);
+         Fx.rockburst(level, ParticleTypes.TOTEM_OF_UNDYING, mark.pos.add(0.0, 0.4, 0.0), 1.2, CROWN_GOLD);
+         level.sendParticles(ParticleTypes.EXPLOSION, mark.pos.x, mark.pos.y + 0.5, mark.pos.z, 2, 0.4, 0.2, 0.4, 0.0);
          level.playSound(null, mark.pos.x, mark.pos.y, mark.pos.z, SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.2F, 1.4F);
-         for (ServerPlayer p : playersNear(level, mark.pos.x, mark.pos.y + 0.5, mark.pos.z, mark.radius + 1.4)) {
+         // The hit matches the ring that was drawn: a player whose feet are outside it is
+         // safe. This used to reach 1.4 blocks past the drawn edge, in all three axes.
+         double reach = mark.radius + 0.4;
+         for (ServerPlayer p : playersNear(level, mark.pos.x, mark.pos.y, mark.pos.z, reach + 3.0)) {
+            double dx = p.getX() - mark.pos.x;
+            double dz = p.getZ() - mark.pos.z;
+            if (dx * dx + dz * dz > reach * reach || Math.abs(p.getY() - mark.pos.y) > 2.5) {
+               continue;
+            }
             p.hurtServer(level, level.damageSources().mobAttack(boss), mark.damage);
             p.push(0.0, 0.45, 0.0);
             p.hurtMarked = true;
          }
          it.remove();
       }
+   }
+
+   /**
+    * Kneel: he rings three bells and the floor round him slams down on the third.
+    *
+    * <p>A gold rune circle the size of the blast counts the bells down, and every player
+    * inside it sees the count on their action bar. Anyone whose feet are on the ground
+    * when the third bell lands is forced to kneel - hurt, and pinned for two seconds. The
+    * answer is a jump timed on the third bell; being outside the circle works too, but it
+    * is wide enough that running is the slow answer and jumping is the clean one.
+    */
+   private static void startKneel(ServerLevel level, Mob boss, Fight fight, long now) {
+      Vec3 at = boss.position();
+      fight.strikes.add(new Strike(Strike.KNEEL, at, now + KNEEL_WARN, KNEEL_RADIUS, KNEEL_DAMAGE, null));
+      Fx.runeCircle(level, ParticleTypes.END_ROD, at.add(0.0, 0.05, 0.0), KNEEL_RADIUS, KNEEL_WARN, CROWN_GOLD);
+      Fx.summonCircle(level, ParticleTypes.HAPPY_VILLAGER, at.add(0.0, 0.08, 0.0), 3.0, KNEEL_WARN, EMERALD);
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.EVOKER_PREPARE_ATTACK, SoundSource.HOSTILE, 1.4F, 0.7F);
+      announce(level, SAY + "\"§fKneel.\"");
+      announceNear(level, boss, ARENA_RADIUS, "&8Three bells. &7Jump on the third.");
+   }
+
+   /**
+    * Appraisal: he picks a subject and weighs them, and the price is one lance down a line.
+    *
+    * <p>A gold chain runs from his crown to the target every few ticks for two seconds.
+    * The chain stops at the first solid block between them, so a player can see the moment
+    * they are safe: the chain hits the wall instead of them. When the time is up the lance
+    * follows the same rule. The answer is to break line of sight - a pillar, a wall, a hole,
+    * a block placed in time. On the throne he weighs two people at once.
+    */
+   private static void startAppraisal(ServerLevel level, Mob boss, Fight fight, long now) {
+      List<ServerPlayer> room = new ArrayList<>();
+      for (ServerPlayer p : participantsNear(level, boss, ARENA_RADIUS)) {
+         if (fight.participants.contains(p.getUUID())) {
+            room.add(p);
+         }
+      }
+      if (room.isEmpty()) {
+         return;
+      }
+      int picks = Math.min(room.size(), fight.phase >= 2 ? 2 : 1);
+      for (int i = 0; i < picks; i++) {
+         ServerPlayer p = room.remove(RANDOM.nextInt(room.size()));
+         fight.strikes.add(new Strike(Strike.APPRAISAL, p.position(), now + APPRAISAL_WARN, 0.0, APPRAISAL_DAMAGE, p.getUUID()));
+         Fx.runeCircle(level, ParticleTypes.END_ROD, p.position().add(0.0, 0.05, 0.0), 1.4, APPRAISAL_WARN, CROWN_GOLD);
+         p.addEffect(new MobEffectInstance(MobEffects.GLOWING, APPRAISAL_WARN + 10, 0, false, false, true));
+         p.sendOverlayMessage(Component.literal("§6◆ §fYou're being appraised §8- §fbreak line of sight."));
+         announceNear(level, boss, ARENA_RADIUS, "&8He's weighing &f" + p.getName().getString() + "&8. &7Get behind something.");
+      }
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_POWER_SELECT, SoundSource.HOSTILE, 1.4F, 0.8F);
+      announce(level, SAY + "\"§fWhat are you worth?\"");
+   }
+
+   /** Rings the Kneel bells, draws the Appraisal chains, and lands both when their time is up. */
+   private static void tickStrikes(ServerLevel level, Mob boss, Fight fight, long now) {
+      if (fight.strikes.isEmpty()) {
+         return;
+      }
+      for (Iterator<Strike> it = fight.strikes.iterator(); it.hasNext();) {
+         Strike strike = it.next();
+         if (strike.kind == Strike.KNEEL) {
+            long left = strike.landAt - now;
+            // Bells one and two at 30 and 15 ticks out; the third is the slam itself.
+            int due = left <= KNEEL_BEAT ? 2 : left <= KNEEL_BEAT * 2L ? 1 : 0;
+            while (strike.beats < due) {
+               strike.beats++;
+               kneelBell(level, strike);
+            }
+            if (now < strike.landAt) {
+               continue;
+            }
+            it.remove();
+            landKneel(level, boss, strike);
+            continue;
+         }
+
+         ServerPlayer target = level.getServer().getPlayerList().getPlayer(strike.target);
+         if (target == null || !target.isAlive() || target.isSpectator() || target.isCreative() || target.level() != level) {
+            // Gone, dead or elsewhere: the appraisal is dropped, not redirected.
+            it.remove();
+            continue;
+         }
+         Vec3 crown = boss.position().add(0.0, boss.getBbHeight() * 0.85, 0.0);
+         Vec3 chest = target.position().add(0.0, target.getBbHeight() * 0.6, 0.0);
+         Vec3 end = sightEnd(level, crown, chest);
+         if (now < strike.landAt) {
+            if ((strike.landAt - now) % 8 == 0) {
+               Fx.chains(level, ParticleTypes.END_ROD, crown, end, CROWN_GOLD);
+            }
+            if (!strike.charged && strike.landAt - now <= 8) {
+               strike.charged = true;
+               Fx.flare(level, ParticleTypes.END_ROD, crown, 1.2, CROWN_GOLD);
+               level.playSound(null, crown.x, crown.y, crown.z, SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 1.4F, 1.8F);
+            }
+            continue;
+         }
+         it.remove();
+         landAppraisal(level, boss, strike, target, crown, chest, end);
+      }
+   }
+
+   /** One of the Kneel count-in bells, with the count on the action bar of everyone inside. */
+   private static void kneelBell(ServerLevel level, Strike strike) {
+      Vec3 at = strike.at;
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, 0.9F);
+      Fx.ring(level, ParticleTypes.END_ROD, at.add(0.0, 0.1, 0.0), strike.radius, CROWN_GOLD);
+      Fx.resonance(level, ParticleTypes.NOTE, at.add(0.0, 3.4, 0.0), 12.0, EMERALD);
+      String count = strike.beats == 1
+         ? "§6● §8● ●"
+         : "§6● ● §8● §f- jump on the next";
+      for (ServerPlayer p : playersNear(level, at.x, at.y, at.z, strike.radius + 4.0)) {
+         p.sendOverlayMessage(Component.literal(count));
+      }
+   }
+
+   /** The third bell: everyone with their feet on the floor inside the circle kneels. */
+   private static void landKneel(ServerLevel level, Mob boss, Strike strike) {
+      Vec3 at = strike.at;
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, 0.5F);
+      level.playSound(null, at.x, at.y, at.z, SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.HOSTILE, 1.8F, 0.6F);
+      Fx.shockwave(level, ParticleTypes.HAPPY_VILLAGER, at, strike.radius, EMERALD);
+      Fx.nova(level, ParticleTypes.END_ROD, at.add(0.0, 0.2, 0.0), strike.radius * 0.6, CROWN_GOLD);
+      Fx.rockburst(level, ParticleTypes.HAPPY_VILLAGER, at.add(0.0, 0.3, 0.0), 2.5, DEEP_GREEN);
+      int knelt = 0;
+      for (ServerPlayer p : playersNear(level, at.x, at.y, at.z, strike.radius + 4.0)) {
+         double dx = p.getX() - at.x;
+         double dz = p.getZ() - at.z;
+         if (dx * dx + dz * dz > strike.radius * strike.radius || Math.abs(p.getY() - at.y) > 3.0) {
+            continue;
+         }
+         if (!p.onGround()) {
+            p.sendOverlayMessage(Component.literal("§aClean."));
+            continue;
+         }
+         p.hurtServer(level, level.damageSources().mobAttack(boss), strike.damage);
+         p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 4, false, true, true));
+         Fx.shatter(level, ParticleTypes.HAPPY_VILLAGER, p.position().add(0.0, 0.4, 0.0), 0.8, EMERALD);
+         knelt++;
+      }
+      announce(level, SAY + (knelt > 0 ? "\"§fGood. Stay down.\"" : "\"§f...Rude.\""));
+   }
+
+   /** The lance: down the line to the target, or into whatever they put in its way. */
+   private static void landAppraisal(ServerLevel level, Mob boss, Strike strike, ServerPlayer target, Vec3 crown, Vec3 chest, Vec3 end) {
+      Fx.beam(level, ParticleTypes.END_ROD, crown, end, CROWN_GOLD);
+      Fx.lightning(level, ParticleTypes.HAPPY_VILLAGER, crown, end, EMERALD);
+      level.playSound(null, crown.x, crown.y, crown.z, SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 1.6F, 1.8F);
+      if (end.distanceToSqr(chest) > 1.0) {
+         // Blocked: the lance breaks on the cover, and the player learns that cover works.
+         Fx.shatter(level, ParticleTypes.END_ROD, end, 1.0, CROWN_GOLD);
+         level.playSound(null, end.x, end.y, end.z, SoundEvents.ANVIL_LAND, SoundSource.HOSTILE, 1.0F, 1.6F);
+         target.sendOverlayMessage(Component.literal("§aBlocked."));
+         announce(level, SAY + "\"§fHiding. Cheap.\"");
+         return;
+      }
+      Fx.flare(level, ParticleTypes.END_ROD, chest, 1.4, CROWN_GOLD);
+      Fx.clash(level, ParticleTypes.HAPPY_VILLAGER, chest, chest.subtract(crown), EMERALD);
+      target.hurtServer(level, level.damageSources().mobAttack(boss), strike.damage);
+      target.addEffect(new MobEffectInstance(MobEffects.GLOWING, 100, 0, false, false, true));
+      announce(level, SAY + "\"§fOverpriced.\"");
    }
 
    /**
@@ -806,8 +1171,10 @@ public final class EmeraldSovereignManager {
       fight.wheelTicks = WHEEL_TICKS;
       fight.wheelAngle = RANDOM.nextDouble() * Math.PI * 2.0;
       fight.wheelHits.clear();
-      announce(level, SAY + "\"\u00a7fThe whole hall turns. \u00a7aKeep up.\"");
-      announceNear(level, boss, ARENA_RADIUS, "&a&lSOVEREIGN'S WHEEL&7 - three rays sweep the room. Stand in the gaps!");
+      Fx.runeCircle(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.05, 0.0), 3.0, WHEEL_TICKS, CROWN_GOLD);
+      Fx.vortex(level, ParticleTypes.HAPPY_VILLAGER, boss.position(), 2.5, WHEEL_TICKS, EMERALD);
+      announce(level, SAY + "\"§fRound we go.\"");
+      announceNear(level, boss, ARENA_RADIUS, "&8Three rays. &7Stand in the gaps or behind a wall.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 2.0F, 1.3F);
    }
 
@@ -820,7 +1187,15 @@ public final class EmeraldSovereignManager {
       for (int arm = 0; arm < 3; arm++) {
          double angle = fight.wheelAngle + arm * (Math.PI * 2.0 / 3.0);
          Vec3 dir = new Vec3(Math.cos(angle), 0.0, Math.sin(angle));
-         double reach = drawRay(level, origin, dir);
+         double reach = rayReach(level, origin, dir, WHEEL_REACH);
+         if (fight.wheelTicks % 2 == 0) {
+            Vec3 tip = origin.add(dir.scale(reach));
+            Fx.beam(level, ParticleTypes.HAPPY_VILLAGER, origin, tip, EMERALD);
+            if (reach < WHEEL_REACH - 0.5) {
+               // Where an arm is broken by cover, the break is visible.
+               vanillaOnly(() -> level.sendParticles(ParticleTypes.CRIT, tip.x, tip.y, tip.z, 4, 0.2, 0.2, 0.2, 0.04));
+            }
+         }
          for (ServerPlayer p : playersNear(level, origin.x, origin.y, origin.z, reach + 2.0)) {
             Vec3 rel = p.position().add(0.0, p.getBbHeight() * 0.5, 0.0).subtract(origin);
             if (Math.abs(rel.y) > 2.2) {
@@ -838,11 +1213,10 @@ public final class EmeraldSovereignManager {
                continue;
             }
             fight.wheelHits.put(p.getUUID(), now + 8L);
-            fight.participants.add(p.getUUID());
             p.hurtServer(level, level.damageSources().mobAttack(boss), WHEEL_DAMAGE);
             p.push(dir.x * 0.5, 0.12, dir.z * 0.5);
             p.hurtMarked = true;
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, p.getX(), p.getY() + 1.0, p.getZ(), 8, 0.3, 0.4, 0.3, 0.05);
+            Fx.clash(level, ParticleTypes.HAPPY_VILLAGER, p.position().add(0.0, 1.0, 0.0), dir, EMERALD);
          }
       }
 
@@ -851,35 +1225,52 @@ public final class EmeraldSovereignManager {
       }
       if (fight.wheelTicks <= 0) {
          fight.wheelHits.clear();
-         announceNear(level, boss, ARENA_RADIUS, "&aThe wheel comes to rest.");
+         Fx.ring(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.1, 0.0), 4.0, CROWN_GOLD);
+         announceNear(level, boss, ARENA_RADIUS, "&8The wheel stops.");
       }
    }
 
-   /** Draws a ray and reports how far it reached before a block stopped it. */
-   private static double drawRay(ServerLevel level, Vec3 from, Vec3 dir) {
+   /**
+    * How far a ray gets before the first non-air block stops it, in half-block steps.
+    *
+    * @param dir a unit vector
+    */
+   private static double rayReach(ServerLevel level, Vec3 from, Vec3 dir, double max) {
       double reach = 0.0;
-      for (double d = 0.0; d < WHEEL_REACH; d += 0.5) {
-         Vec3 point = from.add(dir.scale(d));
-         if (!level.getBlockState(BlockPos.containing(point)).isAir()) {
-            level.sendParticles(ParticleTypes.CRIT, point.x, point.y, point.z, 5, 0.2, 0.2, 0.2, 0.04);
+      for (double d = 0.0; d <= max; d += 0.5) {
+         if (!level.getBlockState(BlockPos.containing(from.add(dir.scale(d)))).isAir()) {
             break;
          }
          reach = d;
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, point.x, point.y, point.z, 2, 0.1, 0.1, 0.1, 0.0);
       }
       return reach;
    }
 
+   /** Where a line from {@code from} to {@code to} ends: at {@code to}, or at the first block in the way. */
+   private static Vec3 sightEnd(ServerLevel level, Vec3 from, Vec3 to) {
+      Vec3 delta = to.subtract(from);
+      double dist = delta.length();
+      if (dist < 1.0E-3) {
+         return to;
+      }
+      Vec3 dir = delta.scale(1.0 / dist);
+      double reach = rayReach(level, from, dir, dist);
+      return reach >= dist - 0.5 ? to : from.add(dir.scale(reach));
+   }
+
    /**
-    * Emerald Coffin: a green circle, then four walls of emerald block around whoever
-    * is standing on it.
+    * Emerald Coffin: a green circle, then four glass walls around whoever is standing on it.
     *
     * <p>The tell is the whole move. The circle is on the ground for a second and a
     * half, it does not follow anybody, and it leaves the spot it was aimed at - so a
     * fighter who moves is never in it. Anybody still standing there when the walls
     * come up is boxed in with the court for two and a half seconds, which is a
-    * sentence rather than a death sentence: the walls are emerald, and the way out is
-    * the one his guards are standing in.
+    * sentence rather than a death sentence: the walls are glass, and the way out is
+    * through them or past his guards.
+    *
+    * <p>The walls used to be emerald blocks, which a fighter with a pickaxe could mine
+    * out for nine emeralds apiece - twelve blocks a cast, in an economy mod. Glass drops
+    * nothing worth having, and the green comes from the effects instead.
     */
    private static void startCoffin(ServerLevel level, Mob boss, Fight fight) {
       ServerPlayer target = nearestPlayer(boss, ARENA_RADIUS);
@@ -888,7 +1279,10 @@ public final class EmeraldSovereignManager {
       }
       fight.coffinAt = target.position();
       fight.coffinTell = COFFIN_TELL;
-      announceNear(level, boss, ARENA_RADIUS, "&a&lEMERALD COFFIN&7 - do not be standing on the green.");
+      Fx.runeCircle(level, ParticleTypes.HAPPY_VILLAGER, fight.coffinAt.add(0.0, 0.05, 0.0), 1.7, COFFIN_TELL, EMERALD);
+      Fx.pillar(level, ParticleTypes.HAPPY_VILLAGER, fight.coffinAt, 3.5, DEEP_GREEN);
+      announce(level, SAY + "\"§fHold still.\"");
+      announceNear(level, boss, ARENA_RADIUS, "&8Off the green. &7Now.");
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.HOSTILE, 1.5F, 0.8F);
    }
 
@@ -896,9 +1290,13 @@ public final class EmeraldSovereignManager {
       if (fight.coffinTell > 0) {
          fight.coffinTell--;
          Vec3 at = fight.coffinAt;
-         for (int i = 0; i < 28; i++) {
-            double a = i * (Math.PI * 2.0 / 28.0);
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, at.x + Math.cos(a) * 1.7, at.y + 0.15, at.z + Math.sin(a) * 1.7, 1, 0.0, 0.0, 0.0, 0.0);
+         if (fight.coffinTell % 2 == 0) {
+            vanillaOnly(() -> {
+               for (int i = 0; i < 20; i++) {
+                  double a = i * (Math.PI * 2.0 / 20.0);
+                  level.sendParticles(ParticleTypes.HAPPY_VILLAGER, at.x + Math.cos(a) * 1.7, at.y + 0.15, at.z + Math.sin(a) * 1.7, 1, 0.0, 0.0, 0.0, 0.0);
+               }
+            });
          }
          if (fight.coffinTell > 0) {
             return;
@@ -909,10 +1307,14 @@ public final class EmeraldSovereignManager {
 
       fight.coffinHold--;
       Vec3 at = fight.coffinAt;
-      level.sendParticles(ParticleTypes.HAPPY_VILLAGER, at.x, at.y + 1.0, at.z, 10, 1.0, 1.0, 1.0, 0.05);
+      if (fight.coffinHold % 4 == 0) {
+         vanillaOnly(() -> level.sendParticles(ParticleTypes.HAPPY_VILLAGER, at.x, at.y + 1.0, at.z, 8, 1.0, 1.0, 1.0, 0.05));
+      }
       if (fight.coffinHold <= 0) {
+         Fx.shatter(level, ParticleTypes.HAPPY_VILLAGER, at.add(0.0, 1.2, 0.0), 1.4, EMERALD);
+         level.playSound(null, at.x, at.y, at.z, SoundEvents.GLASS_BREAK, SoundSource.HOSTILE, 1.2F, 0.8F);
          dropCoffin(level, fight);
-         announceNear(level, boss, ARENA_RADIUS, "&aThe coffin opens.");
+         announceNear(level, boss, ARENA_RADIUS, "&8The coffin opens.");
       }
    }
 
@@ -931,31 +1333,37 @@ public final class EmeraldSovereignManager {
                if (!level.getBlockState(pos).isAir()) {
                   continue;
                }
-               level.setBlock(pos, Blocks.EMERALD_BLOCK.defaultBlockState(), 3);
+               level.setBlock(pos, Blocks.GLASS.defaultBlockState(), 3);
                fight.coffinBlocks.add(pos);
             }
          }
       }
       fight.coffinHold = COFFIN_HOLD;
-      level.sendParticles(ParticleTypes.EXPLOSION, fight.coffinAt.x, fight.coffinAt.y + 0.5, fight.coffinAt.z, 8, 0.8, 0.5, 0.8, 0.05);
+      Fx.rockburst(level, ParticleTypes.HAPPY_VILLAGER, fight.coffinAt.add(0.0, 0.5, 0.0), 1.6, EMERALD);
+      Fx.aura(level, ParticleTypes.HAPPY_VILLAGER, fight.coffinAt, 3.0, COFFIN_HOLD, EMERALD);
       level.playSound(null, fight.coffinAt.x, fight.coffinAt.y, fight.coffinAt.z, SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 1.8F, 1.2F);
+      level.playSound(null, fight.coffinAt.x, fight.coffinAt.y, fight.coffinAt.z, SoundEvents.GLASS_PLACE, SoundSource.HOSTILE, 1.4F, 0.7F);
+      int caught = 0;
       for (ServerPlayer p : playersNear(level, fight.coffinAt.x, fight.coffinAt.y + 1.0, fight.coffinAt.z, 2.2)) {
          p.hurtServer(level, level.damageSources().mobAttack(boss), COFFIN_DAMAGE);
          p.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, COFFIN_HOLD, 0, false, true, true));
+         caught++;
       }
-      announceNear(level, boss, ARENA_RADIUS, "&a&lEMERALD COFFIN&7 - it closed.");
+      if (caught > 0) {
+         announceNear(level, boss, ARENA_RADIUS, "&8Boxed in. &7Glass breaks.");
+      }
    }
 
    /**
     * Takes the walls down again.
     *
     * <p>Only blocks this move put there are removed, and only while they are still
-    * emerald - a fighter who mined one out and built something in its place keeps what
-    * they built.
+    * its glass - a fighter who mined one out and built something in its place keeps
+    * what they built.
     */
    private static void dropCoffin(ServerLevel level, Fight fight) {
       for (BlockPos pos : fight.coffinBlocks) {
-         if (level.getBlockState(pos).is(Blocks.EMERALD_BLOCK)) {
+         if (level.getBlockState(pos).is(Blocks.GLASS)) {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
          }
       }
@@ -964,7 +1372,12 @@ public final class EmeraldSovereignManager {
       fight.coffinHold = 0;
    }
 
-   /** Phase two's signature: a green beam that has to be out-walked. */
+   /**
+    * Phase two's signature: a green beam that has to be walked out of.
+    *
+    * <p>The line it will fire down sits on the floor for a second and a half first, and
+    * stops where the beam will stop - at the first solid block - so a wall is cover too.
+    */
    private static void startJudgement(ServerLevel level, Mob boss, Fight fight) {
       ServerPlayer target = nearestPlayer(boss, ARENA_RADIUS);
       if (target == null) {
@@ -972,13 +1385,16 @@ public final class EmeraldSovereignManager {
       }
       fight.judgementOrigin = boss.position().add(0.0, boss.getBbHeight() * 0.7, 0.0);
       Vec3 dir = target.position().add(0.0, target.getBbHeight() * 0.5, 0.0).subtract(fight.judgementOrigin);
+      dir = new Vec3(dir.x, 0.0, dir.z);
       if (dir.lengthSqr() < 1.0E-4) {
          dir = new Vec3(1.0, 0.0, 0.0);
       }
-      fight.judgementDir = new Vec3(dir.x, 0.0, dir.z).normalize();
-      fight.judgementCharge = 46;
-      announce(level, SAY + "\"\u00a7fThen let judgement be \u00a7asimple\u00a7f.\"");
-      announceNear(level, boss, ARENA_RADIUS, "&a&l\u26a0 SOVEREIGN'S JUDGEMENT&7 - move!");
+      fight.judgementDir = dir.normalize();
+      fight.judgementCharge = JUDGEMENT_WARN;
+      Fx.runeCircle(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.05, 0.0), 2.5, JUDGEMENT_WARN, CROWN_GOLD);
+      Fx.aura(level, ParticleTypes.HAPPY_VILLAGER, boss.position(), boss.getBbHeight() + 0.5, JUDGEMENT_WARN, EMERALD);
+      announce(level, SAY + "\"§fGuilty.\"");
+      announceNear(level, boss, ARENA_RADIUS, "&8JUDGEMENT &7- step off the line. Walls stop it.");
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 2.0F, 0.8F);
    }
 
@@ -986,40 +1402,51 @@ public final class EmeraldSovereignManager {
       fight.judgementCharge--;
       Vec3 origin = fight.judgementOrigin;
       Vec3 dir = fight.judgementDir;
-      int elapsed = 46 - fight.judgementCharge;
+      double reach = rayReach(level, origin, dir, JUDGEMENT_REACH);
 
-      if (elapsed < 20) {
-         // Telegraph: a growing line on the floor where the beam will land.
-         for (double d = 0; d < 32; d += 1.0) {
-            Vec3 point = origin.add(dir.scale(d));
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, point.x, boss.getY() + 0.2, point.z, 1, 0.05, 0.0, 0.05, 0.0);
+      if (fight.judgementCharge > 0) {
+         // Telegraph: the line on the floor where the beam will land, as far as it will land.
+         Vec3 floorStart = new Vec3(origin.x, boss.getY() + 0.15, origin.z);
+         Vec3 floorEnd = floorStart.add(dir.scale(reach));
+         if (fight.judgementCharge % 6 == 0) {
+            Fx.beam(level, ParticleTypes.HAPPY_VILLAGER, floorStart, floorEnd, DEEP_GREEN);
+         } else if (fight.judgementCharge % 2 == 0) {
+            vanillaOnly(() -> {
+               for (double d = 0; d < reach; d += 1.0) {
+                  Vec3 point = floorStart.add(dir.scale(d));
+                  level.sendParticles(ParticleTypes.HAPPY_VILLAGER, point.x, point.y, point.z, 1, 0.05, 0.0, 0.05, 0.0);
+               }
+            });
          }
          boss.addEffect(new MobEffectInstance(MobEffects.GLOWING, 8, 0, false, false, false));
-         if (fight.judgementCharge > 0) {
-            return;
-         }
+         return;
       }
 
-      // Fire: a proper beam with a knockback and a burn, drawn thick.
-      for (double d = 0; d < 34; d += 0.6) {
-         Vec3 point = origin.add(dir.scale(d));
-         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, point.x, point.y, point.z, 3, 0.25, 0.25, 0.25, 0.0);
-         level.sendParticles(ParticleTypes.END_ROD, point.x, point.y, point.z, 1, 0.1, 0.1, 0.1, 0.0);
-      }
+      // Fire: one thick beam to the first block, a flare at his chest and a burst where it stops.
+      Vec3 end = origin.add(dir.scale(reach));
+      Fx.beam(level, ParticleTypes.END_ROD, origin, end, EMERALD);
+      Fx.beam(level, ParticleTypes.HAPPY_VILLAGER, origin.add(0.0, 0.3, 0.0), end.add(0.0, 0.3, 0.0), CROWN_GOLD);
+      Fx.flare(level, ParticleTypes.END_ROD, origin, 1.8, EMERALD);
+      Fx.rockburst(level, ParticleTypes.HAPPY_VILLAGER, end, 1.4, DEEP_GREEN);
       level.playSound(null, origin.x, origin.y, origin.z, SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 1.6F, 1.6F);
+      level.playSound(null, origin.x, origin.y, origin.z, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.HOSTILE, 1.0F, 1.4F);
 
-      for (ServerPlayer p : participantsNear(level, boss, 34.0)) {
+      for (ServerPlayer p : participantsNear(level, boss, JUDGEMENT_REACH + 2.0)) {
          Vec3 rel = p.position().add(0.0, p.getBbHeight() * 0.5, 0.0).subtract(origin);
-         double along = rel.x * dir.x + rel.z * dir.z;
-         if (along < 0.0 || along > 34.0) {
+         if (Math.abs(rel.y) > 2.5) {
             continue;
          }
-         double lateral = Math.abs(rel.x * dir.z - rel.z * dir.x);
-         if (lateral > 2.2) {
+         double along = rel.x * dir.x + rel.z * dir.z;
+         if (along < 0.0 || along > reach + 0.5) {
+            continue;
+         }
+         // Signed: which side of the line the player is on decides which way they are thrown.
+         double cross = rel.x * dir.z - rel.z * dir.x;
+         if (Math.abs(cross) > 2.2) {
             continue;
          }
          p.hurtServer(level, level.damageSources().mobAttack(boss), 20.0F);
-         Vec3 push = new Vec3(dir.z, 0.0, -dir.x).scale(lateral >= 0 ? 1.4 : -1.4);
+         Vec3 push = new Vec3(dir.z, 0.0, -dir.x).scale(cross >= 0.0 ? 1.4 : -1.4);
          p.push(push.x, 0.5, push.z);
          p.hurtMarked = true;
          p.igniteForTicks(60);
@@ -1035,6 +1462,7 @@ public final class EmeraldSovereignManager {
          Emerald emerald = it.next();
          int steps = 3;
          boolean done = false;
+         ServerPlayer struck = null;
          for (int s = 0; s < steps && !done; s++) {
             emerald.pos = emerald.pos.add(emerald.vel.scale(1.0 / steps));
             level.sendParticles(ParticleTypes.HAPPY_VILLAGER, emerald.pos.x, emerald.pos.y, emerald.pos.z, 1, 0.05, 0.05, 0.05, 0.0);
@@ -1044,13 +1472,18 @@ public final class EmeraldSovereignManager {
             }
             for (ServerPlayer p : playersNear(level, emerald.pos.x, emerald.pos.y, emerald.pos.z, 1.1)) {
                p.hurtServer(level, level.damageSources().mobAttack(boss), emerald.damage);
+               struck = p;
                done = true;
                break;
             }
          }
          emerald.life--;
          if (done || emerald.life <= 0) {
-            level.sendParticles(ParticleTypes.CRIT, emerald.pos.x, emerald.pos.y, emerald.pos.z, 6, 0.2, 0.2, 0.2, 0.05);
+            if (struck != null) {
+               Fx.clash(level, ParticleTypes.HAPPY_VILLAGER, emerald.pos, emerald.vel, EMERALD);
+            } else {
+               level.sendParticles(ParticleTypes.CRIT, emerald.pos.x, emerald.pos.y, emerald.pos.z, 6, 0.2, 0.2, 0.2, 0.05);
+            }
             it.remove();
          }
       }
@@ -1061,19 +1494,24 @@ public final class EmeraldSovereignManager {
    private static void enterPhase(ServerLevel level, Mob boss, Fight fight, int phase) {
       fight.phase = phase;
       summonGuards(level, boss, fight, 4);
-      announce(level, SAY + "\"\u00a7fEnough courtesy. \u00a7aThe throne takes over.\"");
-      announceNear(level, boss, ARENA_RADIUS, "&a&lTHE THRONE&7 - the court doubles and leads with steel.");
-      level.sendParticles(ColorParticleOption.create(ParticleTypes.FLASH, 0x55FF88), boss.getX(), boss.getY() + 1.5, boss.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+      announce(level, SAY + "\"§fFine. §aThrone room.\"");
+      announceNear(level, boss, ARENA_RADIUS, "&8PHASE II &7- more guards, and they hit harder.");
+      Vec3 head = boss.position().add(0.0, boss.getBbHeight() * 0.85, 0.0);
+      Fx.flare(level, ParticleTypes.END_ROD, head, 2.4, CROWN_GOLD);
+      Fx.shockwave(level, ParticleTypes.HAPPY_VILLAGER, boss.position(), 14.0, EMERALD);
+      Fx.runeCircle(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.05, 0.0), 7.0, 60, CROWN_GOLD);
+      Fx.pillar(level, ParticleTypes.HAPPY_VILLAGER, boss.position(), 10.0, DEEP_GREEN);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 2.0F, 0.5F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.RAID_HORN, SoundSource.HOSTILE, 1.2F, 0.8F);
    }
 
    private static void taunt(ServerLevel level, Mob boss, Fight fight) {
-      String line = switch (fight.guards.isEmpty() ? 3 : fight.phase) {
-         case 1 -> "\u00a78\u201c\u00a7fYou are negotiating with the wrong man.\u00a78\u201d";
-         case 2 -> "\u00a78\u201c\u00a7fA crown is a promise that someone else will bleed.\u00a78\u201d";
-         default -> "\u00a78\u201c\u00a7fWhere is my court? \u00a7f...oh. You did that.\u00a78\u201d";
+      String[] lines = switch (fight.guards.isEmpty() ? 3 : fight.phase) {
+         case 1 -> new String[]{"You're haggling with the wrong man.", "Everyone has a price.", "Bow. It's easier."};
+         case 2 -> new String[]{"Pay up.", "This crown cost more than you.", "I own this floor."};
+         default -> new String[]{"Where'd my court go?", "Fine. I'll do it myself."};
       };
-      announce(level, SAY + "\"" + line + "\"");
+      announce(level, SAY + "\"§f" + lines[RANDOM.nextInt(lines.length)] + "\"");
    }
 
    // -------------------------------------------------------------- lethal blow
@@ -1097,15 +1535,42 @@ public final class EmeraldSovereignManager {
       boss.setHealth(1.0F);
       boss.setNoAi(true);
       fight.bar.setProgress(0.0F);
+      // Everything in the air stops with him: nothing he marked lands after the blow that
+      // ended him, and his walls come down now rather than at the end of the ceremony.
+      fight.strikes.clear();
+      fight.marks.clear();
+      fight.emeralds.clear();
+      fight.wheelTicks = 0;
+      fight.wheelHits.clear();
+      fight.judgementCharge = 0;
+      fight.arrivalTicks = 0;
+      dropCoffin(level, fight);
+      Vec3 floor = boss.position();
+      Fx.runeCircle(level, ParticleTypes.END_ROD, floor.add(0.0, 0.05, 0.0), 5.0, DEATH_CEREMONY_TICKS, CROWN_GOLD);
+      Fx.spiral(level, ParticleTypes.HAPPY_VILLAGER, floor, 7.0, DEATH_CEREMONY_TICKS, EMERALD);
+      Fx.aura(level, ParticleTypes.TOTEM_OF_UNDYING, floor, boss.getBbHeight(), DEATH_CEREMONY_TICKS, CROWN_GOLD);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 2.0F, 0.9F);
-      announce(level, SAY + "\"\u00a7f...dismissed. \u00a7fAll of it, \u00a7adismissed\u00a7f.\"");
+      announce(level, SAY + "\"§fNo. §aI'm the king.\"");
       // FALSE cancels the blow so the death ceremony - and its loot - runs.
       return Boolean.FALSE;
    }
 
+   /**
+    * The abdication: the bell he fought with tolls for him, lower each time, and his court
+    * kneels and leaves one guard at a time. The crown cracks on every toll, and on the last
+    * one it goes - a gold flare, a starburst, a shockwave across the hall and a slow rain of
+    * gold over the place he stood.
+    */
    private static void tickDeath(MinecraftServer server, Mob boss, Fight fight) {
       ServerLevel level = (ServerLevel) boss.level();
+      // Held on his feet for the ceremony: a second blow, a fall or the void must not
+      // take him to zero and end it early with nothing said.
+      if (boss.getHealth() <= 0.0F) {
+         boss.setHealth(1.0F);
+      }
       fight.deathTicks--;
+      double progress = 1.0 - Math.min(1.0, fight.deathTicks / (double) DEATH_CEREMONY_TICKS);
+      Vec3 head = boss.position().add(0.0, boss.getBbHeight() * 0.85, 0.0);
 
       // The court kneels as he falls.
       if (fight.deathTicks % 10 == 0 && !fight.guards.isEmpty()) {
@@ -1113,14 +1578,36 @@ public final class EmeraldSovereignManager {
          fight.guards.remove(id);
          Entity raw = findEntity(server, id);
          if (raw != null) {
-            level.sendParticles(ParticleTypes.HAPPY_VILLAGER, raw.getX(), raw.getY() + 0.8, raw.getZ(), 24, 0.4, 0.5, 0.4, 0.08);
-            level.sendParticles(ParticleTypes.LARGE_SMOKE, raw.getX(), raw.getY() + 0.8, raw.getZ(), 14, 0.4, 0.4, 0.4, 0.05);
+            if (raw.level() == level) {
+               Fx.ring(level, ParticleTypes.END_ROD, raw.position().add(0.0, 0.1, 0.0), 1.2, CROWN_GOLD);
+               Fx.shatter(level, ParticleTypes.HAPPY_VILLAGER, raw.position().add(0.0, 0.9, 0.0), 0.9, EMERALD);
+               level.playSound(null, raw.getX(), raw.getY(), raw.getZ(), SoundEvents.VINDICATOR_CELEBRATE, SoundSource.HOSTILE, 0.8F, 0.6F);
+            }
             raw.discard();
          }
       }
 
-      level.sendParticles(ParticleTypes.HAPPY_VILLAGER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 14, 1.4, 1.2, 1.4, 0.1);
-      level.sendParticles(ParticleTypes.NOTE, boss.getX(), boss.getY() + 1.0, boss.getZ(), 10, 1.0, 0.8, 1.0, 0.1);
+      // The bell tolls for him, lower each time, and the crown cracks with it.
+      if (fight.deathTicks > 0 && fight.deathTicks % 16 == 0) {
+         float pitch = (float) Math.max(0.5, 1.0 - progress * 0.5);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, pitch);
+         Fx.shatter(level, ParticleTypes.TOTEM_OF_UNDYING, head, 0.6 + progress, CROWN_GOLD);
+         Fx.ring(level, ParticleTypes.HAPPY_VILLAGER, boss.position().add(0.0, 0.1, 0.0), 3.0 + progress * 6.0, EMERALD);
+      }
+      if (fight.deathTicks == 40) {
+         announce(level, SAY + "\"§fTake it, then. §aIt's heavy.\"");
+      }
+      // The last second: everything is pulled in before it goes.
+      if (fight.deathTicks == 20) {
+         Fx.vortex(level, ParticleTypes.HAPPY_VILLAGER, boss.position(), 4.0, 20, DEEP_GREEN);
+         Fx.summonCircle(level, ParticleTypes.END_ROD, boss.position().add(0.0, 0.05, 0.0), 3.0, 20, CROWN_GOLD);
+         level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BEACON_POWER_SELECT, SoundSource.HOSTILE, 1.8F, 0.5F);
+      }
+      vanillaOnly(() -> level.sendParticles(ParticleTypes.HAPPY_VILLAGER, boss.getX(), boss.getY() + 1.5, boss.getZ(), 8, 1.4, 1.2, 1.4, 0.1));
+      // He sinks, a little, towards one knee.
+      if (fight.deathTicks > 20) {
+         boss.setPos(boss.getX(), boss.getY() - 0.006, boss.getZ());
+      }
 
       if (fight.deathTicks > 0) {
          return;
@@ -1133,14 +1620,26 @@ public final class EmeraldSovereignManager {
       }
       fight.guards.clear();
       fight.emeralds.clear();
+      fight.strikes.clear();
       // A coffin left standing because the king died inside it would be a wall in the
       // arena forever, so his death takes it down with him.
       dropCoffin(level, fight);
       fight.marks.clear();
       fight.wheelTicks = 0;
 
-      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 6, 1.5, 1.5, 1.5, 0.1);
+      // The crown goes.
+      Vec3 floor = boss.position();
+      Fx.flare(level, ParticleTypes.END_ROD, head, 3.4, CROWN_GOLD);
+      Fx.starburst(level, ParticleTypes.TOTEM_OF_UNDYING, head, 8.0, CROWN_GOLD);
+      Fx.shockwave(level, ParticleTypes.HAPPY_VILLAGER, floor, 16.0, EMERALD);
+      Fx.nova(level, ParticleTypes.END_ROD, floor.add(0.0, 0.3, 0.0), 8.0, DEEP_GREEN);
+      Fx.pillar(level, ParticleTypes.HAPPY_VILLAGER, floor, 14.0, EMERALD);
+      Fx.emberRain(level, ParticleTypes.TOTEM_OF_UNDYING, floor, 8.0, 70, CROWN_GOLD);
+      level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, boss.getX(), boss.getY() + 1.0, boss.getZ(), 3, 1.5, 1.5, 1.5, 0.1);
       level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), ModSounds.BOSS_DEATH, SoundSource.HOSTILE, 2.0F, 0.9F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 2.0F, 0.5F);
+      level.playSound(null, boss.getX(), boss.getY(), boss.getZ(), SoundEvents.TOTEM_USE, SoundSource.HOSTILE, 1.4F, 0.7F);
+      announce(level, "§8The crown hits the floor and rolls.");
       boss.setNoAi(false);
       onBossDeath(level, boss);
       boss.hurtServer(level, level.damageSources().generic(), boss.getMaxHealth() * 4.0F + 100.0F);
@@ -1170,7 +1669,7 @@ public final class EmeraldSovereignManager {
       if (fight.everSeen && !fight.dying && fight.lastSeenLevel != null && !LOOT_PAID.contains(fight.bossId)) {
          LOOT_PAID.add(fight.bossId);
          ServerLevel level = fight.lastSeenLevel;
-         announce(level, "&7His court is empty and the hall is quiet - he is gone, and what he owed is on the floor where he stood.");
+         announce(level, "&8The hall is empty. &7He left what he owed on the floor.");
          grantLoot(level, fight, fight.lastSeenX, fight.lastSeenY, fight.lastSeenZ);
       }
       shutDown(server, fight);
@@ -1239,10 +1738,13 @@ public final class EmeraldSovereignManager {
 
    private static void shutDown(MinecraftServer server, Fight fight) {
       Mob boss = bossOf(server, fight);
+      // The coffin comes down even when his body cannot be found: a fight ended by the
+      // missing-body timer used to skip this and leave the walls standing for good.
+      ServerLevel coffinLevel = boss != null && boss.level() instanceof ServerLevel bl ? bl : fight.lastSeenLevel;
+      if (coffinLevel != null && !fight.coffinBlocks.isEmpty()) {
+         Safe.run("sovereign coffin teardown", () -> dropCoffin(coffinLevel, fight));
+      }
       if (boss != null) {
-         if (boss.level() instanceof ServerLevel level) {
-            Safe.run("sovereign coffin teardown", () -> dropCoffin(level, fight));
-         }
          boss.discard();
       }
       for (UUID id : new ArrayList<>(fight.guards)) {
@@ -1253,6 +1755,8 @@ public final class EmeraldSovereignManager {
       }
       fight.guards.clear();
       fight.emeralds.clear();
+      fight.strikes.clear();
+      fight.marks.clear();
       release(server, fight);
    }
 
@@ -1283,7 +1787,7 @@ public final class EmeraldSovereignManager {
       ServerPlayer best = null;
       double bestDist = range * range;
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level) {
+         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level || BossManager.isFakePlayer(p)) {
             continue;
          }
          double d = p.distanceToSqr(from);
@@ -1303,7 +1807,7 @@ public final class EmeraldSovereignManager {
       List<ServerPlayer> out = new ArrayList<>();
       double r2 = range * range;
       for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level) {
+         if (!p.isAlive() || p.isCreative() || p.isSpectator() || p.level() != level || BossManager.isFakePlayer(p)) {
             continue;
          }
          if (p.distanceToSqr(x, y, z) <= r2) {
@@ -1311,6 +1815,19 @@ public final class EmeraldSovereignManager {
          }
       }
       return out;
+   }
+
+   /**
+    * Runs plain-particle drawing as the vanilla-only fallback: modded clients already see
+    * the Fx shape it stands in for, so only clients without the mod get these.
+    */
+   private static void vanillaOnly(Runnable draw) {
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         draw.run();
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
    }
 
    private static void announce(ServerLevel level, String message) {
