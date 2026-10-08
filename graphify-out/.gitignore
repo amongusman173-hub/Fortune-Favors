@@ -1,0 +1,5 @@
+# graphify: commit only report + viz
+cache/
+graph.json
+manifest.json
+.graphify_*
