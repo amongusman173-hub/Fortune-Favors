@@ -106,11 +106,11 @@ public final class ClockworkGear {
       // A piston of brass and soul-fire punched straight out along the line, a shockwave where it
       // stops. Five shape cues; the old ram sent fifty particle packets to draw the same line.
       Vec3 low = eye.add(0.0, -0.3, 0.0);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.ELECTRIC_SPARK, low.add(flat.scale(0.8)), flat, 0.0, 0.0, SOULFIRE);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.ELECTRIC_SPARK, low, end.add(0.0, -0.3, 0.0), 0.0, 0.0, BRASS);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SLASH, ParticleTypes.CRIT, attacker.position(), flat, RAM_RANGE, 0.0, BRASS);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, end.add(0.0, -0.3, 0.0), Vec3.ZERO, RAM_WIDTH + 0.6, 0.0, 0xD8C8A8);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.ELECTRIC_SPARK, end.add(0.0, -0.3, 0.0), Vec3.ZERO, RAM_WIDTH + 0.4, 0.0, BRASS);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.ELECTRIC_SPARK, low.add(flat.scale(0.8)), flat, 0.0, 0.0, SOULFIRE);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.ELECTRIC_SPARK, low, end.add(0.0, -0.3, 0.0), 0.0, 0.0, BRASS);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.SLASH, ParticleTypes.CRIT, attacker.position(), flat, RAM_RANGE, 0.0, BRASS);
+      Fx.shockwave(level, ParticleTypes.CLOUD, attacker.position().add(flat.scale(RAM_RANGE)), RAM_WIDTH + 1.4, BRASS);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.ELECTRIC_SPARK, end.add(0.0, -0.3, 0.0), Vec3.ZERO, RAM_WIDTH + 0.4, 0.0, BRASS);
       level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), ModSounds.BOSS_SLAM, SoundSource.PLAYERS, 1.1F, 1.5F);
       level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), SoundEvents.ANVIL_LAND, SoundSource.PLAYERS, 0.8F, 1.2F);
 
@@ -218,7 +218,7 @@ public final class ClockworkGear {
          if (player.level() instanceof ServerLevel level) {
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HEART, player.getX(), player.getY() + 1.4, player.getZ(), 3, 0.3, 0.2, 0.3, 0.0);
             // A gear turns once over the heart with every repair.
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.ELECTRIC_SPARK, player.position().add(0.0, 1.2, 0.0), Vec3.ZERO, 0.9, 0.0, BRASS);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.ELECTRIC_SPARK, player.position().add(0.0, 1.2, 0.0), Vec3.ZERO, 0.9, 0.0, BRASS);
             level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 0.5F, 1.6F);
          }
       }

@@ -342,8 +342,8 @@ public final class SeaAndSkyGear {
       target.setDeltaMovement(toward.x * GRASP_PULL * heft, 0.34 * heft, toward.z * GRASP_PULL * heft);
       target.hurtMarked = true;
       target.hurtServer(level, level.damageSources().playerAttack(player), 4.5F);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.DRIPPING_WATER, target.position().add(0.0, 1.0, 0.0), player.getEyePosition(), 0.0, 0.0, TIDE);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.BUBBLE_POP, target.position().add(0.0, 0.35, 0.0), Vec3.ZERO, 1.5, 0.0, FOAM);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.DRIPPING_WATER, target.position().add(0.0, 1.0, 0.0), player.getEyePosition(), 0.0, 0.0, TIDE);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.BUBBLE_POP, target.position().add(0.0, 0.35, 0.0), Vec3.ZERO, 1.5, 0.0, FOAM);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.TRIDENT_THROW, SoundSource.PLAYERS, 0.9F, 0.7F);
       bar(player, "&3Grasp &8- &7hauled in &f" + target.getName().getString() + "&7.");
    }
@@ -354,8 +354,8 @@ public final class SeaAndSkyGear {
       target.setDeltaMovement(target.getDeltaMovement().x * 0.2, CRUSH_SLAM, target.getDeltaMovement().z * 0.2);
       target.hurtMarked = true;
       // The claw closes and the floor answers with a column of water.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, target.position(), Vec3.ZERO, 3.5, 0.0, TIDE);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.SPLASH, target.position().add(0.0, 0.15, 0.0), Vec3.ZERO, 2.6, 0.0, FOAM);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, target.position(), Vec3.ZERO, 3.5, 0.0, TIDE);
+      Fx.shockwave(level, ParticleTypes.SPLASH, target.position(), 2.8, FOAM);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.PLAYERS, 1.2F, 0.85F);
       bar(player, "&3Crush &8- &f" + target.getName().getString() + "&7 met the floor.");
    }
@@ -371,8 +371,8 @@ public final class SeaAndSkyGear {
          victim.hurtServer(level, level.damageSources().playerAttack(hitter), 8.0F);
          victim.setDeltaMovement(0.0, CRUSH_SLAM, 0.0);
          victim.hurtMarked = true;
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.SPLASH, victim.position().add(0.0, 0.2, 0.0), Vec3.ZERO, 4.4, 0.0, TIDE);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, victim.position(), Vec3.ZERO, 4.0, 0.0, FOAM);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.SPLASH, victim.position().add(0.0, 0.2, 0.0), Vec3.ZERO, 4.4, 0.0, TIDE);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.SPLASH, victim.position(), Vec3.ZERO, 4.0, 0.0, FOAM);
          level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.GENERIC_SPLASH, SoundSource.PLAYERS, 1.3F, 0.7F);
          bar(hitter, "&3Depth Breaker &8- &7the drop did the rest.");
          return;
@@ -473,8 +473,8 @@ public final class SeaAndSkyGear {
       // lever - the drag is what the damage is for.
       target.hurtServer(level, level.damageSources().playerAttack(player), CHAIN_PULL_DAMAGE);
       markTarget(player, target);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.SCULK_SOUL, target.position().add(0.0, 1.0, 0.0), player.getEyePosition(), 0.0, 0.0, ABYSS);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, target.position().add(0.0, target.getBbHeight() * 0.6, 0.0), toward, 0.0, 0.0, ABYSS);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.SCULK_SOUL, target.position().add(0.0, 1.0, 0.0), player.getEyePosition(), 0.0, 0.0, ABYSS);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, target.position().add(0.0, target.getBbHeight() * 0.6, 0.0), toward, 0.0, 0.0, ABYSS);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.CHAIN_BREAK, SoundSource.PLAYERS, 1.0F, 0.7F);
       bar(player, "&3Chain Pull &8- &f" + target.getName().getString() + "&7 came to you.");
    }
@@ -490,8 +490,8 @@ public final class SeaAndSkyGear {
       player.hurtMarked = true;
       player.fallDistance = 0.0F;
       DEEP_STRIKE.put(player.getUUID(), ServerClock.clock(player.level()) + DEEP_STRIKE_WINDOW_TICKS);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.SCULK_SOUL, player.getEyePosition(), to, 0.0, 0.0, ABYSS);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.SCULK_SOUL, to, Vec3.ZERO, 0.8, 0.0, ABYSS);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.SCULK_SOUL, player.getEyePosition(), to, 0.0, 0.0, ABYSS);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.SCULK_SOUL, to, Vec3.ZERO, 0.8, 0.0, ABYSS);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.CHAIN_FALL, SoundSource.PLAYERS, 1.0F, 1.3F);
       bar(player, "&3Abyssal Hook &8- &7the chain brought you instead.");
    }
@@ -507,8 +507,8 @@ public final class SeaAndSkyGear {
       if (until != null && now <= until) {
          DEEP_STRIKE.remove(hitter.getUUID());
          victim.hurtServer(level, level.damageSources().playerAttack(hitter), DEEP_STRIKE_DAMAGE);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RESONANCE, ParticleTypes.SCULK_SOUL, victim.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 14.0, 0.0, ABYSS);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, 1.0, 0.0), hitter.getLookAngle(), 0.0, 0.0, ABYSS);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.RESONANCE, ParticleTypes.SCULK_SOUL, victim.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 14.0, 0.0, ABYSS);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, 1.0, 0.0), hitter.getLookAngle(), 0.0, 0.0, ABYSS);
          level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.SCULK_CATALYST_BLOOM, SoundSource.PLAYERS, 1.0F, 0.8F);
          bar(hitter, "&3Deep Strike &8- &7it was still moving when it landed.");
       }
@@ -603,9 +603,9 @@ public final class SeaAndSkyGear {
       }
       // One crescent of wind down the whole line, edged on both sides. The old blade was drawn as
       // seventy-two separate particle calls, every swing.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SLASH, ParticleTypes.SWEEP_ATTACK, player.position(), look, SLASH_REACH, 0.0, GALE);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.GUST, eye.add(side.scale(SLASH_HALF_WIDTH)), eye.add(look.scale(SLASH_REACH)).add(side.scale(SLASH_HALF_WIDTH)), 0.0, 0.0, GALE);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.GUST, eye.subtract(side.scale(SLASH_HALF_WIDTH)), eye.add(look.scale(SLASH_REACH)).subtract(side.scale(SLASH_HALF_WIDTH)), 0.0, 0.0, GALE);
+      Fx.crescent(level, ParticleTypes.SWEEP_ATTACK, player.position(), look, SLASH_REACH, GALE);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.GUST, eye.add(side.scale(SLASH_HALF_WIDTH)), eye.add(look.scale(SLASH_REACH)).add(side.scale(SLASH_HALF_WIDTH)), 0.0, 0.0, GALE);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.GUST, eye.subtract(side.scale(SLASH_HALF_WIDTH)), eye.add(look.scale(SLASH_REACH)).subtract(side.scale(SLASH_HALF_WIDTH)), 0.0, 0.0, GALE);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BREEZE_SHOOT, SoundSource.PLAYERS, 1.2F, 1.15F);
       bar(player, hits == 0 ? "&7Wind Slash &8- &7it found nothing." : "&fWind Slash &8- &7caught &f" + hits + "&7.");
    }
@@ -625,7 +625,7 @@ public final class SeaAndSkyGear {
          victim.hurtServer(level, level.damageSources().playerAttack(hitter), DOWNFORCE_DAMAGE);
          victim.setDeltaMovement(victim.getDeltaMovement().x * 0.3, DOWNFORCE_SLAM, victim.getDeltaMovement().z * 0.3);
          victim.hurtMarked = true;
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.GUST, victim.position().add(0.0, 0.3, 0.0), Vec3.ZERO, 3.2, 0.0, GALE);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.GUST, victim.position().add(0.0, 0.3, 0.0), Vec3.ZERO, 3.2, 0.0, GALE);
          level.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.BREEZE_LAND, SoundSource.PLAYERS, 1.2F, 0.8F);
          bar(hitter, "&fDownforce &8- &7back to the floor.");
          return;

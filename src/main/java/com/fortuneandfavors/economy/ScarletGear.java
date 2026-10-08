@@ -303,8 +303,8 @@ public final class ScarletGear {
       bar(player, "§4" + SPELL_NAMES[index] + " §8| §7cast §8- §f" + SPELL_COOLDOWN_SECONDS[index] + "s");
       if (player.level() instanceof ServerLevel level) {
          // The sigil the Grimoire draws under its reader on every cast.
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.6, 0.0, SCARLET);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 0.9, 0.0, GLINT);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.6, 0.0, SCARLET);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 0.9, 0.0, GLINT);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.0F, 0.7F);
       }
       return null;
@@ -339,9 +339,9 @@ public final class ScarletGear {
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PHANTOM_BITE, SoundSource.PLAYERS, 1.2F, 0.9F);
       Vec3 wound = target.position().add(0.0, target.getBbHeight() * 0.6, 0.0);
       // The bite, then the blood drawn back along the line to the mouth that took it.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GOO_SPLASH, ParticleTypes.CRIMSON_SPORE, wound, Vec3.ZERO, 1.1, 0.0, SCARLET);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, wound, player.getEyePosition().add(0.0, -0.4, 0.0), 0.0, 0.0, GLINT);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, wound, player.getLookAngle(), 0.0, 0.0, SCARLET);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GOO_SPLASH, ParticleTypes.CRIMSON_SPORE, wound, Vec3.ZERO, 1.1, 0.0, SCARLET);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, wound, player.getEyePosition().add(0.0, -0.4, 0.0), 0.0, 0.0, GLINT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, wound, player.getLookAngle(), 0.0, 0.0, SCARLET);
       blood(level, target.getX(), target.getY() + 1.0, target.getZ(), 24);
       return true;
    }
@@ -355,7 +355,7 @@ public final class ScarletGear {
       SPEARS.add(new Spear(target.getUUID(), level, player, player.getEyePosition(), 3, ServerClock.clock(level) + 5L));
       // Three spears drawn up out of the caster's own blood before they are thrown.
       Vec3 behind = player.getEyePosition().add(player.getLookAngle().scale(-0.6));
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.CRIMSON_SPORE, behind.add(0.0, 0.5, 0.0), new Vec3(-player.getLookAngle().z, 0.0, player.getLookAngle().x), 1.4, 16, SCARLET);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.CRIMSON_SPORE, behind.add(0.0, 0.5, 0.0), new Vec3(-player.getLookAngle().z, 0.0, player.getLookAngle().x), 1.4, 16, SCARLET);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ARROW_SHOOT, SoundSource.PLAYERS, 1.2F, 0.7F);
       return true;
    }
@@ -400,8 +400,8 @@ public final class ScarletGear {
 
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BAT_TAKEOFF, SoundSource.PLAYERS, 1.4F, 0.7F);
       // Night falls outward from the caster to the edge of the blind, and the swarm bursts out of it.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.LARGE_SMOKE, player.position().add(0.0, 0.4, 0.0), Vec3.ZERO, 12.0, 0.0, CLOT);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, ParticleTypes.LARGE_SMOKE, player.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 0.0, 1.0, CLOT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.LARGE_SMOKE, player.position().add(0.0, 0.4, 0.0), Vec3.ZERO, 12.0, 0.0, CLOT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, ParticleTypes.LARGE_SMOKE, player.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 0.0, 1.0, CLOT);
       com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, player.getX(), player.getY() + 1.0, player.getZ(), 30, 1.4, 0.9, 1.4, 0.03);
       return true;
    }
@@ -432,8 +432,8 @@ public final class ScarletGear {
          if (hits <= 8) {
             // A drop falls on each victim, and what it takes runs back to the caster.
             Vec3 hit = le.position().add(0.0, le.getBbHeight() * 0.6, 0.0);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.METEOR, ParticleTypes.CRIMSON_SPORE, hit.add(0.0, 7.0, 0.0), hit, 0.0, 6.0, SCARLET);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, hit, player.position().add(0.0, 1.0, 0.0), 0.0, 0.0, GLINT);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.METEOR, ParticleTypes.CRIMSON_SPORE, hit.add(0.0, 7.0, 0.0), hit, 0.0, 6.0, SCARLET);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, hit, player.position().add(0.0, 1.0, 0.0), 0.0, 0.0, GLINT);
          }
       }
       if (drained > 0.0) {
@@ -441,8 +441,9 @@ public final class ScarletGear {
       }
       com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CRIMSON_SPORE, player.getX(), player.getY() + 6.0, player.getZ(), 120, 7.0, 1.0, 7.0, 0.3);
       // The circle the rain falls inside, drawn on the ground at its true radius.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, RAIN_RADIUS, 50.0, SCARLET);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.CRIMSON_SPORE, player.position(), Vec3.ZERO, 8.0, 0.0, CLOT);
+      Fx.runeCircle(level, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), RAIN_RADIUS, 50, SCARLET);
+      Fx.emberRain(level, ParticleTypes.CRIMSON_SPORE, player.position(), RAIN_RADIUS, 40, SCARLET);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.CRIMSON_SPORE, player.position(), Vec3.ZERO, 8.0, 0.0, CLOT);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENDER_DRAGON_GROWL, SoundSource.PLAYERS, 1.0F, 0.6F);
       if (hits == 0) {
          bar(player, "§4Blood Rain §8| §7nothing in the downpour to drink");
@@ -515,8 +516,8 @@ public final class ScarletGear {
       // A visible tether, so both sides can see the channel and its direction.
       blood(level, player.getX(), player.getY() + 1.0, player.getZ(), 40);
       blood(level, target.getX(), target.getY() + 1.0, target.getZ(), 30);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, RITUAL_ANCHOR + 0.5, 40.0, SCARLET);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.CRIMSON_SPORE, target.position().add(0.0, target.getBbHeight() * 0.5, 0.0), Vec3.ZERO, 1.6, 0.0, GLINT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.CRIMSON_SPORE, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, RITUAL_ANCHOR + 0.5, 40.0, SCARLET);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.CRIMSON_SPORE, target.position().add(0.0, target.getBbHeight() * 0.5, 0.0), Vec3.ZERO, 1.6, 0.0, GLINT);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WITCH_CELEBRATE, SoundSource.PLAYERS, 1.0F, 0.7F);
       bar(
          player,
@@ -575,8 +576,8 @@ public final class ScarletGear {
          // An arrow hits for its speed times its base damage, so a base of SPEAR_DAMAGE at this
          // speed was a 14-point spear. Divided back out, each spear hits for SPEAR_DAMAGE.
          arrow.setBaseDamage(SPEAR_DAMAGE / SPEAR_SPEED);
-         com.fortuneandfavors.net.FfVfx.shape(s.level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, s.origin, eye, 0.0, 0.0, SCARLET);
-         com.fortuneandfavors.net.FfVfx.shape(s.level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.CRIMSON_SPORE, s.origin, dir.normalize(), 0.0, 0.0, GLINT);
+         Fx.shape(s.level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, s.origin, eye, 0.0, 0.0, SCARLET);
+         Fx.shape(s.level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.CRIMSON_SPORE, s.origin, dir.normalize(), 0.0, 0.0, GLINT);
          arrow.setCritArrow(false);
          arrow.pickup = net.minecraft.world.entity.projectile.arrow.AbstractArrow.Pickup.DISALLOWED;
          s.level.addFreshEntity(arrow);
@@ -754,7 +755,7 @@ public final class ScarletGear {
          if (len > 0.01 && ritual.ticksLeft % 4 == 0) {
             // One beam cue every few ticks. The old tether sent a particle packet for every third
             // of a block, every tick - sixty packets a second on a long channel, for one line.
-            com.fortuneandfavors.net.FfVfx.shape(ritual.level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, to, from, 0.0, 0.0, SCARLET);
+            Fx.shape(ritual.level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.CRIMSON_SPORE, to, from, 0.0, 0.0, SCARLET);
          }
          if (targetIsPlayer) {
             bar((ServerPlayer) target, "§4BEING DRAINED §8| §f" + Math.max(0, (int) Math.ceil(target.getHealth() / 2.0)) + " ❤ §7- hurt them or run");
@@ -801,7 +802,7 @@ public final class ScarletGear {
       double y = target != null ? target.getY() : ritual.anchor.y;
       double z = target != null ? target.getZ() : ritual.anchor.z;
       com.fortuneandfavors.net.FfVfx.particles(ritual.level, ParticleTypes.POOF, x, y + 1.0, z, 24, 1.0, 1.0, 1.0, 0.05);
-      com.fortuneandfavors.net.FfVfx.shape(ritual.level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.SMOKE, new Vec3(x, y + 0.2, z), Vec3.ZERO, 1.8, 0.0, CLOT);
+      Fx.shape(ritual.level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.SMOKE, new Vec3(x, y + 0.2, z), Vec3.ZERO, 1.8, 0.0, CLOT);
       ritual.level.playSound(null, x, y, z, SoundEvents.FIRE_EXTINGUISH, SoundSource.PLAYERS, 1.0F, 0.8F);
    }
 
@@ -821,9 +822,10 @@ public final class ScarletGear {
 
       blood(level, target.getX(), target.getY() + 1.0, target.getZ(), 80);
       Vec3 body = target.position();
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.CRIMSON_SPORE, body, Vec3.ZERO, 9.0, 0.0, SCARLET);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.CRIMSON_SPORE, body.add(0.0, 0.3, 0.0), Vec3.ZERO, 5.0, 0.0, CLOT);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GOO_SPLASH, ParticleTypes.CRIMSON_SPORE, body.add(0.0, 1.0, 0.0), Vec3.ZERO, 2.2, 0.0, GLINT);
+      Fx.spiral(level, ParticleTypes.CRIMSON_SPORE, body, 6.0, 24, SCARLET);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.CRIMSON_SPORE, body, Vec3.ZERO, 9.0, 0.0, SCARLET);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.CRIMSON_SPORE, body.add(0.0, 0.3, 0.0), Vec3.ZERO, 5.0, 0.0, CLOT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GOO_SPLASH, ParticleTypes.CRIMSON_SPORE, body.add(0.0, 1.0, 0.0), Vec3.ZERO, 2.2, 0.0, GLINT);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), ModSounds.BOSS_DEATH, SoundSource.PLAYERS, 0.9F, 0.8F);
       level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.WITHER_DEATH, SoundSource.PLAYERS, 0.6F, 1.4F);
 
@@ -1100,9 +1102,9 @@ public final class ScarletGear {
 
       // It climbs out of a pool of the victim's blood.
       Vec3 pool = new Vec3(x, y + 0.05, z);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.CRIMSON_SPORE, pool, Vec3.ZERO, 2.0, 30.0, SCARLET);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.CRIMSON_SPORE, pool, Vec3.ZERO, 3.0, 0.0, SCARLET);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIMSON_SPORE, pool, Vec3.ZERO, 1.1, 0.0, GLINT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.CRIMSON_SPORE, pool, Vec3.ZERO, 2.0, 30.0, SCARLET);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.GEYSER, ParticleTypes.CRIMSON_SPORE, pool, Vec3.ZERO, 3.0, 0.0, SCARLET);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.CRIMSON_SPORE, pool, Vec3.ZERO, 1.1, 0.0, GLINT);
       bar(owner, "§4The blood answers §8| §fa Blood Revenant of §f" + name + "§a fights for you for a minute");
       return servant;
    }

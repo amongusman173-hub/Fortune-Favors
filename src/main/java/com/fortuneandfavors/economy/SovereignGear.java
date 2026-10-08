@@ -131,8 +131,8 @@ public final class SovereignGear {
       GUARDS.put(player.getUUID(), list);
 
       // The contract's seal is pressed into the ground and the guard steps up out of it.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.HAPPY_VILLAGER, guard.position().add(0.0, 0.05, 0.0), Vec3.ZERO, 1.6, 30.0, EMERALD);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.HAPPY_VILLAGER, guard.position(), Vec3.ZERO, 4.0, 0.0, CROWN);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.HAPPY_VILLAGER, guard.position().add(0.0, 0.05, 0.0), Vec3.ZERO, 1.6, 30.0, EMERALD);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.HAPPY_VILLAGER, guard.position(), Vec3.ZERO, 4.0, 0.0, CROWN);
       com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.HAPPY_VILLAGER, guard.getX(), guard.getY() + 1.0, guard.getZ(), 30, 0.5, 0.8, 0.5, 0.08);
       level.playSound(null, guard.getX(), guard.getY(), guard.getZ(), SoundEvents.VINDICATOR_CELEBRATE, SoundSource.PLAYERS, 1.2F, 1.0F);
       bar(player, "&aRoyal Guard &7- his contract runs for &f60s");
@@ -162,9 +162,10 @@ public final class SovereignGear {
       // The toll rolls outward in three rings to the edge of its reach. Three shape cues where the
       // old version sent ninety separate particle packets.
       Vec3 bell = new Vec3(x, y, z);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.NOTE, bell.add(0.0, -0.8, 0.0), Vec3.ZERO, BELL_RADIUS, 0.0, EMERALD);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.NOTE, bell.add(0.0, -0.8, 0.0), Vec3.ZERO, BELL_RADIUS, 0.0, EMERALD);
+      Fx.flare(level, ParticleTypes.NOTE, bell.add(0.0, 1.2, 0.0), 1.6, CROWN);
       for (int ring = 1; ring <= 3; ring++) {
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.NOTE, bell, Vec3.ZERO, ring * 5.0, 0.0, ring == 2 ? CROWN : EMERALD);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.NOTE, bell, Vec3.ZERO, ring * 5.0, 0.0, ring == 2 ? CROWN : EMERALD);
       }
 
       int staggered = 0;
@@ -289,8 +290,8 @@ public final class SovereignGear {
       player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 200, 1, false, true, true));
       SEAL_UNTIL.put(player.getUUID(), now + SEAL_COOLDOWN_TICKS);
       com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1.2, player.getZ(), 30, 0.6, 0.8, 0.6, 0.12);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 2.2, 0.0, CROWN);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.4, 0.0, EMERALD);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 1.0, 0.0), Vec3.ZERO, 2.2, 0.0, CROWN);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, player.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.4, 0.0, EMERALD);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BELL_RESONATE, SoundSource.PLAYERS, 1.4F, 1.3F);
       bar(player, "&a&lROYAL TRIBUTE &7- Strength + Resistance for 10s");
       return null;
@@ -403,7 +404,7 @@ public final class SovereignGear {
                }
                if (guard.ticks == 0) {
                   com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, mob.getX(), mob.getY() + 0.8, mob.getZ(), 14, 0.4, 0.4, 0.4, 0.05);
-                  com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, mob.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.2, 0.0, EMERALD);
+                  Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.HAPPY_VILLAGER, mob.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.2, 0.0, EMERALD);
                   level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.VINDICATOR_CELEBRATE, SoundSource.PLAYERS, 1.0F, 0.7F);
                   if (owner != null) {
                      bar(owner, "&7A Royal Guard's contract has expired.");

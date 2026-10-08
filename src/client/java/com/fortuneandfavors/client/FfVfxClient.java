@@ -4,6 +4,7 @@ import com.fortuneandfavors.client.FfParticle.Tex;
 import com.fortuneandfavors.net.FfVfx;
 import com.fortuneandfavors.net.FfVfxPayload;
 import com.fortuneandfavors.net.FfVfxPayload.Cue;
+import com.fortuneandfavors.util.FxKinds;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -88,7 +89,16 @@ public final class FfVfxClient {
          new Cue(FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, (float)(at.x + side.x * 4), (float)at.y + 1.5F, (float)(at.z + side.z * 4),
             (float)side.x, 0, (float)side.z, 1.6F, 40, 0, 0xB06BFF),
          new Cue(FfVfx.NOVA, ParticleTypes.SOUL_FIRE_FLAME, (float)(at.x - side.x * 4), (float)at.y, (float)(at.z - side.z * 4), 0, 0, 0, 4.0F, 0, 0, 0x3FE0FF),
-         new Cue(FfVfx.GOO_SPLASH, ParticleTypes.ITEM_SLIME, (float)at.x, (float)at.y, (float)at.z, 0, 0, 0, 2.5F, 0, 0, 0x6FE36A)
+         new Cue(FfVfx.GOO_SPLASH, ParticleTypes.ITEM_SLIME, (float)at.x, (float)at.y, (float)at.z, 0, 0, 0, 2.5F, 0, 0, 0x6FE36A),
+         // The template set, laid out behind the first row so each one can be told apart.
+         new Cue(FxKinds.RUNE_CIRCLE, p, (float)(at.x + look.x * 5), (float)at.y + 0.1F, (float)(at.z + look.z * 5), 0, 0, 0, 2.5F, 80, 0, 0xC0102A),
+         new Cue(FxKinds.SPIRAL, p, (float)(at.x + look.x * 5 + side.x * 4), (float)at.y, (float)(at.z + look.z * 5 + side.z * 4), 0, 0, 0, 4.0F, 40, 0, 0x99EEFF),
+         new Cue(FxKinds.LIGHTNING, p, (float)(at.x + side.x * 2), (float)at.y + 5.0F, (float)(at.z + side.z * 2),
+            (float)(at.x - side.x * 2), (float)at.y, (float)(at.z - side.z * 2), 0, 0, 0, 0xB8E8FF),
+         new Cue(FxKinds.STARBURST, p, (float)(at.x + look.x * 5 - side.x * 4), (float)at.y + 1.5F, (float)(at.z + look.z * 5 - side.z * 4), 0, 0, 0, 2.5F, 0, 0, 0xF0C24A),
+         new Cue(FxKinds.DOME, p, (float)(at.x + look.x * 10), (float)at.y, (float)(at.z + look.z * 10), 0, 0, 0, 3.0F, 60, 0, 0x3FD86A),
+         new Cue(FxKinds.SHOCKWAVE, p, (float)(at.x + look.x * 10 + side.x * 5), (float)at.y, (float)(at.z + look.z * 10 + side.z * 5), 0, 0, 0, 4.0F, 0, 0, 0xE2B042),
+         new Cue(FxKinds.VORTEX, ParticleTypes.REVERSE_PORTAL, (float)(at.x + look.x * 10 - side.x * 5), (float)at.y, (float)(at.z + look.z * 10 - side.z * 5), 0, 0, 0, 2.5F, 60, 0, 0x8C5CFF)
       ));
    }
 
@@ -177,6 +187,17 @@ public final class FfVfxClient {
                }
                case FfVfx.WORMHOLE -> start(level, c, c.b() > 0.5F ? 16 : 18, true);
                case FfVfx.SUMMON_CIRCLE -> start(level, c, Math.max(4, Math.min(400, (int)c.b())), true);
+               // The template set (see util.FxKinds): timed ones live for b ticks, one-shots draw now.
+               case FxKinds.SPIRAL, FxKinds.DOME, FxKinds.VORTEX, FxKinds.RUNE_CIRCLE, FxKinds.EMBER_RAIN,
+                  FxKinds.HEARTBEAT, FxKinds.PETALS, FxKinds.AURA -> start(level, c, Math.max(4, Math.min(400, (int)c.b())), true);
+               case FxKinds.COMET -> start(level, c, Math.max(2, Math.min(80, (int)c.b())), true);
+               case FxKinds.SHOCKWAVE -> start(level, c, 14, true);
+               case FxKinds.CRESCENT -> start(level, c, 8, true);
+               case FxKinds.LIGHTNING -> lightning(level, c);
+               case FxKinds.STARBURST -> starburst(level, c);
+               case FxKinds.CHAINS -> chains(level, c);
+               case FxKinds.SHATTER -> shatter(level, c);
+               case FxKinds.FLARE -> flare(level, c);
                default -> {
                }
             }
@@ -229,6 +250,17 @@ public final class FfVfxClient {
          case FfVfx.RESONANCE -> resonance(level, l);
          case FfVfx.SCULK_AURA -> sculkAura(level, l);
          case FfVfx.ROD_ORBIT -> rodOrbit(level, l);
+         case FxKinds.SPIRAL -> spiral(level, l);
+         case FxKinds.DOME -> dome(level, l);
+         case FxKinds.VORTEX -> funnel(level, l);
+         case FxKinds.RUNE_CIRCLE -> runeCircle(level, l);
+         case FxKinds.EMBER_RAIN -> emberRain(level, l);
+         case FxKinds.HEARTBEAT -> heartbeat(level, l);
+         case FxKinds.PETALS -> petals(level, l);
+         case FxKinds.AURA -> aura(level, l);
+         case FxKinds.COMET -> comet(level, l);
+         case FxKinds.SHOCKWAVE -> shockwave(level, l);
+         case FxKinds.CRESCENT -> crescent(level, l);
          default -> {
          }
       }
@@ -1603,6 +1635,297 @@ public final class FfVfxClient {
          p(level, Tex.SMOKE, 0xE8F6FF, cam.x + (r.nextDouble() - 0.5) * 20.0, mc.player.getY() + 0.3, cam.z + (r.nextDouble() - 0.5) * 20.0,
             wind * 0.5, 0.0, 0.0, 2.5F, 60, 1.6F, 0.02F, 1.0F, 0.18F);
       }
+   }
+
+   // ------------------------------------------------------------------ templates (util.FxKinds)
+
+   private static int colourOf(Cue c) {
+      return c.color() == 0 ? tintOf(c.particle()) : c.color();
+   }
+
+   /** A double helix climbing a column, one turn every fourteen ticks. */
+   private static void spiral(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double h = Math.max(1.0, c.a());
+      double t = l.t();
+      double y = c.y() + h * t;
+      double r = 0.55 + 0.35 * Math.sin(t * Math.PI);
+      for (int k = 0; k < 2; k++) {
+         double ang = l.age * 0.45 + k * Math.PI;
+         double x = c.x() + Math.cos(ang) * r;
+         double z = c.z() + Math.sin(ang) * r;
+         p(level, Tex.GLOW, k == 0 ? rgb : WHITE, x, y, z, 0.0, 0.01, 0.0, 0.5F, 14, 0.3F, 0.0F, 0.9F);
+         p(level, Tex.SPARK, rgb, x, y, z, -Math.sin(ang) * 0.03, 0.02, Math.cos(ang) * 0.03, 0.25F, 10, 0.4F, 0.2F, 0.9F);
+      }
+   }
+
+   /** A ground wave rolling out to its radius, kicking up stone as it passes. */
+   private static void shockwave(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double radius = Math.max(1.0, c.a());
+      if (l.age == 0) {
+         flash(level, c.x(), c.y() + 0.3, c.z(), rgb, (float)Math.min(6.0, 1.0 + radius * 0.3));
+         p(level, Tex.RING, rgb, c.x(), c.y() + 0.1, c.z(), 0.0, 0.0, 0.0, 1.0F, 10, (float)Math.min(40.0, radius * 1.8), 0.0F, 0.8F);
+      }
+      double t = (l.age + 1.0) / l.life;
+      double at = radius * (1.0 - Math.pow(1.0 - t, 2.0));
+      int pts = clamp((int)(Math.PI * 2.0 * at / 1.2), 8, 48);
+      for (int i = 0; i < pts; i++) {
+         double ang = Math.PI * 2.0 * i / pts;
+         double cos = Math.cos(ang);
+         double sin = Math.sin(ang);
+         double x = c.x() + cos * at;
+         double z = c.z() + sin * at;
+         p(level, Tex.GLOW, rgb, x, c.y() + 0.15, z, 0.0, 0.02, 0.0, 0.9F, 6, 0.3F, 0.0F, 0.8F);
+         if (i % 4 == l.age % 4) {
+            p(level, Tex.ROCK, 0x8A7F70, x, c.y() + 0.1, z, cos * 0.05, 0.12, sin * 0.05, 0.35F, 12, 0.5F, 0.3F, 0.9F);
+         }
+      }
+   }
+
+   /** A forked bolt from the cue's position to its second vector. */
+   private static void lightning(ClientLevel level, Cue c) {
+      int rgb = colourOf(c);
+      RandomSource r = level.getRandom();
+      Vec3 a = new Vec3(c.x(), c.y(), c.z());
+      Vec3 b = new Vec3(c.ax(), c.ay(), c.az());
+      Vec3 d = b.subtract(a);
+      double len = d.length();
+      if (len < 0.1) {
+         return;
+      }
+      int segs = clamp((int)(len / 1.2), 3, 24);
+      double jag = Math.min(0.6, 0.15 + len * 0.02);
+      Vec3 prev = a;
+      for (int i = 1; i <= segs; i++) {
+         Vec3 q = a.add(d.scale(i / (double)segs));
+         if (i < segs) {
+            q = q.add(r.nextGaussian() * jag, r.nextGaussian() * jag, r.nextGaussian() * jag);
+         }
+         line(level, Tex.GLOW, WHITE, prev, q, 4, 0.18F, 5, 1.0F);
+         line(level, Tex.GLOW, rgb, prev, q, 3, 0.42F, 7, 0.6F);
+         if (i < segs && r.nextInt(4) == 0) {
+            Vec3 branch = q.add(r.nextGaussian() * 1.2, r.nextGaussian() * 0.8, r.nextGaussian() * 1.2);
+            line(level, Tex.GLOW, rgb, q, branch, 3, 0.2F, 4, 0.7F);
+         }
+         prev = q;
+      }
+      flash(level, b.x, b.y, b.z, rgb, 1.6F);
+   }
+
+   /** A hemisphere of light that holds over its radius, fading out over its life. */
+   private static void dome(ClientLevel level, Live l) {
+      if (l.age % 2 == 1) {
+         return;
+      }
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double radius = Math.max(1.0, c.a());
+      float alpha = (float)(0.35 + 0.5 * (1.0 - l.t()));
+      int meridians = clamp((int)(radius * 2.0), 6, 14);
+      for (int m = 0; m < meridians; m++) {
+         double ang = Math.PI * 2.0 * m / meridians + l.age * 0.03;
+         for (int k = 0; k <= 5; k++) {
+            double el = Math.PI / 2.0 * k / 5.0;
+            double x = c.x() + Math.cos(ang) * Math.cos(el) * radius;
+            double y = c.y() + Math.sin(el) * radius;
+            double z = c.z() + Math.sin(ang) * Math.cos(el) * radius;
+            p(level, Tex.MOTE, k == 5 ? WHITE : rgb, x, y, z, 0.0, 0.0, 0.0, 0.35F, 4, 1.0F, 0.0F, 1.0F, alpha);
+         }
+      }
+   }
+
+   /** A funnel: three tiers of motes spiralling in toward a bright core. */
+   private static void funnel(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double radius = Math.max(1.0, c.a());
+      for (int tier = 0; tier < 3; tier++) {
+         vortex(level, tier == 1 ? Tex.WISP : Tex.MOTE, rgb, c.x(), c.y() + tier * 0.8, c.z(), radius * (1.0 - tier * 0.25), 4, 0.4F, 1.6);
+      }
+      if (l.age % 3 == 0) {
+         p(level, Tex.GLOW, WHITE, c.x(), c.y() + 0.8, c.z(), 0.0, 0.05, 0.0, 0.8F, 8, 0.6F, 0.0F, 0.9F);
+      }
+   }
+
+   /** A moon-shaped blade sweeping across the facing from one side to the other. */
+   private static void crescent(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double radius = Math.max(1.0, c.a());
+      Vec3 f = new Vec3(c.ax(), 0.0, c.az());
+      f = f.lengthSqr() < 1.0E-4 ? new Vec3(0.0, 0.0, 1.0) : f.normalize();
+      Vec3 side = new Vec3(-f.z, 0.0, f.x);
+      double sweep = -1.1 + 2.2 * l.t();
+      for (int k = -2; k <= 2; k++) {
+         double ang = sweep + k * 0.08;
+         Vec3 dir = f.scale(Math.cos(ang)).add(side.scale(Math.sin(ang)));
+         for (double rr = radius * 0.55; rr <= radius; rr += 0.35) {
+            Vec3 q = new Vec3(c.x(), c.y() + 1.0, c.z()).add(dir.scale(rr));
+            p(level, k == 0 ? Tex.STREAK : Tex.GLOW, k == 0 ? WHITE : rgb, q.x, q.y + (rr / radius - 0.75) * 0.3, q.z,
+               dir.x * 0.05, 0.0, dir.z * 0.05, 0.45F, 5, 0.6F, 0.0F, 0.9F);
+         }
+      }
+   }
+
+   /** Rays thrown out in every direction from a flash. */
+   private static void starburst(ClientLevel level, Cue c) {
+      int rgb = colourOf(c);
+      double len = Math.max(1.0, c.a());
+      Vec3 o = new Vec3(c.x(), c.y(), c.z());
+      flash(level, o.x, o.y, o.z, rgb, (float)Math.min(6.0, 1.0 + len * 0.4));
+      int rays = 12;
+      for (int i = 0; i < rays; i++) {
+         double yaw = Math.PI * 2.0 * i / rays;
+         double pitch = i % 2 == 0 ? 0.25 : -0.15;
+         Vec3 d = new Vec3(Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch), Math.sin(yaw) * Math.cos(pitch));
+         line(level, Tex.GLOW, i % 3 == 0 ? WHITE : rgb, o.add(d.scale(0.3)), o.add(d.scale(len * (i % 2 == 0 ? 1.0 : 0.6))), 6, 0.22F, 7, 0.95F);
+      }
+      sparkBurst(level, o.x, o.y, o.z, 16, 0.25, rgb);
+   }
+
+   /** A turning ring of runes with a six-pointed star drawn inside it. */
+   private static void runeCircle(ClientLevel level, Live l) {
+      if (l.age % 2 == 1) {
+         return;
+      }
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double radius = Math.max(0.8, c.a());
+      double rot = l.age * 0.06;
+      double y = c.y() + 0.05;
+      int runes = clamp((int)(radius * 4.0), 6, 24);
+      for (int i = 0; i < runes; i++) {
+         double a = rot + Math.PI * 2.0 * i / runes;
+         p(level, i % 2 == 0 ? Tex.HEXRUNE : Tex.RUNE, rgb, c.x() + Math.cos(a) * radius, y, c.z() + Math.sin(a) * radius,
+            0.0, 0.005, 0.0, 0.42F, 4, 1.0F, 0.0F, 1.0F);
+      }
+      int steps = clamp((int)(radius * 2.0), 3, 10);
+      for (int tri = 0; tri < 2; tri++) {
+         for (int k = 0; k < 3; k++) {
+            double a1 = -rot * 1.5 + tri * Math.PI / 3.0 + Math.PI * 2.0 * k / 3.0;
+            double a2 = a1 + Math.PI * 2.0 / 3.0;
+            Vec3 p1 = new Vec3(c.x() + Math.cos(a1) * radius * 0.8, y, c.z() + Math.sin(a1) * radius * 0.8);
+            Vec3 p2 = new Vec3(c.x() + Math.cos(a2) * radius * 0.8, y, c.z() + Math.sin(a2) * radius * 0.8);
+            line(level, Tex.MOTE, tri == 0 ? rgb : WHITE, p1, p2, steps, 0.2F, 4, 0.8F);
+         }
+      }
+   }
+
+   /** Embers falling over a circle. */
+   private static void emberRain(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double radius = Math.max(1.0, c.a());
+      RandomSource r = level.getRandom();
+      int n = clamp((int)(radius * 1.5), 3, 20);
+      for (int i = 0; i < n; i++) {
+         double a = r.nextDouble() * Math.PI * 2.0;
+         double d = Math.sqrt(r.nextDouble()) * radius;
+         p(level, i % 3 == 0 ? Tex.EMBER : Tex.STREAK, rgb, c.x() + Math.cos(a) * d, c.y() + 5.0 + r.nextDouble() * 2.0, c.z() + Math.sin(a) * d,
+            0.0, -0.45, 0.0, 0.35F, 14, 0.8F, 0.0F, 1.0F);
+      }
+   }
+
+   /** Chain links hung from the cue's position to its second vector, sagging in the middle. */
+   private static void chains(ClientLevel level, Cue c) {
+      int rgb = colourOf(c);
+      Vec3 a = new Vec3(c.x(), c.y(), c.z());
+      Vec3 b = new Vec3(c.ax(), c.ay(), c.az());
+      double len = a.distanceTo(b);
+      int links = clamp((int)(len / 0.45), 4, 48);
+      double sag = Math.min(1.5, len * 0.08);
+      for (int i = 0; i <= links; i++) {
+         double t = i / (double)links;
+         Vec3 q = a.lerp(b, t).add(0.0, -sag * 4.0 * t * (1.0 - t), 0.0);
+         p(level, i % 2 == 0 ? Tex.RING : Tex.SHARD, i % 2 == 0 ? rgb : WHITE, q.x, q.y, q.z, 0.0, 0.0, 0.0, 0.28F, 16, 1.0F, 0.4F, 1.0F);
+      }
+   }
+
+   /** A heart's double beat: a ring and a flash, then a smaller one, then a rest. */
+   private static void heartbeat(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double radius = Math.max(1.0, c.a());
+      int phase = l.age % 12;
+      if (phase == 0 || phase == 3) {
+         float s = phase == 0 ? 1.0F : 0.7F;
+         p(level, Tex.RING, rgb, c.x(), c.y() + 0.1, c.z(), 0.0, 0.0, 0.0, 0.8F, 12, (float)Math.min(40.0, radius * 1.7 * s), 0.0F, 0.75F);
+         flash(level, c.x(), c.y() + 1.0, c.z(), rgb, 1.2F * s);
+      }
+   }
+
+   /** Three motes circling the position on a breathing radius. */
+   private static void petals(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double radius = Math.max(0.6, c.a());
+      for (int i = 0; i < 3; i++) {
+         double a = l.age * 0.25 + i * Math.PI * 2.0 / 3.0;
+         double rr = radius * (0.6 + 0.4 * Math.sin(l.age * 0.1 + i));
+         double x = c.x() + Math.cos(a) * rr;
+         double z = c.z() + Math.sin(a) * rr;
+         double y = c.y() + 0.5 + Math.sin(l.age * 0.15 + i) * 0.5;
+         p(level, Tex.WISP, i == 0 ? WHITE : rgb, x, y, z, -Math.sin(a) * 0.06, 0.01, Math.cos(a) * 0.06, 0.35F, 18, 0.6F, 0.5F, 0.95F);
+      }
+   }
+
+   /** Shards flying apart from a flash. */
+   private static void shatter(ClientLevel level, Cue c) {
+      int rgb = colourOf(c);
+      double size = Math.max(0.5, c.a());
+      RandomSource r = level.getRandom();
+      flash(level, c.x(), c.y(), c.z(), rgb, (float)Math.min(5.0, 1.0 + size));
+      int n = clamp((int)(size * 14.0), 8, 40);
+      for (int i = 0; i < n; i++) {
+         Vec3 d = new Vec3(r.nextGaussian(), Math.abs(r.nextGaussian()) * 0.8, r.nextGaussian()).normalize()
+            .scale(0.15 + r.nextDouble() * 0.25 * size);
+         p(level, i % 3 == 0 ? Tex.CRYSTAL : Tex.SHARD, i % 4 == 0 ? WHITE : rgb, c.x(), c.y(), c.z(), d.x, d.y, d.z,
+            0.35F, 18 + r.nextInt(10), 0.5F, 0.6F, 0.88F);
+      }
+   }
+
+   /** A bright head with a trail, travelling from the position to the second vector over its life. */
+   private static void comet(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      Vec3 a = new Vec3(c.x(), c.y(), c.z());
+      Vec3 b = new Vec3(c.ax(), c.ay(), c.az());
+      double t = (l.age + 1.0) / l.life;
+      Vec3 head = a.lerp(b, t);
+      Vec3 back = a.lerp(b, Math.max(0.0, t - 0.12));
+      p(level, Tex.FLARE, WHITE, head.x, head.y, head.z, 0.0, 0.0, 0.0, 0.9F, 3, 1.0F, 0.0F, 1.0F);
+      p(level, Tex.GLOW, rgb, head.x, head.y, head.z, 0.0, 0.0, 0.0, 1.4F, 5, 0.8F, 0.0F, 0.9F);
+      line(level, Tex.STREAK, rgb, back, head, 5, 0.4F, 8, 0.8F);
+      if (l.age + 2 >= l.life) {
+         flash(level, b.x, b.y, b.z, rgb, 3.0F);
+         sparkBurst(level, b.x, b.y, b.z, 18, 0.3, rgb);
+      }
+   }
+
+   /** A flickering column of flame and wisps around a body. */
+   private static void aura(ClientLevel level, Live l) {
+      Cue c = l.cue;
+      int rgb = colourOf(c);
+      double h = Math.max(1.0, c.a());
+      RandomSource r = level.getRandom();
+      for (int i = 0; i < 3; i++) {
+         double a = r.nextDouble() * Math.PI * 2.0;
+         double rr = 0.5 + r.nextDouble() * 0.3;
+         p(level, i == 0 ? Tex.FLAME : Tex.WISP, rgb, c.x() + Math.cos(a) * rr, c.y() + r.nextDouble() * h * 0.4, c.z() + Math.sin(a) * rr,
+            0.0, 0.06 + r.nextDouble() * 0.04, 0.0, 0.4F, 14, 0.5F, 0.2F, 0.95F);
+      }
+   }
+
+   /** A blinding bloom with a ring behind it. */
+   private static void flare(ClientLevel level, Cue c) {
+      int rgb = colourOf(c);
+      float s = (float)Math.max(1.0, c.a());
+      flash(level, c.x(), c.y(), c.z(), rgb, s * 1.6F);
+      p(level, Tex.FLARE, WHITE, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, s, 8, 1.4F, 0.1F, 1.0F);
+      p(level, Tex.RING, rgb, c.x(), c.y(), c.z(), 0.0, 0.0, 0.0, s * 0.6F, 10, s * 2.4F, 0.0F, 0.8F);
    }
 
    // ------------------------------------------------------------------ helpers

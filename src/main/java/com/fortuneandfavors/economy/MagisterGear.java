@@ -156,7 +156,7 @@ public final class MagisterGear {
          fireStar(level, player, from, aim, 6.0F, 1.5);
       }
       com.fortuneandfavors.net.FfVfx.particles(level, ColorParticleOption.create(ParticleTypes.FLASH, STARLIGHT), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.END_ROD, from.add(player.getViewVector(1.0F).scale(0.8)), Vec3.ZERO, 0.9, 0.0, STARLIGHT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.END_ROD, from.add(player.getViewVector(1.0F).scale(0.8)), Vec3.ZERO, 0.9, 0.0, STARLIGHT);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 0.9F, 1.5F);
       bar(player, "&bStar Bolt");
    }
@@ -193,9 +193,9 @@ public final class MagisterGear {
          caught++;
       }
       // A well opens in the air and everything in reach falls sideways into it.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, ParticleTypes.REVERSE_PORTAL, centre, Vec3.ZERO, 0.0, 0.0, WARP);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.REVERSE_PORTAL, centre, Vec3.ZERO, 7.0, 0.0, WARP);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.END_ROD, centre, Vec3.ZERO, 3.5, 0.0, STARLIGHT);
+      Fx.vortex(level, ParticleTypes.REVERSE_PORTAL, centre, 6.0, 30, WARP);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.REVERSE_PORTAL, centre, Vec3.ZERO, 7.0, 0.0, WARP);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.END_ROD, centre, Vec3.ZERO, 3.5, 0.0, STARLIGHT);
       level.playSound(null, centre.x, centre.y, centre.z, SoundEvents.ENDER_DRAGON_FLAP, SoundSource.PLAYERS, 1.2F, 0.8F);
       bar(player, "&5Gravity &7- &f" + caught + " &7caught");
    }
@@ -222,9 +222,9 @@ public final class MagisterGear {
       METEORS.add(new Meteor(impact, METEOR_FUSE, player.getUUID()));
       // Marked once and drawn by the client for the whole fuse - the old ring re-sent twenty-two
       // particle packets every tick until it landed - with the star already falling toward it.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.END_ROD, impact.add(0.0, 0.1, 0.0), Vec3.ZERO, METEOR_RADIUS, METEOR_FUSE, STARLIGHT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.END_ROD, impact.add(0.0, 0.1, 0.0), Vec3.ZERO, METEOR_RADIUS, METEOR_FUSE, STARLIGHT);
       Vec3 sky = impact.add(dir.x * -6.0, 22.0, dir.z * -6.0);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.METEOR, ParticleTypes.END_ROD, sky, impact, 0.0, METEOR_FUSE, STARGOLD);
+      Fx.comet(level, ParticleTypes.END_ROD, sky, impact, METEOR_FUSE, STARGOLD);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.PLAYERS, 1.0F, 0.8F);
       bar(player, "&bMeteor &7- marked, clear the ring");
    }
@@ -246,7 +246,7 @@ public final class MagisterGear {
       arrow.setCritArrow(false);
       arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
       level.addFreshEntity(arrow);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.END_ROD, from, dir, 0.0, 0.0, STARLIGHT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.END_ROD, from, dir, 0.0, 0.0, STARLIGHT);
    }
 
    // ------------------------------------------------------------------ starpiercer
@@ -265,8 +265,8 @@ public final class MagisterGear {
       Vec3 dir = attacker.getViewVector(1.0F).normalize();
       fireStar(level, attacker, from, dir, STAR_DAMAGE, 2.1);
       // The star leaves a lance of light down the line it was fired along.
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, from.add(dir.scale(0.8)), from.add(dir.scale(18.0)), 0.0, 0.0, STARLIGHT);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, victim.getBbHeight() * 0.6, 0.0), dir, 0.0, 0.0, STARGOLD);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, from.add(dir.scale(0.8)), from.add(dir.scale(18.0)), 0.0, 0.0, STARLIGHT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, victim.getBbHeight() * 0.6, 0.0), dir, 0.0, 0.0, STARGOLD);
       com.fortuneandfavors.net.FfVfx.particles(level, ColorParticleOption.create(ParticleTypes.FLASH, 0xBBEEFF), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
       level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.8F);
       attacker.sendOverlayMessage(Component.literal(Chat.colorize("&bStarpiercer &7- &fpiercing star")));
@@ -302,9 +302,11 @@ public final class MagisterGear {
          }
          it.remove();
          Vec3 at = meteor.pos.add(0.0, 0.3, 0.0);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, at, Vec3.ZERO, 3.0, 0.0, 0xD8E6F2);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.END_ROD, at, Vec3.ZERO, METEOR_RADIUS + 1.5, 0.0, STARLIGHT);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.END_ROD, meteor.pos, Vec3.ZERO, 7.0, 0.0, STARGOLD);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, at, Vec3.ZERO, 3.0, 0.0, 0xD8E6F2);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.END_ROD, at, Vec3.ZERO, METEOR_RADIUS + 1.5, 0.0, STARLIGHT);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.END_ROD, meteor.pos, Vec3.ZERO, 7.0, 0.0, STARGOLD);
+         Fx.starburst(level, ParticleTypes.END_ROD, at.add(0.0, 0.6, 0.0), METEOR_RADIUS + 1.0, STARLIGHT);
+         Fx.shockwave(level, ParticleTypes.END_ROD, at, METEOR_RADIUS + 1.5, STARGOLD);
          com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION_EMITTER, meteor.pos.x, meteor.pos.y + 0.4, meteor.pos.z, 1, 0.4, 0.2, 0.4, 0.0);
          level.playSound(null, meteor.pos.x, meteor.pos.y, meteor.pos.z, SoundEvents.GENERIC_EXPLODE, SoundSource.PLAYERS, 1.4F, 1.1F);
          ServerPlayer owner = server.getPlayerList().getPlayer(meteor.owner);
@@ -445,9 +447,9 @@ public final class MagisterGear {
 
    /** A tear where the body left, a thread of starlight along the way, a burst where it lands. */
    private static void blinkFx(ServerLevel level, Vec3 from, Vec3 to) {
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, from.add(0.0, 1.0, 0.0), new Vec3(to.z - from.z, 0.0, from.x - to.x).normalize(), 1.4, 14, WARP);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, from.add(0.0, 1.0, 0.0), to.add(0.0, 1.0, 0.0), 0.0, 0.0, STARLIGHT);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.END_ROD, to.add(0.0, 1.0, 0.0), Vec3.ZERO, 1.6, 0.0, STARLIGHT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, from.add(0.0, 1.0, 0.0), new Vec3(to.z - from.z, 0.0, from.x - to.x).normalize(), 1.4, 14, WARP);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, from.add(0.0, 1.0, 0.0), to.add(0.0, 1.0, 0.0), 0.0, 0.0, STARLIGHT);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.END_ROD, to.add(0.0, 1.0, 0.0), Vec3.ZERO, 1.6, 0.0, STARLIGHT);
    }
 
    public static void onPlayerDisconnect(UUID id) {

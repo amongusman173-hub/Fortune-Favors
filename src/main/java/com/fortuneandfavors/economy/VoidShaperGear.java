@@ -116,7 +116,7 @@ public final class VoidShaperGear {
             return;
          }
          // The blade tears the ground open beside them.
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.REVERSE_PORTAL, victim.getEyePosition().add(0.0, -0.4, 0.0), attacker.getLookAngle(), 0.0, 0.0, 0xB06BFF);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.REVERSE_PORTAL, victim.getEyePosition().add(0.0, -0.4, 0.0), attacker.getLookAngle(), 0.0, 0.0, 0xB06BFF);
       }
       NEXT_THROW.put(attacker.getUUID(), now + THROW_COOLDOWN_TICKS);
       attacker.sendOverlayMessage(Component.literal(Chat.colorize("&5Void Reaver &7- &fblock hurled")));

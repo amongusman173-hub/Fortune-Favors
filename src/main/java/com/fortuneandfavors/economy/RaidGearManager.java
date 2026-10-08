@@ -151,14 +151,14 @@ public final class RaidGearManager {
             level.addFreshEntity(raider);
             allyOwner.put(raider.getUUID(), owner.getUUID());
             allyBorn.put(raider.getUUID(), ServerClock.clock(level));
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.FLAME, raider.position(), net.minecraft.world.phys.Vec3.ZERO, 1.8, 30, 0xFFD24A);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.FLAME, raider.position(), net.minecraft.world.phys.Vec3.ZERO, 4.0, 0.0, 0xFF4A2A);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.FLAME, raider.position(), net.minecraft.world.phys.Vec3.ZERO, 1.8, 30, 0xFFD24A);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.PILLAR, ParticleTypes.FLAME, raider.position(), net.minecraft.world.phys.Vec3.ZERO, 4.0, 0.0, 0xFF4A2A);
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.CAMPFIRE_COSY_SMOKE, raider.getX(), raider.getY() + 1.0, raider.getZ(), 14, 0.6, 0.8, 0.6, 0.04);
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, raider.getX(), raider.getY() + 1.2, raider.getZ(), 8, 0.3, 0.6, 0.3, 0.03);
          }
          level.playSound(null, owner.blockPosition(), SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 1.4F, 0.9F);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.FROST_NOVA, ParticleTypes.FLAME, owner.position(), net.minecraft.world.phys.Vec3.ZERO, 7.0, 0.0, 0xFFD24A);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.FLAME, owner.position().add(0.0, 1.2, 0.0), net.minecraft.world.phys.Vec3.ZERO, 3.0, 0.0, 0xFF4A2A);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.FROST_NOVA, ParticleTypes.FLAME, owner.position(), net.minecraft.world.phys.Vec3.ZERO, 7.0, 0.0, 0xFFD24A);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.FLAME, owner.position().add(0.0, 1.2, 0.0), net.minecraft.world.phys.Vec3.ZERO, 3.0, 0.0, 0xFF4A2A);
          Chat.raw(owner, "§6§lThe horn blares - §f" + toSpawn + " raider" + (toSpawn == 1 ? "" : "s") + " answer your call! §7(60s ally)");
          int tier = ModItems.tierOf(owner.getMainHandItem());
          captainHornCd.put(owner.getUUID(), ServerClock.clock(level) + Math.max(1, 5 - (tier - 1)) * 400L); // I=100s, II=80s, III=60s
@@ -219,12 +219,12 @@ public final class RaidGearManager {
                continue;
             }
             EvokerFangs fang = new EvokerFangs(level, fx, gy, fz, yRot, step * 2, owner);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.ENCHANT, new net.minecraft.world.phys.Vec3(fx, gy + 0.1, fz), net.minecraft.world.phys.Vec3.ZERO, 0.8, 0.0, 0xC8F08A);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.ENCHANT, new net.minecraft.world.phys.Vec3(fx, gy + 0.1, fz), net.minecraft.world.phys.Vec3.ZERO, 0.8, 0.0, 0xC8F08A);
             level.addFreshEntity(fang);
          }
          com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.ENCHANT, owner.getX(), owner.getY() + 1.4, owner.getZ(), 18, 0.4, 0.5, 0.4, 0.35);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.ENCHANT, owner.position(), net.minecraft.world.phys.Vec3.ZERO, 2.2, 24, 0xC8F08A);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.ENCHANT, owner.position().add(0.0, 1.6, 0.0), net.minecraft.world.phys.Vec3.ZERO, 0.8, 0.0, 0xC8F08A);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.ENCHANT, owner.position(), net.minecraft.world.phys.Vec3.ZERO, 2.2, 24, 0xC8F08A);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.ENCHANT, owner.position().add(0.0, 1.6, 0.0), net.minecraft.world.phys.Vec3.ZERO, 0.8, 0.0, 0xC8F08A);
          level.playSound(null, owner.blockPosition(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 0.9F, 1.1F);
          return null;
       } catch (Exception e) {
@@ -295,7 +295,7 @@ public final class RaidGearManager {
             illusionBorn.put(vex.getUUID(), ServerClock.clock(level));
             illusionStrike.put(vex.getUUID(), ServerClock.clock(level) + 30L);
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, vex.getX(), vex.getY(), vex.getZ(), 16, 0.4, 0.6, 0.4, 0.25);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, vex.position(), new net.minecraft.world.phys.Vec3(1.0, 0.0, 0.0), 0.8, 18, 0x9BB8FF);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, vex.position(), new net.minecraft.world.phys.Vec3(1.0, 0.0, 0.0), 0.8, 18, 0x9BB8FF);
          }
          level.playSound(null, owner.blockPosition(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 0.8F, 1.6F);
          return null;
@@ -332,7 +332,7 @@ public final class RaidGearManager {
          illusionBorn.put(vex.getUUID(), ServerClock.clock(level));
          illusionStrike.put(vex.getUUID(), ServerClock.clock(level) + 30L);
          com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, vex.getX(), vex.getY(), vex.getZ(), 16, 0.4, 0.6, 0.4, 0.25);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, vex.position(), new net.minecraft.world.phys.Vec3(1.0, 0.0, 0.0), 0.8, 18, 0x9BB8FF);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.REVERSE_PORTAL, vex.position(), new net.minecraft.world.phys.Vec3(1.0, 0.0, 0.0), 0.8, 18, 0x9BB8FF);
          return null;
       } catch (Exception e) {
          return "The vex refuses to manifest.";
@@ -388,12 +388,12 @@ public final class RaidGearManager {
             copyBorn.put(copy.getUUID(), ServerClock.clock(level));
             copyStrike.put(copy.getUUID(), ServerClock.clock(level) + 20L + i * 10L);
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, copy.getX(), copy.getY(), copy.getZ(), 14, 0.5, 0.5, 0.5, 0.2);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.PORTAL, owner.position().add(0.0, 1.0, 0.0), copy.position().add(0.0, 1.0, 0.0), 0.0, 0.0, 0x8C6BFF);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.PORTAL, copy.position().add(0.0, 1.0, 0.0), net.minecraft.world.phys.Vec3.ZERO, 0.8, 0.0, 0x8C6BFF);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.PORTAL, owner.position().add(0.0, 1.0, 0.0), copy.position().add(0.0, 1.0, 0.0), 0.0, 0.0, 0x8C6BFF);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.PORTAL, copy.position().add(0.0, 1.0, 0.0), net.minecraft.world.phys.Vec3.ZERO, 0.8, 0.0, 0x8C6BFF);
          }
          com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, owner.getX(), owner.getY() + 1.5, owner.getZ(), 30, 1.5, 1.2, 1.5, 0.08);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.PORTAL, owner.position(), net.minecraft.world.phys.Vec3.ZERO, 4.0, 0.0, 0x8C6BFF);
-         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.PORTAL, owner.position().add(0.0, 1.0, 0.0), net.minecraft.world.phys.Vec3.ZERO, 3.0, 0.0, 0x8C6BFF);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.PORTAL, owner.position(), net.minecraft.world.phys.Vec3.ZERO, 4.0, 0.0, 0x8C6BFF);
+         Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.PORTAL, owner.position().add(0.0, 1.0, 0.0), net.minecraft.world.phys.Vec3.ZERO, 3.0, 0.0, 0x8C6BFF);
          level.playSound(null, owner.blockPosition(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.0F, 0.8F);
          // The caster turns TRULY invisible for the whole illusion window (copies
          // fight in their place) - a hit shatters it (see onPlayerHit).

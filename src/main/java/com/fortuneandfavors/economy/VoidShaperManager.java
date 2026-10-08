@@ -308,8 +308,8 @@ public final class VoidShaperManager {
 
    /** A player's throw or grip: a tear in the world where the block came loose. */
    private static void playerTearFx(ServerLevel level, Vec3 at, Vec3 dir) {
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, at, Vec3.ZERO, 0.8, 0.0, 0x7A2BD9);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.REVERSE_PORTAL, at, dir.normalize(), 0.0, 0.0, 0xB06BFF);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, at, Vec3.ZERO, 0.8, 0.0, 0x7A2BD9);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.MUZZLE, ParticleTypes.REVERSE_PORTAL, at, dir.normalize(), 0.0, 0.0, 0xB06BFF);
    }
 
    /** Void Anchor right-click: throw the hook and he follows it up. */
@@ -1351,8 +1351,8 @@ public final class VoidShaperManager {
       LIFTED.put(display.getUUID(), new Lift(owner.getUUID(), kindOf(state), ServerClock.clock(level) + LIFT_LIFETIME));
       // The block is pulled out of its socket and up into the hand along a thread of void.
       Vec3 socket = Vec3.atCenterOf(pos);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, socket, Vec3.ZERO, 0.6, 0.0, 0x7A2BD9);
-      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.REVERSE_PORTAL, socket, display.position(), 0.0, 0.0, 0xB06BFF);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.RIFT, ParticleTypes.REVERSE_PORTAL, socket, Vec3.ZERO, 0.6, 0.0, 0x7A2BD9);
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.REVERSE_PORTAL, socket, display.position(), 0.0, 0.0, 0xB06BFF);
       level.playSound(null, display.getX(), display.getY(), display.getZ(), SoundEvents.DEEPSLATE_BREAK, SoundSource.PLAYERS, 0.8F, 0.7F);
       return display.getUUID();
    }
@@ -1512,7 +1512,7 @@ public final class VoidShaperManager {
             }
             LivingEntity victim = livingNear(level, loose.thrower, loose.pos, 1.3, loose.kind);
             if (victim != null) {
-               com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, victim.getBbHeight() * 0.6, 0.0), loose.vel.normalize(), 0.0, 0.0, 0xB06BFF);
+               Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, victim.position().add(0.0, victim.getBbHeight() * 0.6, 0.0), loose.vel.normalize(), 0.0, 0.0, 0xB06BFF);
                done = true;
                break;
             }
@@ -1520,8 +1520,8 @@ public final class VoidShaperManager {
          loose.life--;
          if (done || loose.life <= 0) {
             // The block shatters back into the void it was borrowed from.
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, loose.pos.add(0.0, 0.2, 0.0), Vec3.ZERO, 1.8, 0.0, 0x9C8AB8);
-            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.REVERSE_PORTAL, loose.pos.add(0.0, 0.2, 0.0), Vec3.ZERO, 1.4, 0.0, 0x7A2BD9);
+            Fx.shape(level, com.fortuneandfavors.net.FfVfx.ROCKBURST, ParticleTypes.CLOUD, loose.pos.add(0.0, 0.2, 0.0), Vec3.ZERO, 1.8, 0.0, 0x9C8AB8);
+            Fx.shatter(level, ParticleTypes.REVERSE_PORTAL, loose.pos.add(0.0, 0.3, 0.0), 1.2, 0x7A2BD9);
             com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.LARGE_SMOKE, loose.pos.x, loose.pos.y + 0.3, loose.pos.z, 10, 0.4, 0.3, 0.4, 0.05);
             level.playSound(null, loose.pos.x, loose.pos.y, loose.pos.z, SoundEvents.STONE_HIT, SoundSource.PLAYERS, 1.0F, 1.0F);
             if (display != null) {

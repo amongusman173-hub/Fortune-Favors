@@ -1,0 +1,16 @@
+-d
+/tmp/claude-0/-home-user-Fortune-Favors/76ddc99b-e221-53d6-ae74-f1a27e9b16f8/scratchpad/jc
+-Xmaxerrs
+100000
+-sourcepath
+..:../../../
+RaidGearManager.java
+ScarletGear.java
+PuppeteerGear.java
+VoidShaperGear.java
+VoidShaperManager.java
+MagisterGear.java
+SovereignGear.java
+ClockworkGear.java
+SeaAndSkyGear.java
+Fx.java
