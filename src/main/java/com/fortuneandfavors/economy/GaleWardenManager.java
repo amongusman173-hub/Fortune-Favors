@@ -609,6 +609,7 @@ public final class GaleWardenManager {
 
       fight.bar.setProgress(Math.max(0.0F, Math.min(1.0F, boss.getHealth() / boss.getMaxHealth())));
       fight.bar.setName(Component.literal(barName(fight.phase)));
+      fight.bar.setColor(fight.phase >= 2 ? BossBarColor.RED : BossBarColor.WHITE);
 
       // The two systems that are not moves: he always drifts toward whoever is closest, and he is
       // always reading their movement.

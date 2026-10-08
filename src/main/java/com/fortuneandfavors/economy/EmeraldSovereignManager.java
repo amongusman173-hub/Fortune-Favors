@@ -472,6 +472,8 @@ public final class EmeraldSovereignManager {
 
       fight.bar.setProgress(Math.max(0.0F, Math.min(1.0F, boss.getHealth() / boss.getMaxHealth())));
       fight.bar.setName(Component.literal(barName(fight)));
+      // The bar's art follows the phase: red is the client's cue for the throne-room bar.
+      fight.bar.setColor(fight.phase >= 2 ? BossBarColor.RED : BossBarColor.GREEN);
 
       tickEmeralds(level, boss, fight);
 

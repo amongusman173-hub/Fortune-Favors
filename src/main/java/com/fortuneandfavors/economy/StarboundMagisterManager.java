@@ -450,6 +450,7 @@ public final class StarboundMagisterManager {
 
       fight.bar.setProgress(Math.max(0.0F, Math.min(1.0F, boss.getHealth() / boss.getMaxHealth())));
       fight.bar.setName(Component.literal(barName(fight)));
+      fight.bar.setColor(fight.phase >= 2 ? BossBarColor.RED : BossBarColor.BLUE);
 
       // She stands on the ground. She used to hover three blocks above the
       // summoner for the entire fight, which put her out of melee reach and made

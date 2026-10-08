@@ -453,6 +453,7 @@ public final class VoidShaperManager {
 
       fight.bar.setProgress(Math.max(0.0F, Math.min(1.0F, boss.getHealth() / boss.getMaxHealth())));
       fight.bar.setName(Component.literal(barName(fight)));
+      fight.bar.setColor(fight.phase >= 2 ? BossBarColor.RED : BossBarColor.PURPLE);
 
       float share = boss.getHealth() / boss.getMaxHealth();
       if (share <= 0.4F && fight.phase < 2) {

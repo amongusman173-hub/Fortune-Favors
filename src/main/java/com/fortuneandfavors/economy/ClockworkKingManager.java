@@ -601,6 +601,8 @@ public final class ClockworkKingManager {
       // for an entire fight.
       fight.bar.setProgress(Math.max(0.0F, Math.min(1.0F, boss.getHealth() / boss.getMaxHealth())));
       fight.bar.setName(Component.literal(phaseName(fight, boss)));
+      // The bar's art follows the phase: red is the client's cue for the overheated bar.
+      fight.bar.setColor(fight.phase >= 2 ? BossBarColor.RED : BossBarColor.YELLOW);
 
       applyShield(server, boss, fight);
       tickMachines(server, boss, fight, now);

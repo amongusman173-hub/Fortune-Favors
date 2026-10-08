@@ -565,6 +565,7 @@ public final class DrownedSovereignManager {
 
       fight.bar.setProgress(Math.max(0.0F, Math.min(1.0F, boss.getHealth() / boss.getMaxHealth())));
       fight.bar.setName(Component.literal(barName(fight.phase)));
+      fight.bar.setColor(fight.phase >= 2 ? BossBarColor.RED : BossBarColor.BLUE);
 
       // A presence, so the fight is never silent between moves - and it is water rather than a
       // generic aura, because the whole read of this fight is "the sea is standing here with you".

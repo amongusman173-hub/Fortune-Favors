@@ -41,6 +41,15 @@ public abstract class BossHealthOverlayMixin {
       {"wither", "wither"},
    };
 
+   /**
+    * The reworked bosses: each has a signature bar (patterned fill and an end-cap frame) and a
+    * {@code _red} phase-two variant, shown when the server recolours the bar for phase two.
+    */
+   private static final java.util.Set<String> FF_PHASED = java.util.Set.of(
+      "scarlet_devil", "emerald_sovereign", "puppeteer", "clockwork_king",
+      "starbound_magister", "drowned_sovereign", "void_shaper", "gale_warden"
+   );
+
    @Inject(
       method = "extractBar(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IILnet/minecraft/world/BossEvent;I[Lnet/minecraft/resources/Identifier;[Lnet/minecraft/resources/Identifier;)V",
       at = @At("HEAD"),
@@ -54,7 +63,8 @@ public abstract class BossHealthOverlayMixin {
          return;
       }
       boolean signature = key.equals("ender_dragon") || key.equals("time_lord") || key.equals("slime_king") || key.equals("wither")
-         || key.equals("stone_golem") || key.equals("wither_king") || key.equals("mindbinder") || key.equals("snow_queen") || key.equals("elder_warden") || key.equals("raid");
+         || key.equals("stone_golem") || key.equals("wither_king") || key.equals("mindbinder") || key.equals("snow_queen") || key.equals("elder_warden") || key.equals("raid")
+         || FF_PHASED.contains(key);
       if (key.equals("wither") && event.getName().getString().toLowerCase(Locale.ROOT).contains("supercharged")) {
          key = "wither_supercharged";
       }
@@ -74,6 +84,10 @@ public abstract class BossHealthOverlayMixin {
          key = "elder_warden_red";
       } else if (key.equals("mindbinder") && color == BossEvent.BossBarColor.RED) {
          key = "mindbinder_red";
+      } else if (FF_PHASED.contains(key) && color == (key.equals("scarlet_devil") ? BossEvent.BossBarColor.PURPLE : BossEvent.BossBarColor.RED)) {
+         // Phase two. The Scarlet Devil's bar opens red and turns purple when she changes, so her
+         // cue is purple; every other one turns red.
+         key = key + "_red";
       }
       boolean progress = bar[0].getPath().endsWith("_progress");
       graphics.blitSprite(

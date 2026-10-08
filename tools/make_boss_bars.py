@@ -272,6 +272,137 @@ SIGNATURE = {
 }
 
 
+# ---------------------------------------------------------------- the eight reworked bosses
+# Each gets a fill pattern drawn from its own material, an end cap of its emblem, and a red
+# phase-two variant the client switches to when the server turns the bar red.
+
+def blood_drips(x, y):
+    # Blood running down from the top edge, a long drip every 11 px and a short one between.
+    u = x % 11
+    if u == 3:
+        return 0.55 if y >= 1 else 0
+    if u == 8:
+        return 0.6 if y <= 2 else 0
+    return 1.5 if y == 1 and u in (2, 4, 7, 9) else 0
+
+
+def bat_cap(x, y):
+    shape = ["........", "1.....1.", "21...12.", "221.122.", "2223322.", ".22332..", "..2222..", "...11...", "........", "........", "........"]
+    return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
+
+
+def facets(x, y):
+    # A cut-gem lattice: diagonals crossing every 8 px, a bright facet where they meet.
+    u = (x + y) % 8
+    v = (x - y) % 8
+    if u == 0 and v == 0:
+        return 1.9
+    return 0.75 if u == 0 or v == 0 else 0
+
+
+def crown_cap(x, y):
+    shape = ["........", "3..3..3.", "2..2..2.", "22222222", "21313121", "22222222", "11111111", "........", "........", "........", "........"]
+    return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
+
+
+def strings(x, y):
+    # Marionette strings running across the bar, a knot on each every 10 px.
+    u = x % 10
+    if u == 5:
+        return 1.8
+    return 1.35 if y == 1 or y == 3 and u in (2, 8) else 0
+
+
+def mask_cap(x, y):
+    shape = ["........", "..2222..", ".222222.", "21122112", "22222222", "22222222", ".23333..", "..2222..", "........", "........", "........"]
+    return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
+
+
+def cogs(x, y):
+    # Cog teeth along both edges, a rivet every 15 px down the middle.
+    if y in (1, 3) and x % 4 in (0, 1):
+        return 0.7
+    return 1.8 if y == 2 and x % 15 == 7 else 0
+
+
+def cog_cap(x, y):
+    shape = ["..1.1...", ".122221.", "1222222.", ".213312.", "1231132.", ".213312.", "1222222.", ".122221.", "..1.1...", "........", "........"]
+    return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
+
+
+def constellation(x, y):
+    # Sparse stars, and a faint line joining them into a constellation.
+    stars = {7: 1, 23: 3, 41: 2, 58: 1, 77: 3, 96: 2, 113: 1, 131: 3, 150: 2, 168: 1}
+    if stars.get(x) == y:
+        return 1.95
+    for sx, sy in stars.items():
+        if 0 < x - sx < 10 and y == 2:
+            return 1.3
+    return 0
+
+
+def star_cap(x, y):
+    shape = ["...3....", "...2....", "...2....", "..121...", "3222223.", "..121...", "...2....", "...2....", "...3....", "........", "........"]
+    return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
+
+
+def waves(x, y):
+    # A rolling crest, white where the wave breaks.
+    import math
+    crest = round(2 + 1.2 * math.sin(x * 0.28))
+    if y == crest:
+        return 1.85 if x % 22 < 4 else 1.4
+    return 0.7 if y > crest else 0
+
+
+def trident_cap(x, y):
+    shape = ["1.1.1...", "2.2.2...", "2.2.2...", "22222...", "..2.....", "..2.....", "..3.....", "..2.....", "..1.....", "........", "........"]
+    return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
+
+
+def rifts(x, y):
+    # Tears in the bar: near-black voids every 17 px with bright edges.
+    u = x % 17
+    if 6 <= u <= 10:
+        return 1.9 if u in (6, 10) else 0.3
+    return 0
+
+
+def rune_cap(x, y):
+    shape = ["........", ".111111.", ".122221.", ".123321.", ".133331.", ".123321.", ".122221.", ".111111.", "........", "........", "........"]
+    return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
+
+
+def gusts(x, y):
+    # Wind streaks leaning across the bar.
+    return 1.75 if (x - y * 3) % 13 in (0, 1) else 0
+
+
+def gust_cap(x, y):
+    shape = ["........", ".2222...", "2....2..", "..22..2.", ".2..2.2.", ".2.3.2..", ".2..22..", "..2.....", "...2222.", "........", "........"]
+    return {"1": 1, "2": 2, "3": 3}.get(shape[y][x], 0)
+
+
+SIGNATURE.update({
+    "scarlet_devil":          ((40, 6, 16), (150, 18, 34), (226, 60, 70), (255, 214, 120), blood_drips, ((60, 10, 20), (230, 70, 80), bat_cap)),
+    "scarlet_devil_red":      ((30, 2, 8), (110, 6, 20), (255, 40, 60), (255, 230, 200), blood_drips, ((50, 4, 12), (255, 90, 100), bat_cap)),
+    "emerald_sovereign":      ((8, 40, 24), (20, 150, 80), (90, 230, 140), (240, 210, 90), facets, ((20, 60, 34), (240, 210, 90), crown_cap)),
+    "emerald_sovereign_red":  ((40, 20, 8), (150, 60, 20), (230, 170, 60), (255, 240, 160), facets, ((60, 30, 12), (240, 210, 90), crown_cap)),
+    "puppeteer":              ((30, 12, 40), (110, 40, 140), (200, 90, 200), (240, 220, 255), strings, ((44, 18, 58), (220, 190, 250), mask_cap)),
+    "puppeteer_red":          ((40, 6, 24), (150, 20, 70), (230, 60, 120), (240, 220, 255), strings, ((60, 10, 36), (255, 150, 190), mask_cap)),
+    "clockwork_king":         ((40, 28, 10), (150, 100, 30), (230, 180, 80), (255, 240, 190), cogs, ((60, 42, 16), (240, 200, 110), cog_cap)),
+    "clockwork_king_red":     ((44, 14, 8), (170, 60, 20), (255, 130, 60), (130, 230, 255), cogs, ((60, 22, 12), (255, 160, 90), cog_cap)),
+    "starbound_magister":     ((10, 14, 44), (40, 60, 170), (120, 170, 255), (255, 255, 255), constellation, ((20, 26, 70), (190, 220, 255), star_cap)),
+    "starbound_magister_red": ((30, 8, 44), (120, 40, 170), (240, 120, 255), (255, 255, 255), constellation, ((44, 14, 70), (240, 190, 255), star_cap)),
+    "drowned_sovereign":      ((6, 34, 40), (20, 120, 130), (80, 210, 200), (200, 255, 240), waves, ((10, 50, 60), (150, 240, 230), trident_cap)),
+    "drowned_sovereign_red":  ((4, 14, 30), (14, 50, 110), (60, 140, 230), (200, 255, 240), waves, ((8, 24, 50), (120, 190, 255), trident_cap)),
+    "void_shaper":            ((10, 4, 16), (60, 20, 100), (150, 60, 220), (220, 170, 255), rifts, ((24, 10, 36), (200, 150, 255), rune_cap)),
+    "void_shaper_red":        ((20, 2, 14), (100, 10, 80), (230, 50, 200), (255, 190, 250), rifts, ((40, 6, 30), (255, 140, 240), rune_cap)),
+    "gale_warden":            ((20, 40, 56), (110, 170, 210), (210, 240, 255), (255, 255, 255), gusts, ((30, 60, 80), (220, 245, 255), gust_cap)),
+    "gale_warden_red":        ((40, 30, 50), (140, 120, 190), (230, 210, 255), (255, 255, 255), gusts, ((60, 44, 80), (240, 230, 255), gust_cap)),
+})
+
+
 def shatter(rows):
     """Knocks slanted gaps out of a bar (fully transparent) and runs white-hot cracks through what is left."""
     for y in range(H):
