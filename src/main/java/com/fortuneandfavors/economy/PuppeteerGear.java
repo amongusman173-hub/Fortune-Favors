@@ -92,6 +92,15 @@ public final class PuppeteerGear {
    private static final Map<UUID, Long> ESCAPED = new HashMap<>();
    private static long clock = 0L;
 
+   /** Violet thread: the colour every string, sigil and puppet effect is drawn in. */
+   private static final int THREAD = 0x9A6CFF;
+   /** The pale glint of a string pulled taut. */
+   private static final int TAUT = 0xE6D6FF;
+   /** The paint on the mask, for the moments it bites. */
+   private static final int PAINT = 0xC3283F;
+   /** Most puppets one wearer can have standing at once - decoys included. */
+   private static final int ALLIES_PER_OWNER = 3;
+
    private PuppeteerGear() {
    }
 
@@ -153,7 +162,9 @@ public final class PuppeteerGear {
          if (RANDOM.nextFloat() > ALLY_CHANCE) {
             return;
          }
-         if (ALLIES.size() >= 4) {
+         // Per wearer. The cap used to be four for the whole server, so one player's puppets and
+         // decoys quietly switched the mask off for everybody else.
+         if (alliesOf(killer.getUUID()) >= ALLIES_PER_OWNER) {
             return;
          }
 
@@ -167,8 +178,12 @@ public final class PuppeteerGear {
          }
          long now = ServerClock.clock(level);
          ALLIES.put(puppet.getUUID(), new Ally(puppet.getUUID(), killer.getUUID(), name, false, now + ALLY_TICKS));
-         level.sendParticles(ParticleTypes.SOUL, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 30, 0.6, 0.8, 0.6, 0.06);
-         level.sendParticles(ParticleTypes.END_ROD, puppet.getX(), puppet.getY() + 1.4, puppet.getZ(), 20, 0.5, 0.7, 0.5, 0.04);
+         // The body is hauled up on four strings let down from nowhere.
+         Vec3 feet = puppet.position();
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.SOUL, feet.add(0.0, 0.05, 0.0), Vec3.ZERO, 1.8, 30.0, THREAD);
+         stringsFromAbove(level, puppet, 9.0);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 30, 0.6, 0.8, 0.6, 0.06);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, puppet.getX(), puppet.getY() + 1.4, puppet.getZ(), 20, 0.5, 0.7, 0.5, 0.04);
          level.playSound(null, puppet.getX(), puppet.getY(), puppet.getZ(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.0F, 0.8F);
          killer.sendOverlayMessage(Component.literal("\u00a75The mask takes the body \u00a78| \u00a7f" + name + " \u00a77is yours for 20s"));
       } catch (Throwable ignored) {
@@ -198,6 +213,7 @@ public final class PuppeteerGear {
       if (mark != null && (tie == null || !tie.target.equals(mark.getUUID()))) {
          TIES.put(player.getUUID(), new Tie(mark.getUUID(), now + TIE_TICKS));
          drawTie(level, player, mark);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.END_ROD, mark.position().add(0.0, mark.getBbHeight() * 0.6, 0.0), Vec3.ZERO, Math.max(0.6, mark.getBbWidth()), 0.0, TAUT);
          level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_ATTACH, SoundSource.PLAYERS, 1.0F, 1.1F);
          player.sendOverlayMessage(Component.literal("\u00a75String tied \u00a78- \u00a7fright-click again to pull"));
          return null;
@@ -234,11 +250,23 @@ public final class PuppeteerGear {
       if (flat.lengthSqr() < 1.0E-4) {
          return null;
       }
-      Vec3 yank = flat.normalize().scale(PULL_POWER);
-      living.setDeltaMovement(living.getDeltaMovement().add(yank.x, 0.35, yank.z));
+      // Heavy things move less. A boss used to come across the arena exactly as far as a zombie,
+      // which turned the Strings into a way to drag a fight out of its own room.
+      double weight = 1.0;
+      try {
+         weight = 1.0 - Math.max(0.0, Math.min(1.0, living.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE)));
+      } catch (Throwable ignored) {
+      }
+      if (BossManager.isMarkedBoss(living)) {
+         weight = Math.min(weight, 0.25);
+      }
+      Vec3 yank = flat.normalize().scale(PULL_POWER * Math.max(0.15, weight));
+      living.setDeltaMovement(living.getDeltaMovement().add(yank.x, 0.35 * Math.max(0.3, weight), yank.z));
       living.hurtMarked = true;
       drawTie(level, player, living);
-      level.sendParticles(ParticleTypes.CRIT, living.getX(), living.getY() + 1.0, living.getZ(), 14, 0.3, 0.4, 0.3, 0.05);
+      Vec3 at = living.position().add(0.0, living.getBbHeight() * 0.6, 0.0);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.CLASH, ParticleTypes.CRIT, at, flat.normalize(), 0.0, 0.0, TAUT);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, at, player.position().add(0.0, 1.2, 0.0), 0.0, 0.0, TAUT);
       level.playSound(null, living.getX(), living.getY(), living.getZ(), SoundEvents.TRIPWIRE_CLICK_ON, SoundSource.PLAYERS, 1.2F, 1.0F);
       player.sendOverlayMessage(Component.literal("\u00a75PULL \u00a78| \u00a7f" + living.getName().getString() + " \u00a77is dragged toward you"));
       return null;
@@ -265,6 +293,13 @@ public final class PuppeteerGear {
             if (dot < 0.86) {
                continue;
             }
+            // A string has to reach: nothing is tied through a wall.
+            net.minecraft.world.phys.HitResult wall = level.clip(new net.minecraft.world.level.ClipContext(
+               eye, eye.add(to), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, player
+            ));
+            if (wall.getType() != net.minecraft.world.phys.HitResult.Type.MISS) {
+               continue;
+            }
             double score = (1.0 - dot) * 20.0 + distance;
             if (score < bestScore) {
                bestScore = score;
@@ -285,11 +320,30 @@ public final class PuppeteerGear {
       if (length < 0.01) {
          return;
       }
-      Vec3 unit = dir.normalize();
-      for (double d = 0.0; d < length; d += 0.5) {
-         Vec3 point = start.add(unit.scale(d));
-         level.sendParticles(ParticleTypes.END_ROD, point.x, point.y, point.z, 1, 0.0, 0.0, 0.0, 0.0);
+      // One beam cue. The old string sent a particle packet every half block, every tick, for as
+      // long as it was tied - forty packets a second for a single thread.
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, start, end, 0.0, 0.0, THREAD);
+   }
+
+   /** Four strings let down onto a body from above, the way a marionette hangs. */
+   private static void stringsFromAbove(ServerLevel level, Entity body, double height) {
+      double h = body.getBbHeight();
+      double w = Math.max(0.3, body.getBbWidth() * 0.5);
+      double[][] anchors = {{w, h * 0.85, 0.0}, {-w, h * 0.85, 0.0}, {w * 0.5, h * 0.35, w * 0.5}, {-w * 0.5, h * 0.35, -w * 0.5}};
+      for (double[] a : anchors) {
+         Vec3 on = body.position().add(a[0], a[1], a[2]);
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.END_ROD, on.add(0.0, height, 0.0), on, 0.0, 0.0, TAUT);
       }
+   }
+
+   private static int alliesOf(UUID owner) {
+      int n = 0;
+      for (Ally ally : ALLIES.values()) {
+         if (ally.owner.equals(owner)) {
+            n++;
+         }
+      }
+      return n;
    }
 
    private static Entity findEntity(MinecraftServer server, UUID id) {
@@ -346,7 +400,10 @@ public final class PuppeteerGear {
          level, player, "\u00a78" + player.getName().getString(), player.getMaxHealth(), false
       );
       if (decoy != null) {
-         level.sendParticles(ParticleTypes.POOF, decoy.getX(), decoy.getY() + 1.0, decoy.getZ(), 30, 0.5, 0.8, 0.5, 0.06);
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.POOF, decoy.getX(), decoy.getY() + 1.0, decoy.getZ(), 30, 0.5, 0.8, 0.5, 0.06);
+         // The swap: a mirror tears where they stood and the decoy is left hanging in it.
+         com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.TEAR, ParticleTypes.END_ROD, decoy.position().add(0.0, 1.0, 0.0), new Vec3(1.0, 0.0, 0.0), 1.6, 18, TAUT);
+         stringsFromAbove(level, decoy, 7.0);
          // The decoy is scenery: it exists to be hit, and it goes quiet on its own.
          level.getServer().execute(() -> {
             try {
@@ -364,7 +421,8 @@ public final class PuppeteerGear {
 
       Chat.msg(player, "&8&lTHE PUPPET TAKES YOUR PLACE.");
       player.sendOverlayMessage(Component.literal("\u00a78THE PUPPET TAKES YOUR PLACE \u00a78| \u00a7frun."));
-      level.sendParticles(ParticleTypes.SMOKE, player.getX(), player.getY() + 1.0, player.getZ(), 40, 0.7, 1.0, 0.7, 0.05);
+      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SMOKE, player.getX(), player.getY() + 1.0, player.getZ(), 40, 0.7, 1.0, 0.7, 0.05);
+      com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.SMOKE, player.position().add(0.0, 0.3, 0.0), Vec3.ZERO, 3.5, 0.0, 0x2A2236);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.PLAYERS, 1.4F, 0.8F);
       level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ILLUSIONER_MIRROR_MOVE, SoundSource.PLAYERS, 1.2F, 0.7F);
       return true;
@@ -465,7 +523,9 @@ public final class PuppeteerGear {
          now = ServerClock.clock(level);
          if (now >= ally.until) {
             it.remove();
-            level.sendParticles(ParticleTypes.POOF, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 16, 0.4, 0.6, 0.4, 0.05);
+            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.POOF, puppet.getX(), puppet.getY() + 1.0, puppet.getZ(), 16, 0.4, 0.6, 0.4, 0.05);
+            // Its strings are cut and it drops.
+            com.fortuneandfavors.net.FfVfx.shape(level, com.fortuneandfavors.net.FfVfx.RING, ParticleTypes.END_ROD, puppet.position().add(0.0, 0.1, 0.0), Vec3.ZERO, 1.2, 0.0, THREAD);
             level.playSound(null, puppet.getX(), puppet.getY(), puppet.getZ(), SoundEvents.TRIPWIRE_DETACH, SoundSource.PLAYERS, 0.8F, 1.2F);
             BossManager.removeFakePlayer(server, puppet);
             if (ally.passive) {
@@ -490,26 +550,31 @@ public final class PuppeteerGear {
          // meant to be hit instead of its owner.
          return;
       }
+      // Whatever the owner is fighting, first: the thing they last hit, then the thing that last
+      // hit them. Only then the nearest monster. It used to take the nearest player who was not
+      // its owner - the owner's friends, and every other puppet, since puppets are players too -
+      // so a pair of puppets would turn on each other, or on the decoy covering their owner.
+      ServerPlayer owner = level.getServer().getPlayerList().getPlayer(ally.owner);
       LivingEntity target = null;
-      double best = ALLY_CHASE * ALLY_CHASE;
-      for (ServerPlayer other : level.getPlayers(p -> p.isAlive() && !p.isSpectator())) {
-         if (other.getUUID().equals(ally.owner)) {
-            continue;
-         }
-         double distance = other.distanceToSqr(puppet);
-         if (distance < best) {
-            best = distance;
-            target = other;
+      if (owner != null) {
+         for (LivingEntity wanted : new LivingEntity[]{owner.getLastHurtMob(), owner.getLastHurtByMob()}) {
+            if (wanted != null && isFoe(wanted, ally) && wanted.distanceToSqr(puppet) < ALLY_CHASE * ALLY_CHASE * 4.0) {
+               target = wanted;
+               break;
+            }
          }
       }
-      for (Mob mob : level.getEntitiesOfClass(Mob.class, puppet.getBoundingBox().inflate(ALLY_CHASE), m -> m.isAlive())) {
-         if (BossManager.isMarkedBoss(mob)) {
-            continue;
-         }
-         double distance = mob.distanceToSqr(puppet);
-         if (distance < best) {
-            best = distance;
-            target = mob;
+      double best = ALLY_CHASE * ALLY_CHASE;
+      if (target == null) {
+         for (Mob mob : level.getEntitiesOfClass(Mob.class, puppet.getBoundingBox().inflate(ALLY_CHASE), m -> m.isAlive())) {
+            if (BossManager.isMarkedBoss(mob) || !(mob instanceof net.minecraft.world.entity.monster.Enemy) || !isFoe(mob, ally)) {
+               continue;
+            }
+            double distance = mob.distanceToSqr(puppet);
+            if (distance < best) {
+               best = distance;
+               target = mob;
+            }
          }
       }
       if (target == null) {
@@ -568,11 +633,20 @@ public final class PuppeteerGear {
             holder.sendOverlayMessage(Component.literal("\u00a77The string snaps. \u00a7fToo far."));
             continue;
          }
-         // The trail is the point: a string you cannot see is a string you forget.
-         if (holder.level() instanceof ServerLevel level) {
+         // The trail is the point: a string you cannot see is a string you forget. Redrawn four
+         // times a second; the client's beam fills the gaps between cues.
+         if (holder.level() instanceof ServerLevel level && clock % 5L == 0L) {
             drawTie(level, holder, target);
          }
       }
+   }
+
+   /** Not the owner, not a puppet or decoy, not any of the mod's fake players. */
+   private static boolean isFoe(LivingEntity entity, Ally ally) {
+      return entity.isAlive()
+         && !entity.getUUID().equals(ally.owner)
+         && !ALLIES.containsKey(entity.getUUID())
+         && !BossManager.isFakePlayer(entity);
    }
 
    private static float faceYaw(Entity from, Entity to) {
