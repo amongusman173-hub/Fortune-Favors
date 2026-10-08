@@ -290,6 +290,20 @@ public final class BossManager {
    private static final String REVENANT_TARGETS_KEY = "ff_revenant_targets";
    private static final String REVENANT_VICTIM_KEY = "ff_revenant_victim";
    private static final Map<UUID, SpawnAnim> spawningFriendly = new HashMap<>();
+   /**
+    * The Multidimensional Army's entrance. Each summon gets its own rift a few blocks in front of
+    * the caller: the rift tears open, the summon (placed just behind its plane) walks out through
+    * it toward the caller over the last ARMY_WALK_TICKS of the entrance, and the rift folds shut
+    * behind it as it is released. Purple and void, the Mindbinder's colours, since it is his last
+    * thought the staff is spending.
+    */
+   private static final int ARMY_ENTRANCE_TICKS = 20;
+   /** Ticks of the entrance spent walking through the plane; the rest is the rift opening. */
+   private static final int ARMY_WALK_TICKS = 13;
+   /** How long the tear stands: the entrance plus the close, so it seals as the summon is clear. */
+   private static final int ARMY_RIFT_TICKS = 30;
+   private static final int ARMY_VIOLET = 0x9B4DFF;
+   private static final int ARMY_VOID = 0x2A0A4A;
    private static final Map<UUID, UUID> friendlyVexes = new HashMap<>();
    private static final Map<UUID, Long> friendlyVexBorn = new HashMap<>();
    private static final Map<UUID, Long> friendlyVexStrike = new HashMap<>();
@@ -303,6 +317,13 @@ public final class BossManager {
    private static final Map<UUID, List<GolemBlock>> golemBlocks = new HashMap<>();
    private static final Map<UUID, GolemRock> golemRocks = new HashMap<>();
    private static final Map<UUID, UUID> golemBoulder = new HashMap<>();
+   /**
+    * Carried by the Stone Golem's rising boulder (a BlockDisplay). The display is saved with its
+    * chunk like any entity, so a stop, crash or unload in the 90 ticks it stands would otherwise
+    * leave a cobblestone boulder hanging over the arena forever; the tag lets the sweeps recognise
+    * one that no live golem claims.
+    */
+   private static final String GOLEM_BOULDER_TAG = "ff_golem_boulder";
    private static final Map<UUID, GolemCrumble> golemCrumble = new HashMap<>();
    private static final Map<UUID, StaffStone> staffStones = new HashMap<>();
    private static final Map<UUID, FistWave> fistWaves = new HashMap<>();
@@ -934,6 +955,10 @@ public final class BossManager {
     * whose bar cannot be reached is not a reason to leave the rest of the fight behind.
     */
    private static boolean dismissBossCore(UUID id, ActiveBoss b, ServerLevel level, LivingEntity body) {
+      // Read before the maps are cleared below: the boulder's map entry is the only way to find
+      // its display, and clearing the entry first left removeGolemBoulder nothing to remove - the
+      // boulder outlived every exit that came through this door.
+      UUID boulderId = id == null ? null : golemBoulder.get(id);
       try {
          b.bar.removeAllPlayers();
          b.bar.setVisible(false);
@@ -987,6 +1012,11 @@ public final class BossManager {
          if (level != null) {
             removeKingRods(level.getServer(), id);
             removeGolemBoulder(level, id);
+         }
+         // The reconciliation path arrives with no level; the fight remembers its own.
+         ServerLevel boulderLevel = level != null ? level : b.level;
+         if (boulderId != null && boulderLevel != null) {
+            discardGolemBoulderEntity(boulderLevel.getServer(), boulderId);
          }
       } catch (Throwable ignored) {
       }
@@ -4975,6 +5005,10 @@ public final class BossManager {
       shockBlocks.clear();
       golemBlocks.clear();
       golemRocks.clear();
+      // Any boulder the per-fight doors above did not claim is still an entity in the world.
+      for (UUID boulderId : new ArrayList<>(golemBoulder.values())) {
+         discardGolemBoulderEntity(server, boulderId);
+      }
       golemBoulder.clear();
       golemCrumble.clear();
       staffStones.clear();
@@ -5099,6 +5133,10 @@ public final class BossManager {
          for (Entity entity : level.getAllEntities()) {
             if (entity instanceof Mob mob && isRiggedBoss(mob) && !bosses.containsKey(mob.getUUID())) {
                strays.add(mob);
+            } else if (entity instanceof BlockDisplay bd && bd.entityTags().contains(GOLEM_BOULDER_TAG)
+               && !golemBoulder.containsValue(bd.getUUID())) {
+               // A golem's boulder saved by a stop or crash mid-rise, with no golem behind it.
+               strays.add(bd);
             }
          }
 
@@ -5431,6 +5469,9 @@ public final class BossManager {
       if (++orphanSweepClock >= ORPHAN_SWEEP_TICKS) {
          orphanSweepClock = 0;
          com.fortuneandfavors.util.Safe.run("boss orphan sweep", () -> sweepOrphanBosses(server));
+      }
+      if (orphanSweepClock % 20 == 0) {
+         com.fortuneandfavors.util.Safe.run("golem boulder sweep", () -> sweepGolemBoulders(server));
       }
       if (!scurkOrbProjectiles.isEmpty()) {
          for (ServerLevel sl : server.getAllLevels()) {
@@ -10639,6 +10680,7 @@ public final class BossManager {
          boulder.setNoGravity(true);
          boulder.setInvulnerable(true);
          boulder.setBlockState(Blocks.COBBLESTONE.defaultBlockState());
+         boulder.addTag(GOLEM_BOULDER_TAG);
          // Lit as if it stood in the open: its origin is inside the ground block, and a display
          // takes its light from there - which is why the boulder used to rise pitch black.
          boulder.setBrightnessOverride(new net.minecraft.util.Brightness(12, 15));
@@ -10658,43 +10700,82 @@ public final class BossManager {
          bd.setBlockState(Blocks.STONE.defaultBlockState());
       }
 
-      com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.STONE.defaultBlockState()),
-         golem.getX(),
-         golem.getY() + 1.2,
-         golem.getZ(),
-         40,
-         1.6,
-         1.4,
-         1.6,
-         0.08
-      );
+      // Vanilla-only: golemTick draws this same burst for modded clients as a ROCKBURST cue.
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.STONE.defaultBlockState()),
+            golem.getX(),
+            golem.getY() + 1.2,
+            golem.getZ(),
+            40,
+            1.6,
+            1.4,
+            1.6,
+            0.08
+         );
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, golem.getX(), golem.getY(), golem.getZ(), ModSounds.GOLEM_RUMBLE, SoundSource.HOSTILE, 0.9F, 0.3F);
       level.playSound(null, golem.getX(), golem.getY(), golem.getZ(), ModSounds.GOLEM_CRACK, SoundSource.HOSTILE, 0.7F, 0.5F);
    }
 
    private static void removeGolemBoulder(ServerLevel level, UUID golemId) {
       UUID uid = golemBoulder.remove(golemId);
-      if (uid != null) {
-         Entity ent = findEntity(level.getServer(), uid);
-         if (ent != null) {
-            ent.remove(RemovalReason.DISCARDED);
+      if (uid != null && level != null) {
+         discardGolemBoulderEntity(level.getServer(), uid);
+      }
+   }
+
+   private static void discardGolemBoulderEntity(MinecraftServer server, UUID displayId) {
+      if (server == null || displayId == null) {
+         return;
+      }
+      Entity ent = findEntity(server, displayId);
+      if (ent != null) {
+         ent.remove(RemovalReason.DISCARDED);
+      }
+   }
+
+   /**
+    * Once a second: a boulder whose golem is no longer a live fight goes. The fight's own door
+    * takes it on every exit it knows about; this catches the ones it does not (a body removed by
+    * something else between boss ticks, a golem whose chunk unloaded mid-rise).
+    */
+   private static void sweepGolemBoulders(MinecraftServer server) {
+      if (golemBoulder.isEmpty() || server == null) {
+         return;
+      }
+      for (Entry<UUID, UUID> e : new ArrayList<>(golemBoulder.entrySet())) {
+         ActiveBoss b = bosses.get(e.getKey());
+         Entity golem = b == null ? null : findEntity(server, e.getKey());
+         boolean ownerGone = b == null || golem == null || !golem.isAlive() || golem.isRemoved();
+         if (ownerGone) {
+            golemBoulder.remove(e.getKey());
+            discardGolemBoulderEntity(server, e.getValue());
          }
       }
    }
 
    private static void clearGolemBoulder(ServerLevel level, Mob golem) {
       removeGolemBoulder(level, golem.getUUID());
-      com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.STONE.defaultBlockState()),
-         golem.getX(),
-         golem.getY() + 1.2,
-         golem.getZ(),
-         140,
-         2.5,
-         1.8,
-         2.5,
-         0.15
-      );
-      com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION, golem.getX(), golem.getY() + 1.2, golem.getZ(), 8, 1.2, 1.0, 1.2, 0.1);
+      // Vanilla-only: golemTick sends the boulder's shattering to modded clients as a ROCKBURST cue.
+      com.fortuneandfavors.net.FfVfx.enter();
+      try {
+         com.fortuneandfavors.net.FfVfx.particles(level, new BlockParticleOption(ParticleTypes.BLOCK, Blocks.STONE.defaultBlockState()),
+            golem.getX(),
+            golem.getY() + 1.2,
+            golem.getZ(),
+            140,
+            2.5,
+            1.8,
+            2.5,
+            0.15
+         );
+         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.EXPLOSION, golem.getX(), golem.getY() + 1.2, golem.getZ(), 8, 1.2, 1.0, 1.2, 0.1);
+      } finally {
+         com.fortuneandfavors.net.FfVfx.exit();
+      }
       level.playSound(null, golem.getX(), golem.getY(), golem.getZ(), ModSounds.GOLEM_RUMBLE, SoundSource.HOSTILE, 1.0F, 0.3F);
       level.playSound(null, golem.getX(), golem.getY(), golem.getZ(), ModSounds.GOLEM_CRACK, SoundSource.HOSTILE, 1.0F, 0.6F);
    }
@@ -18824,10 +18905,16 @@ public final class BossManager {
 
       staffCooldown.put(owner.getUUID(), now);
 
+      boolean army = ModItems.isMindAscended(staff);
       for (int i = living; i < cap; i++) {
          Vec3 look = owner.getLookAngle();
-         com.fortuneandfavors.net.FfVfx.shape(owner.level(), com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.SOUL_FIRE_FLAME,
-            owner.position().add(look.x * 2.0, 0.0, look.z * 2.0), Vec3.ZERO, 1.4, 22, 0x3FD8FF);
+         if (!army) {
+            // The Multidimensional Army draws its own rune circle under each rift (armyRift), on
+            // the spot the summon actually arrives - a second circle at the caller's feet would
+            // mark the wrong place.
+            com.fortuneandfavors.net.FfVfx.shape(owner.level(), com.fortuneandfavors.net.FfVfx.SUMMON_CIRCLE, ParticleTypes.SOUL_FIRE_FLAME,
+               owner.position().add(look.x * 2.0, 0.0, look.z * 2.0), Vec3.ZERO, 1.4, 22, 0x3FD8FF);
+         }
          spawnFriendlySkeleton(owner);
       }
 
@@ -19829,6 +19916,120 @@ public final class BossManager {
          && !level.getBlockState(p.below()).isAir();
    }
 
+   /**
+    * Where the next Army summon's rift opens: about three blocks in front of the caller, fanned
+    * to the side by how many of this cast's rifts are already open, so three summons arrive side
+    * by side rather than stacked in one block. Falls back to the plain summon spot when the
+    * ground ahead is not standable.
+    */
+   private static BlockPos armyRiftSpot(ServerLevel level, ServerPlayer owner) {
+      int opening = 0;
+      UUID ownerId = owner.getUUID();
+      for (Entry<UUID, SpawnAnim> e : spawningFriendly.entrySet()) {
+         if (e.getValue().steps != null && !e.getValue().closing
+            && findEntity(level.getServer(), e.getKey()) instanceof LivingEntity le && ownerId.equals(friendlyOwner(le))) {
+            opening++;
+         }
+      }
+
+      Vec3 look = owner.getLookAngle();
+      Vec3 fwd = new Vec3(look.x, 0.0, look.z);
+      fwd = fwd.lengthSqr() < 1.0E-4 ? new Vec3(0.0, 0.0, 1.0) : fwd.normalize();
+      Vec3 side = new Vec3(-fwd.z, 0.0, fwd.x);
+      double off = switch (opening % 3) {
+         case 1 -> -1.8;
+         case 2 -> 1.8;
+         default -> 0.0;
+      };
+      Vec3 want = owner.position().add(fwd.scale(3.0)).add(side.scale(off));
+      BlockPos base = BlockPos.containing(want);
+      for (int dy : new int[]{0, 1, -1, 2, -2}) {
+         BlockPos p = base.above(dy);
+         if (isClearSpot(level, p)) {
+            return p;
+         }
+      }
+      return safeSurfacePos(level, owner);
+   }
+
+   /** True when a body's feet and head at this point are clear of anything solid. */
+   private static boolean armyPassable(ServerLevel level, Vec3 at) {
+      BlockPos p = BlockPos.containing(at);
+      return level.getBlockState(p).getCollisionShape(level, p).isEmpty()
+         && level.getBlockState(p.above()).getCollisionShape(level, p.above()).isEmpty();
+   }
+
+   /**
+    * Plans one Army summon's entrance on a rift at {@code surface}: which way it faces (toward the
+    * caller), where it starts (a block behind the rift's plane) and the step list it is walked
+    * along, one entry per tick, ending a little in front of the plane. Both ends shrink toward the
+    * rift if a wall or a drop is in the way, so nobody is walked into stone.
+    */
+   private static SpawnAnim armyEntrance(ServerLevel level, ServerPlayer owner, BlockPos surface) {
+      Vec3 rift = new Vec3(surface.getX() + 0.5, surface.getY(), surface.getZ() + 0.5);
+      Vec3 face = new Vec3(owner.getX() - rift.x, 0.0, owner.getZ() - rift.z);
+      if (face.lengthSqr() < 0.09) {
+         Vec3 look = owner.getLookAngle();
+         face = new Vec3(-look.x, 0.0, -look.z);
+      }
+      face = face.lengthSqr() < 1.0E-4 ? new Vec3(0.0, 0.0, 1.0) : face.normalize();
+
+      Vec3 from = rift.subtract(face.scale(1.0));
+      if (!armyPassable(level, from)) {
+         from = rift.subtract(face.scale(0.35));
+      }
+      Vec3 to = rift.add(face.scale(0.8));
+      BlockPos toFloor = BlockPos.containing(to).below();
+      if (!armyPassable(level, to) || level.getBlockState(toFloor).getCollisionShape(level, toFloor).isEmpty()) {
+         to = rift;
+      }
+
+      List<Vec3> steps = new ArrayList<>();
+      steps.add(from);
+      for (int i = 1; i <= ARMY_WALK_TICKS; i++) {
+         double t = (double)i / ARMY_WALK_TICKS;
+         // Eased out: a stride through the opening that settles as it lands.
+         double e = 1.0 - (1.0 - t) * (1.0 - t);
+         steps.add(from.lerp(to, e));
+      }
+      return new SpawnAnim(surface, ARMY_ENTRANCE_TICKS, rift, face, steps);
+   }
+
+   /**
+    * A vertical rift for an Army summon to step out of: a tear standing across the summon's path,
+    * a void swirl and an opening wormhole in its middle, and a rune circle on the floor under it.
+    *
+    * @param at     the rift's base, on the floor
+    * @param facing the way the summon walks out (the tear stands across it)
+    * @param ticks  how long the tear and the rune circle stand
+    */
+   private static void armyRift(ServerLevel level, Vec3 at, Vec3 facing, int ticks) {
+      // TODO(rift-portal): replace this composition with Fx's RIFT_PORTAL template once its client
+      // side lands - Fx.riftPortal(level, p, at, face, height, holdTicks, ARMY_VIOLET).
+      Vec3 face = facing == null ? Vec3.ZERO : new Vec3(facing.x, 0.0, facing.z);
+      face = face.lengthSqr() < 1.0E-4 ? new Vec3(0.0, 0.0, 1.0) : face.normalize();
+      Vec3 across = new Vec3(-face.z, 0.0, face.x);
+      Fx.tear(level, ParticleTypes.REVERSE_PORTAL, at.add(0.0, 1.1, 0.0), across, 1.3, ticks, ARMY_VIOLET);
+      Fx.rift(level, ParticleTypes.PORTAL, at, 0.9, ARMY_VOID);
+      armyWormhole(level, at, true);
+      Fx.runeCircle(level, ParticleTypes.WITCH, at.add(0.0, 0.05, 0.0), 1.6, ticks, ARMY_VIOLET);
+   }
+
+   /** The Army rift folding shut behind a summon that has stepped clear of it. */
+   private static void armyRiftClose(ServerLevel level, Vec3 at) {
+      armyWormhole(level, at, false);
+   }
+
+   /**
+    * The wormhole cue, opening or closing. Sent through Fx.shape with the cue's own flag spelled
+    * out rather than through Fx.wormhole: the client draws b = 1 as the wormhole arriving (it
+    * widens and rises) and b = 0 as it collapsing, while Fx.wormhole's parameter is named
+    * {@code closing} and maps true to 1 - the opposite of what this entrance needs to read.
+    */
+   private static void armyWormhole(ServerLevel level, Vec3 at, boolean opening) {
+      Fx.shape(level, com.fortuneandfavors.net.FfVfx.WORMHOLE, ParticleTypes.REVERSE_PORTAL, at, Vec3.ZERO, 0.0, opening ? 1.0 : 0.0, ARMY_VIOLET);
+   }
+
    public static void spawnFriendlySkeleton(ServerPlayer owner) {
       try {
          ServerLevel level = owner.level();
@@ -19939,8 +20140,20 @@ public final class BossManager {
          }
 
          mob.setComponent(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-         BlockPos surface = safeSurfacePos(level, owner);
-         mob.setPos(surface.getX() + 0.5, surface.getY() + (ascended ? 0.0 : -1.2), surface.getZ() + 0.5);
+         BlockPos surface = ascended ? armyRiftSpot(level, owner) : safeSurfacePos(level, owner);
+         SpawnAnim armyAnim = null;
+         if (ascended) {
+            // The Army steps out of a rift: the body starts just behind the rift's plane and is
+            // walked forward through it by tickFriendly over ARMY_WALK_TICKS, facing the caller.
+            armyAnim = armyEntrance(level, owner, surface);
+            mob.setPos(armyAnim.steps.get(0).x, armyAnim.steps.get(0).y, armyAnim.steps.get(0).z);
+            float yaw = (float)Math.toDegrees(Math.atan2(-armyAnim.facing.x, armyAnim.facing.z));
+            mob.setYRot(yaw);
+            mob.setYHeadRot(yaw);
+            mob.yBodyRot = yaw;
+         } else {
+            mob.setPos(surface.getX() + 0.5, surface.getY() - 1.2, surface.getZ() + 0.5);
+         }
          mob.setNoAi(true);
          mob.setInvulnerable(true);
          level.addFreshEntity(mob);
@@ -19959,7 +20172,7 @@ public final class BossManager {
             evokerCharged.add(mob.getUUID());
          }
 
-         spawningFriendly.put(mob.getUUID(), new SpawnAnim(surface, 20, ascended));
+         spawningFriendly.put(mob.getUUID(), armyAnim != null ? armyAnim : new SpawnAnim(surface, 20, false));
          if (livingSkeletonCount(owner) >= 3) {
             Advancements.grant(owner, "army_commander");
          }
@@ -19968,26 +20181,33 @@ public final class BossManager {
             double cx = surface.getX() + 0.5;
             double cy = surface.getY() + 1.0;
             double cz = surface.getZ() + 0.5;
+            armyRift(level, new Vec3(cx, surface.getY(), cz), armyAnim.facing, ARMY_RIFT_TICKS);
+            // Everything below is the vanilla picture of the same rift, for clients without the
+            // mod; modded clients already have armyRift's cues and would see both.
+            com.fortuneandfavors.net.FfVfx.enter();
+            try {
+               for (int i = 0; i < 26; i++) {
+                  double a = i / 26.0 * Math.PI * 2.0;
+                  com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-8371969, 1.1F), cx + Math.cos(a) * 1.5, surface.getY() + 0.15, cz + Math.sin(a) * 1.5, 1, 0.0, 0.0, 0.0, 0.0
+                  );
+               }
 
-            for (int i = 0; i < 26; i++) {
-               double a = i / 26.0 * Math.PI * 2.0;
-               com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-8371969, 1.1F), cx + Math.cos(a) * 1.5, surface.getY() + 0.15, cz + Math.sin(a) * 1.5, 1, 0.0, 0.0, 0.0, 0.0
+               for (int i = 0; i < 22; i++) {
+                  double a = i / 22.0 * Math.PI * 2.0;
+                  com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, cx + Math.cos(a) * 1.35, cy, cz + Math.sin(a) * 1.35, 2, 0.05, 1.1, 0.05, 0.0);
+               }
+
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, cx, cy, cz, 42, 0.8, 1.3, 0.8, 0.1);
+               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, cx, cy, cz, 30, 0.6, 1.1, 0.6, 0.05);
+               com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-8371969, 1.4F), cx, cy, cz, 26, 0.9, 1.2, 0.9, 0.08);
+               // A summoned ally is not an event: the entrance used to open with a boss's own roar at
+               // three quarters volume, which is the loudest thing this class owns and was being played
+               // every time somebody called a helper. Soul-flame and a small portal instead.
+               com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ColorParticleOption.create(ParticleTypes.FLASH, ARMY_VIOLET), cx, cy + 0.9, cz, 1, 0.0, 0.0, 0.0, 0.0
                );
+            } finally {
+               com.fortuneandfavors.net.FfVfx.exit();
             }
-
-            for (int i = 0; i < 22; i++) {
-               double a = i / 22.0 * Math.PI * 2.0;
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, cx + Math.cos(a) * 1.35, cy, cz + Math.sin(a) * 1.35, 2, 0.05, 1.1, 0.05, 0.0);
-            }
-
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, cx, cy, cz, 42, 0.8, 1.3, 0.8, 0.1);
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, cx, cy, cz, 30, 0.6, 1.1, 0.6, 0.05);
-            com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-8371969, 1.4F), cx, cy, cz, 26, 0.9, 1.2, 0.9, 0.08);
-            // A summoned ally is not an event: the entrance used to open with a boss's own roar at
-            // three quarters volume, which is the loudest thing this class owns and was being played
-            // every time somebody called a helper. Soul-flame and a small portal instead.
-            com.fortuneandfavors.net.FfVfx.particles(level, net.minecraft.core.particles.ColorParticleOption.create(ParticleTypes.FLASH, 0x66FFEE), cx, cy + 0.9, cz, 1, 0.0, 0.0, 0.0, 0.0
-            );
             level.playSound(null, cx, cy, cz, SoundEvents.SOUL_ESCAPE, SoundSource.PLAYERS, 0.85F, 0.7F);
             level.playSound(null, cx, cy, cz, SoundEvents.END_PORTAL_SPAWN, SoundSource.PLAYERS, 0.3F, 1.5F);
             level.playSound(null, cx, cy, cz, SoundEvents.WITHER_SKELETON_AMBIENT, SoundSource.PLAYERS, 0.5F, 0.6F);
@@ -20212,23 +20432,39 @@ public final class BossManager {
                      double r = 0.6 + (10 - anim.ticks) * 0.38;
                      int count = Math.max(10, (int)(r * Math.PI * 2.0 / 0.5));
 
-                     for (int i = 0; i < count; i++) {
-                        double a = (double)i / count * Math.PI * 2.0 + anim.ticks * 0.3;
-                        com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-4177665, 1.0F), px + Math.cos(a) * r, py, pz + Math.sin(a) * r, 1, 0.0, 0.02, 0.0, 0.0);
-                     }
+                     // Vanilla-only: modded clients are watching the rift's own collapse (the
+                     // closing wormhole sent when the summon stepped clear), not this ring.
+                     com.fortuneandfavors.net.FfVfx.enter();
+                     try {
+                        for (int i = 0; i < count; i++) {
+                           double a = (double)i / count * Math.PI * 2.0 + anim.ticks * 0.3;
+                           com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-4177665, 1.0F), px + Math.cos(a) * r, py, pz + Math.sin(a) * r, 1, 0.0, 0.02, 0.0, 0.0);
+                        }
 
-                     if ((anim.ticks & 1) == 0) {
-                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, px, py, pz, 6, 0.5, 0.7, 0.5, 0.3);
+                        if ((anim.ticks & 1) == 0) {
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, px, py, pz, 6, 0.5, 0.7, 0.5, 0.3);
+                        }
+
+                        if (anim.ticks <= 0) {
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, px, py, pz, 18, 0.4, 0.5, 0.4, 0.05);
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, px, py, pz, 12, 0.5, 0.6, 0.5, 0.04);
+                        }
+                     } finally {
+                        com.fortuneandfavors.net.FfVfx.exit();
                      }
 
                      if (anim.ticks <= 0) {
-                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, px, py, pz, 18, 0.4, 0.5, 0.4, 0.05);
-                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, px, py, pz, 12, 0.5, 0.6, 0.5, 0.04);
                         level.playSound(null, px, py, pz, SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 0.8F, 0.7F);
                         spawningFriendly.remove(e.getKey());
                      }
                   } else if (anim.ticks <= 0) {
-                     mob.setPos(anim.surface.getX() + 0.5, anim.surface.getY(), anim.surface.getZ() + 0.5);
+                     if (anim.steps != null && !anim.steps.isEmpty()) {
+                        // The Army lands where its walk through the rift ended, in front of the plane.
+                        Vec3 land = anim.steps.get(anim.steps.size() - 1);
+                        mob.setPos(land.x, land.y, land.z);
+                     } else {
+                        mob.setPos(anim.surface.getX() + 0.5, anim.surface.getY(), anim.surface.getZ() + 0.5);
+                     }
                      mob.setNoAi(false);
                      mob.setInvulnerable(false);
                      ServerLevel level = (ServerLevel)mob.level();
@@ -20240,15 +20476,23 @@ public final class BossManager {
                         double px = mob.getX();
                         double py = mob.getY() + 0.6;
                         double pz = mob.getZ();
+                        // The summon is through; the rift behind it folds shut.
+                        Vec3 riftAt = anim.riftAt != null ? anim.riftAt : new Vec3(anim.surface.getX() + 0.5, anim.surface.getY(), anim.surface.getZ() + 0.5);
+                        armyRiftClose(level, riftAt);
 
-                        for (int i = 0; i < 18; i++) {
-                           double a = i / 18.0 * Math.PI * 2.0;
-                           com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-4177665, 1.2F), px + Math.cos(a) * 0.7, py, pz + Math.sin(a) * 0.7, 1, 0.0, 0.0, 0.0, 0.0
-                           );
+                        com.fortuneandfavors.net.FfVfx.enter();
+                        try {
+                           for (int i = 0; i < 18; i++) {
+                              double a = i / 18.0 * Math.PI * 2.0;
+                              com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-4177665, 1.2F), px + Math.cos(a) * 0.7, py, pz + Math.sin(a) * 0.7, 1, 0.0, 0.0, 0.0, 0.0
+                              );
+                           }
+
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, px, py, pz, 40, 0.5, 0.8, 0.5, 0.3);
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, px, py, pz, 22, 0.5, 0.6, 0.5, 0.04);
+                        } finally {
+                           com.fortuneandfavors.net.FfVfx.exit();
                         }
-
-                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, px, py, pz, 40, 0.5, 0.8, 0.5, 0.3);
-                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, px, py, pz, 22, 0.5, 0.6, 0.5, 0.04);
                         level.playSound(null, px, py, pz, ModSounds.BOSS_SLAM, SoundSource.HOSTILE, 0.7F, 0.9F);
                         anim.closing = true;
                         anim.ticks = 10;
@@ -20262,41 +20506,60 @@ public final class BossManager {
                      }
                   } else {
                      ServerLevel level = (ServerLevel)mob.level();
+                     // The Army's walk: one scheduled step per tick once the rift has opened, so the
+                     // body crosses the rift's plane over ARMY_WALK_TICKS instead of popping in.
+                     if (anim.steps != null && anim.ticks <= ARMY_WALK_TICKS) {
+                        int idx = Math.max(0, Math.min(anim.steps.size() - 1, ARMY_WALK_TICKS - anim.ticks + 1));
+                        Vec3 step = anim.steps.get(idx);
+                        mob.setPos(step.x, step.y, step.z);
+                        if (anim.facing != null) {
+                           float yaw = (float)Math.toDegrees(Math.atan2(-anim.facing.x, anim.facing.z));
+                           mob.setYRot(yaw);
+                           mob.setYHeadRot(yaw);
+                           mob.yBodyRot = yaw;
+                        }
+                     }
+
                      double sa = ServerClock.clock(level) * 0.3;
+                     // Vanilla-only: the rift's tear and swirl are already on modded screens.
+                     com.fortuneandfavors.net.FfVfx.enter();
+                     try {
+                        for (int i = 0; i < 6; i++) {
+                           double ra = sa + i * Math.PI / 3.0;
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL,
+                              mob.getX() + Math.cos(ra) * 1.15,
+                              mob.getY() + 0.45 + i % 2 * 0.85 + Math.sin(ServerClock.clock(level) * 0.16) * 0.25,
+                              mob.getZ() + Math.sin(ra) * 1.15,
+                              1,
+                              0.04,
+                              0.04,
+                              0.04,
+                              0.0
+                           );
+                        }
 
-                     for (int i = 0; i < 6; i++) {
-                        double ra = sa + i * Math.PI / 3.0;
-                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL,
-                           mob.getX() + Math.cos(ra) * 1.15,
-                           mob.getY() + 0.45 + i % 2 * 0.85 + Math.sin(ServerClock.clock(level) * 0.16) * 0.25,
-                           mob.getZ() + Math.sin(ra) * 1.15,
-                           1,
-                           0.04,
-                           0.04,
-                           0.04,
-                           0.0
-                        );
-                     }
+                        double ra2 = ServerClock.clock(level) * 0.4;
 
-                     double ra2 = ServerClock.clock(level) * 0.4;
+                        for (int i = 0; i < 8; i++) {
+                           double a = ra2 + i * Math.PI / 4.0;
+                           com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-8371969, 0.9F),
+                              mob.getX() + Math.cos(a) * 1.2,
+                              mob.getY() + 0.15,
+                              mob.getZ() + Math.sin(a) * 1.2,
+                              1,
+                              0.0,
+                              0.0,
+                              0.0,
+                              0.0
+                           );
+                        }
 
-                     for (int i = 0; i < 8; i++) {
-                        double a = ra2 + i * Math.PI / 4.0;
-                        com.fortuneandfavors.net.FfVfx.particles(level, new DustParticleOptions(-8371969, 0.9F),
-                           mob.getX() + Math.cos(a) * 1.2,
-                           mob.getY() + 0.15,
-                           mob.getZ() + Math.sin(a) * 1.2,
-                           1,
-                           0.0,
-                           0.0,
-                           0.0,
-                           0.0
-                        );
-                     }
-
-                     if ((anim.ticks & 1) == 0) {
-                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, mob.getX(), mob.getY() + 0.5, mob.getZ(), 4, 0.35, 0.5, 0.35, 0.04);
-                        com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, mob.getX(), mob.getY() + 0.4, mob.getZ(), 2, 0.3, 0.4, 0.3, 0.02);
+                        if ((anim.ticks & 1) == 0) {
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.REVERSE_PORTAL, mob.getX(), mob.getY() + 0.5, mob.getZ(), 4, 0.35, 0.5, 0.35, 0.04);
+                           com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.SOUL, mob.getX(), mob.getY() + 0.4, mob.getZ(), 2, 0.3, 0.4, 0.3, 0.02);
+                        }
+                     } finally {
+                        com.fortuneandfavors.net.FfVfx.exit();
                      }
                   }
                } else {
@@ -22137,11 +22400,29 @@ public final class BossManager {
        final boolean portal;
        boolean closing;
     
+       /** The Army's rift base, the way it walks out, and its per-tick walk; null for a plain summon. */
+       final Vec3 riftAt;
+       final Vec3 facing;
+       final List<Vec3> steps;
+    
        SpawnAnim(BlockPos surface, int ticks, boolean portal) {
           this.surface = surface;
           this.ticks = ticks;
           this.portal = portal;
           this.closing = false;
+          this.riftAt = null;
+          this.facing = null;
+          this.steps = null;
+       }
+
+       SpawnAnim(BlockPos surface, int ticks, Vec3 riftAt, Vec3 facing, List<Vec3> steps) {
+          this.surface = surface;
+          this.ticks = ticks;
+          this.portal = true;
+          this.closing = false;
+          this.riftAt = riftAt;
+          this.facing = facing;
+          this.steps = steps;
        }
     }
 
