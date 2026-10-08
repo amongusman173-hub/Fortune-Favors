@@ -5,5 +5,5 @@ logs/
 .DS_Store
 .freebuff/
 .agents/
-net/
+/net/
 *.log
