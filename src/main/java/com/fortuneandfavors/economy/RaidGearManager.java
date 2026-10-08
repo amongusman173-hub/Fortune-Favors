@@ -53,8 +53,10 @@ import net.minecraft.world.phys.Vec3;
  *   that fight beside the player for 60s. Long cooldown, max 3 alive.
  * - Evoker's Spellbook: right-click casts evoker fangs, sneak summons a vex ally
  *   (shorter-lived but tougher and harder-hitting; the cloak unlocks a second vex).
- * - Illusioner's Spellbook: blinds everyone near you for 5s (8s with the cloak) and
- *   spawns fragile illusion vexes (5 with the cloak) that mimic your attacks.
+ * - Illusioner's Spellbook: blinds everyone near you for 5s (8s with the cloak), spawns
+ *   3 fragile copies of you (5 with the cloak) that walk in formation at your side and
+ *   mirror your attacks, and turns you truly invisible (no particles, no visible gear)
+ *   for 20s - until you are hit, use the book again, die, leave or change dimension.
  * - Raiders Item Upgrader: upgrades a raid legendary in your offhand to Tier II/III.
  */
 public final class RaidGearManager {
@@ -90,8 +92,6 @@ public final class RaidGearManager {
    private static final Map<UUID, Long> captainHornCd = new HashMap<>();
    private static final Map<UUID, Long> evokerBookCd = new HashMap<>();
    private static final Map<UUID, Long> illusionBookCd = new HashMap<>();
-   /** Illusioner Spellbook active window: owner uuid -> until game time. */
-   private static final Map<UUID, Long> illusionActiveUntil = new HashMap<>();
    /** Wall-clock throttle for the tick's error log, so one broken summon cannot
     *  spam the console 20 times a second. */
    private static long lastTickErrorLog = 0L;
@@ -341,12 +341,16 @@ public final class RaidGearManager {
 
    // === ILLUSIONER'S SPELLBOOK ===
 
-   /** Blinds everyone near you for 5s (8s with the cloak) and spawns 3 illusion
-    *  vexes (5 with the cloak) that mimic your attacks. */
+   /** Blinds everyone near you for 5s (8s with the cloak), spawns 3 illusion
+    *  copies (5 with the cloak) that walk with you, and makes you truly invisible.
+    *  Used again while the illusion is live, it cancels it instead. */
    public static String useIllusionerSpellbook(ServerPlayer owner) {
       try {
          ServerLevel level = (ServerLevel)owner.level();
          long now = ServerClock.clock(level);
+         if (cancelIllusion(owner)) {
+            return null;
+         }
          if (now < illusionBookCd.getOrDefault(owner.getUUID(), 0L)) {
             return "The illusion is still settling.";
          }
@@ -377,9 +381,10 @@ public final class RaidGearManager {
             }
          }
 
+         // The window's state is built first: the copies take their ring slots from its yaw.
+         IllusionState state = new IllusionState(ServerClock.clock(level) + ILLUSION_COPY_TICKS, owner.getId(), level, owner.getYRot());
          for (int i = 0; i < illusionCount; i++) {
-            double a = i / (double)illusionCount * Math.PI * 2.0;
-            Vec3 at = new Vec3(owner.getX() + Math.cos(a) * 2.2, owner.getY() + 0.5, owner.getZ() + Math.sin(a) * 2.2);
+            Vec3 at = formationSlot(owner, level, null, state.formationYaw, i, illusionCount);
             Player copy = spawnIllusionCopy(owner, level, at);
             if (copy == null) {
                continue;
@@ -387,144 +392,301 @@ public final class RaidGearManager {
             copyOwner.put(copy.getUUID(), owner.getUUID());
             copyBorn.put(copy.getUUID(), ServerClock.clock(level));
             copyStrike.put(copy.getUUID(), ServerClock.clock(level) + 20L + i * 10L);
-            com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.PORTAL, copy.getX(), copy.getY(), copy.getZ(), 14, 0.5, 0.5, 0.5, 0.2);
-            Fx.shape(level, com.fortuneandfavors.net.FfVfx.BEAM, ParticleTypes.PORTAL, owner.position().add(0.0, 1.0, 0.0), copy.position().add(0.0, 1.0, 0.0), 0.0, 0.0, 0x8C6BFF);
-            Fx.shape(level, com.fortuneandfavors.net.FfVfx.ICE_BURST, ParticleTypes.PORTAL, copy.position().add(0.0, 1.0, 0.0), net.minecraft.world.phys.Vec3.ZERO, 0.8, 0.0, 0x8C6BFF);
+            copySlot.put(copy.getUUID(), i);
+            copySlotCount.put(copy.getUUID(), illusionCount);
+            // Fx only: a raw sendParticles here reached modded clients too, who then saw the
+            // vanilla portal cloud stacked on top of their custom beam.
+            Fx.beam(level, ParticleTypes.PORTAL, owner.position().add(0.0, 1.0, 0.0), copy.position().add(0.0, 1.0, 0.0), ILLUSION_PURPLE);
+            Fx.iceBurst(level, ParticleTypes.PORTAL, copy.position().add(0.0, 1.0, 0.0), 0.8, ILLUSION_PURPLE);
          }
-         com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.END_ROD, owner.getX(), owner.getY() + 1.5, owner.getZ(), 30, 1.5, 1.2, 1.5, 0.08);
-         Fx.shape(level, com.fortuneandfavors.net.FfVfx.NOVA, ParticleTypes.PORTAL, owner.position(), net.minecraft.world.phys.Vec3.ZERO, 4.0, 0.0, 0x8C6BFF);
-         Fx.shape(level, com.fortuneandfavors.net.FfVfx.CLOCK_BURST, ParticleTypes.PORTAL, owner.position().add(0.0, 1.0, 0.0), net.minecraft.world.phys.Vec3.ZERO, 3.0, 0.0, 0x8C6BFF);
+         Fx.nova(level, ParticleTypes.PORTAL, owner.position(), 4.0, ILLUSION_PURPLE);
+         Fx.clockBurst(level, ParticleTypes.PORTAL, owner.position().add(0.0, 1.0, 0.0), 3.0, ILLUSION_PURPLE);
          level.playSound(null, owner.blockPosition(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.0F, 0.8F);
-         // The caster turns TRULY invisible for the whole illusion window (copies
-         // fight in their place) - a hit shatters it (see onPlayerHit).
-         illusionActiveUntil.put(owner.getUUID(), ServerClock.clock(level) + ILLUSION_COPY_TICKS);
-         applyTrueInvisibility(owner);
+         // The caster turns TRULY invisible for the whole illusion window while the
+         // copies walk at their side - a hit, a second use of the book, leaving or
+         // the timer running out ends it (see endIllusion).
+         activeIllusions.put(owner.getUUID(), state);
+         applyTrueInvisibility(owner, state);
          illusionBookCd.put(owner.getUUID(), now + 600L);
          Chat.raw(owner, "§d§lIllusion burst! §7Blinded §f" + blindedPlayers + " player" + (blindedPlayers == 1 ? "" : "s")
             + "§7, stunned §f" + stunnedMobs + " mob" + (stunnedMobs == 1 ? "" : "s")
-            + "§7 - §f" + illusionCount + " copies of you§7 materialize and mimic your every move!");
+            + "§7 - §f" + illusionCount + " copies of you\u00a77 walk at your side. \u00a78(Use the book again to drop the illusion.)");
          return null;
       } catch (Exception e) {
          return "The spellbook fizzles.";
       }
    }
 
-   /** The Illusioner's Spellbook bearer took a hit while the spell is live:
-    *  the illusions shatter, the caster reappears, and the spellbook starts
-    *  its cooldown. */
-   public static void onPlayerHit(ServerPlayer victim) {
-      UUID id = victim.getUUID();
-      if (!illusionActiveUntil.containsKey(id)) {
-         return;
-      }
-      breakIllusions(victim);
+   /** Why an illusion window closed - it decides the message, the effect and the cooldown. */
+   private enum EndReason {
+      /** Damage landed on the caster. */
+      HIT,
+      /** The caster used the book again. */
+      CANCEL,
+      /** The 20 second window ran out. */
+      EXPIRED,
+      /** Death, a dimension change or a respawn - the body the spell was cast on is gone. */
+      LEFT,
+      /** Logout or server stop: nobody is there to see an effect or read a message. */
+      SILENT
    }
 
-   private static void breakIllusions(ServerPlayer owner) {
+   /** Everything one live illusion window needs. One per caster, keyed by uuid. */
+   private static final class IllusionState {
+      /** Clock tick at which the window closes on its own. */
+      final long until;
+      /** Entity id of the body the spell was cast on: a respawn makes a new body with a new id. */
+      final int casterEntityId;
+      /** The level it was cast in: walking through a portal ends the spell. */
+      final ServerLevel level;
+      /** The ring's facing. It eases toward the caster's yaw instead of snapping to it, so a
+       *  quick turn swings the copies round in an arc rather than through the caster. */
+      float formationYaw;
+      /** An invisibility effect the caster already had (a real potion), put back afterwards. */
+      MobEffectInstance priorInvisibility;
+      /** The gear last hidden, so a swap is re-hidden on the very next tick. */
+      final ItemStack[] hiddenGear = new ItemStack[MIRRORED_SLOTS.length];
+      /** The caster's last attack the copies have already mirrored. */
+      int mirroredAttackStamp = Integer.MIN_VALUE;
+
+      IllusionState(long until, int casterEntityId, ServerLevel level, float yaw) {
+         this.until = until;
+         this.casterEntityId = casterEntityId;
+         this.level = level;
+         this.formationYaw = yaw;
+      }
+   }
+
+   /** Purple used for every Illusioner Spellbook cue. */
+   private static final int ILLUSION_PURPLE = 0x8C6BFF;
+   /** How far out the copies stand. Shrunk toward the caster when a wall is in the way. */
+   private static final double FORMATION_RADIUS = 2.2;
+   /** A copy further than this from its slot gives up walking and is placed there. */
+   private static final double COPY_SNAP_DISTANCE = 14.0;
+   /** Fastest a copy walks per tick - a little over sprint-jumping, so it keeps up. */
+   private static final double COPY_MAX_STEP = 0.75;
+   /** Chance a mob that lost the caster picks one of the copies instead of nothing. */
+   private static final double REDIRECT_CHANCE = 0.6;
+
+   /** Illusioner copies: copy uuid -> its slot in the ring, and how many slots there are. */
+   private static final Map<UUID, Integer> copySlot = new HashMap<>();
+   private static final Map<UUID, Integer> copySlotCount = new HashMap<>();
+   /** Live illusion windows: caster uuid -> state. */
+   private static final Map<UUID, IllusionState> activeIllusions = new HashMap<>();
+
+   /** Using the book while the spell is live drops it on purpose. Returns true when it did. */
+   public static boolean cancelIllusion(ServerPlayer owner) {
+      if (owner == null || !activeIllusions.containsKey(owner.getUUID())) {
+         return false;
+      }
+      endIllusion(owner, EndReason.CANCEL);
+      return true;
+   }
+
+   /** Damage landed on the caster while the spell is live (any source, from
+    *  ModEvents' AFTER_DAMAGE): the illusions shatter, the caster reappears,
+    *  and the spellbook starts its cooldown again. */
+   public static void onPlayerHit(ServerPlayer victim) {
+      if (victim == null || !activeIllusions.containsKey(victim.getUUID())) {
+         return;
+      }
+      endIllusion(victim, EndReason.HIT);
+   }
+
+   /** Logout: the caster must never be saved invisible or leave copies walking around. */
+   public static void onPlayerLeave(ServerPlayer player) {
+      if (player != null && activeIllusions.containsKey(player.getUUID())) {
+         endIllusion(player, EndReason.SILENT);
+      }
+   }
+
+   /** Server stop: close every window and discard every copy, so nothing outlives the
+    *  in-memory state that drives it. */
+   public static void onServerStopping(MinecraftServer server) {
+      for (UUID id : new ArrayList<>(activeIllusions.keySet())) {
+         ServerPlayer owner = server.getPlayerList().getPlayer(id);
+         if (owner != null) {
+            endIllusion(owner, EndReason.SILENT);
+         }
+      }
+      activeIllusions.clear();
+      for (UUID copyId : new ArrayList<>(copyOwner.keySet())) {
+         Entity e = findEntity(server, copyId);
+         if (e != null && !e.isRemoved()) {
+            e.remove(Entity.RemovalReason.DISCARDED);
+         }
+         removeCopyInfo(server, copyId);
+      }
+      copyOwner.clear();
+      copyBorn.clear();
+      copyStrike.clear();
+      copySlot.clear();
+      copySlotCount.clear();
+   }
+
+   /**
+    * The one way an illusion window closes, whatever closed it: the copies break
+    * apart, the caster's body and gear come back for everyone, and (for a hit or a
+    * cancel) the book's 30 second cooldown restarts from now.
+    */
+   private static void endIllusion(ServerPlayer owner, EndReason reason) {
       UUID id = owner.getUUID();
-      illusionActiveUntil.remove(id);
+      IllusionState state = activeIllusions.remove(id);
+      boolean effects = reason != EndReason.SILENT;
       MinecraftServer server = owner.level().getServer();
-      if (server != null && owner.level() instanceof ServerLevel level) {
-         for (UUID copyId : new java.util.ArrayList<>(copyOwner.keySet())) {
-            if (!id.equals(copyOwner.get(copyId))) {
-               continue;
-            }
-            Entity e = findEntity(server, copyId);
-            if (e != null && e.isAlive()) {
-               com.fortuneandfavors.net.FfVfx.particles(level, ParticleTypes.POOF, e.getX(), e.getY() + 1.0, e.getZ(), 12, 0.5, 0.7, 0.5, 0.05);
-               e.remove(Entity.RemovalReason.DISCARDED);
-            }
-            removeCopyInfo(server, copyId);
-            copyOwner.remove(copyId);
-            copyBorn.remove(copyId);
-            copyStrike.remove(copyId);
-         }
-      }
-      clearTrueInvisibility(owner);
-      long now = ServerClock.clock(owner.level());
-      illusionBookCd.put(id, now + 600L);
-      ItemStack book = owner.getMainHandItem();
-      if (!ModItems.isIllusionerSpellbook(book)) {
-         book = ItemStack.EMPTY;
-         for (int i = 0; i < owner.getInventory().getContainerSize(); i++) {
-            ItemStack s = owner.getInventory().getItem(i);
-            if (ModItems.isIllusionerSpellbook(s)) {
-               book = s;
-               break;
+      if (server != null) {
+         for (UUID copyId : new ArrayList<>(copyOwner.keySet())) {
+            if (id.equals(copyOwner.get(copyId))) {
+               discardCopy(server, copyId, effects);
             }
          }
       }
-      if (!book.isEmpty()) {
-         owner.getCooldowns().addCooldown(book, 600);
+      clearTrueInvisibility(owner, state);
+      if (!(owner.level() instanceof ServerLevel level)) {
+         return;
       }
-      if (owner.level() instanceof ServerLevel level) {
+      if (effects && owner.isAlive()) {
+         Fx.flare(level, ParticleTypes.WITCH, owner.position().add(0.0, 1.0, 0.0), 1.2, ILLUSION_PURPLE);
          level.playSound(null, owner.blockPosition(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.0F, 1.6F);
       }
-      Chat.raw(owner, "§dYour illusions shatter - §7you're exposed! The spellbook begins recharging.");
+      if (reason == EndReason.HIT || reason == EndReason.CANCEL) {
+         long now = ServerClock.clock(level);
+         illusionBookCd.put(id, now + 600L);
+         ItemStack book = owner.getMainHandItem();
+         if (!ModItems.isIllusionerSpellbook(book)) {
+            book = ItemStack.EMPTY;
+            for (int i = 0; i < owner.getInventory().getContainerSize(); i++) {
+               ItemStack s = owner.getInventory().getItem(i);
+               if (ModItems.isIllusionerSpellbook(s)) {
+                  book = s;
+                  break;
+               }
+            }
+         }
+         if (!book.isEmpty()) {
+            owner.getCooldowns().addCooldown(book, 600);
+         }
+      }
+      switch (reason) {
+         case HIT -> Chat.raw(owner, "§dYour illusions shatter - §7you're exposed! The spellbook begins recharging.");
+         case CANCEL -> Chat.raw(owner, "\u00a7dYou let the illusion go. \u00a77The spellbook begins recharging.");
+         case EXPIRED -> Chat.raw(owner, "\u00a7dThe illusion fades - \u00a77you're visible again.");
+         default -> {
+         }
+      }
+   }
+
+   /** Removes one copy, with a purple shatter where it stood unless the end is silent. */
+   private static void discardCopy(MinecraftServer server, UUID copyId, boolean effects) {
+      Entity e = findEntity(server, copyId);
+      if (e != null && !e.isRemoved()) {
+         if (effects && e.level() instanceof ServerLevel lv) {
+            Fx.shatter(lv, ParticleTypes.WITCH, e.position().add(0.0, 1.0, 0.0), 0.9, ILLUSION_PURPLE);
+         }
+         e.remove(Entity.RemovalReason.DISCARDED);
+      }
+      removeCopyInfo(server, copyId);
+      copyOwner.remove(copyId);
+      copyBorn.remove(copyId);
+      copyStrike.remove(copyId);
+      copySlot.remove(copyId);
+      copySlotCount.remove(copyId);
    }
 
    // ------------------------------------------------------- true invisibility
 
-   private static final EquipmentSlot[] ARMOUR_SLOTS = {
-      EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
-   };
    private static final EquipmentSlot[] MIRRORED_SLOTS = {
       EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND
    };
 
    /** True while the caster is inside an illusion window. */
    public static boolean isTrulyHidden(ServerPlayer player) {
-      return player != null && illusionActiveUntil.containsKey(player.getUUID());
+      return player != null && activeIllusions.containsKey(player.getUUID());
    }
 
    /**
-    * The Illusioner's true invisibility - three things at once, which is what makes
-    * it worth a 30 second cooldown:
+    * The Illusioner's true invisibility - what the copies are a decoy for:
     *
     * <ul>
-    *   <li><b>Nothing is hidden that should not be.</b> The body is hidden with the
-    *       entity flag, not the potion effect, so the caster keeps every particle
-    *       they were already giving off instead of having them suppressed.</li>
-    *   <li><b>The armour is hidden, not removed.</b> Other players are sent an
-    *       empty equipment packet, so nothing renders on your body - while the
-    *       server keeps the real pieces equipped, so full netherite still
-    *       protects. Vanilla invisibility leaves armour on show and lets it give
-    *       your position away; this does not.</li>
-    *   <li><b>Mobs lose you completely.</b> Existing targets are dropped here, and
-    *       {@code VanishMobTargetMixin} refuses to hand out new ones, so armour no
-    *       longer widens the range at which you are spotted.</li>
+    *   <li><b>No tell-tale swirl.</b> Invisibility goes on as an ambient, particle-free,
+    *       icon-free effect, so nothing drifts off the caster's body and their own HUD
+    *       stays clean. The effect (not the bare entity flag) is used because vanilla
+    *       re-derives the flag from the effect list whenever any effect changes - the
+    *       old flag-only version reappeared the moment a potion wore off mid-window.
+    *       It is sized to the window, so even a missed cleanup can never outlast it.</li>
+    *   <li><b>The gear is hidden, not removed.</b> Other players are sent empty
+    *       equipment for all six slots, so no armour or held item floats in the air
+    *       to give the caster away - while the server keeps the real pieces equipped,
+    *       so full netherite still protects. The tick re-sends it whenever the gear
+    *       changes and every few ticks for anyone who just came into range.</li>
+    *   <li><b>Mobs lose you.</b> Whatever was hunting the caster turns on a copy (or on
+    *       nothing), and {@code VanishMobTargetMixin} refuses to hand the caster out
+    *       as a new target.</li>
     * </ul>
     */
-   private static void applyTrueInvisibility(ServerPlayer owner) {
+   private static void applyTrueInvisibility(ServerPlayer owner, IllusionState state) {
+      MobEffectInstance prior = owner.getEffect(MobEffects.INVISIBILITY);
+      if (prior != null) {
+         state.priorInvisibility = new MobEffectInstance(prior);
+         owner.removeEffect(MobEffects.INVISIBILITY);
+      }
+      int ticks = (int)Math.max(20L, state.until - ServerClock.clock(owner.level())) + 20;
+      // ambient = true, visible (particles) = false, showIcon = false
+      owner.addEffect(new MobEffectInstance(MobEffects.INVISIBILITY, ticks, 0, true, false, false));
       owner.setInvisible(true);
       sendEquipment(owner, true);
-      dropStaleTargets(owner);
+      redirectHunters(owner, 64.0, true);
    }
 
-   private static void clearTrueInvisibility(ServerPlayer owner) {
-      owner.setInvisible(false);
+   /** Undoes {@link #applyTrueInvisibility}. Safe to call on a dead or leaving player. */
+   private static void clearTrueInvisibility(ServerPlayer owner, IllusionState state) {
+      MobEffectInstance current = owner.getEffect(MobEffects.INVISIBILITY);
+      // Only the spell's own instance is taken away - never a potion the caster drank
+      // during the window - and one drunk before the cast is handed back.
+      if (current != null && current.isAmbient() && !current.isVisible() && !current.showIcon()) {
+         owner.removeEffect(MobEffects.INVISIBILITY);
+      }
+      if (state != null && state.priorInvisibility != null && owner.isAlive() && !owner.hasEffect(MobEffects.INVISIBILITY)) {
+         owner.addEffect(state.priorInvisibility);
+      }
+      owner.setInvisible(owner.hasEffect(MobEffects.INVISIBILITY));
       sendEquipment(owner, false);
    }
 
-   /** Re-hides the armour from everyone else; sent again mid-window so a gear swap
-    *  cannot leak the real equipment back onto their screens. */
-   private static void hideArmourFromOthers(ServerPlayer owner) {
-      sendEquipment(owner, true);
+   /** True when the caster's gear differs from what was last hidden (a swap mid-window). */
+   private static boolean gearChanged(ServerPlayer owner, IllusionState state) {
+      boolean changed = false;
+      for (int i = 0; i < MIRRORED_SLOTS.length; i++) {
+         ItemStack now = owner.getItemBySlot(MIRRORED_SLOTS[i]);
+         if (state.hiddenGear[i] == null || !ItemStack.matches(state.hiddenGear[i], now)) {
+            state.hiddenGear[i] = now.copy();
+            changed = true;
+         }
+      }
+      return changed;
    }
 
+   /**
+    * Sends the caster's six equipment slots to every other player in range: empty
+    * stacks while hidden, the real ones when the spell ends. The server's own
+    * equipment never changes - this only decides what other clients draw.
+    */
    private static void sendEquipment(ServerPlayer owner, boolean hide) {
       try {
          MinecraftServer server = owner.level().getServer();
          if (server == null) {
             return;
          }
-         List<com.mojang.datafixers.util.Pair<EquipmentSlot, ItemStack>> slots = new java.util.ArrayList<>();
-         for (EquipmentSlot slot : ARMOUR_SLOTS) {
+         List<com.mojang.datafixers.util.Pair<EquipmentSlot, ItemStack>> slots = new ArrayList<>();
+         for (EquipmentSlot slot : MIRRORED_SLOTS) {
             slots.add(com.mojang.datafixers.util.Pair.of(slot, hide ? ItemStack.EMPTY : owner.getItemBySlot(slot).copy()));
          }
          ClientboundSetEquipmentPacket packet = new ClientboundSetEquipmentPacket(owner.getId(), slots);
          for (ServerPlayer other : server.getPlayerList().getPlayers()) {
-            if (other != owner && other.connection != null && other.level() == owner.level()) {
+            // Hiding goes to anyone who could be tracking the caster; restoring goes to the
+            // whole level so nobody is left with an empty-handed ghost.
+            if (other != owner && other.connection != null && other.level() == owner.level()
+                  && (!hide || other.distanceToSqr(owner) < 192.0 * 192.0)) {
                other.connection.send(packet);
             }
          }
@@ -532,16 +694,99 @@ public final class RaidGearManager {
       }
    }
 
-   /** Everything already fighting the caster loses the thread the moment it turns. */
-   private static void dropStaleTargets(ServerPlayer owner) {
+   /**
+    * The confusion half of the spell. Mobs within {@code radius} that were after the
+    * caster - targeting them, or just hit by them from nowhere - turn on one of the
+    * copies instead, some of the time; the rest simply lose the thread. {@code all}
+    * is the cast itself, where every hunter is re-rolled.
+    */
+   private static void redirectHunters(ServerPlayer owner, double radius, boolean all) {
       if (!(owner.level() instanceof ServerLevel level)) {
          return;
       }
-      for (Mob mob : level.getEntitiesOfClass(Mob.class, owner.getBoundingBox().inflate(64.0))) {
-         if (mob.getTarget() == owner) {
-            mob.setTarget(null);
+      List<Player> copies = new ArrayList<>();
+      for (Map.Entry<UUID, UUID> entry : copyOwner.entrySet()) {
+         if (owner.getUUID().equals(entry.getValue()) && level.getEntity(entry.getKey()) instanceof Player copy && copy.isAlive()) {
+            copies.add(copy);
          }
       }
+      for (Mob mob : level.getEntitiesOfClass(Mob.class, owner.getBoundingBox().inflate(radius))) {
+         if (copyOwner.containsKey(mob.getUUID()) || BossManager.isFriendlySkeleton(mob)) {
+            continue;
+         }
+         boolean hunting = mob.getTarget() == owner;
+         boolean provoked = mob.getTarget() == null && mob.getLastHurtByMob() == owner;
+         if (!hunting && !(provoked && (all || mob.tickCount % 2 == 0))) {
+            continue;
+         }
+         if (hunting) {
+            // Cleared first: the mixin refuses owner targets, but a target set before the
+            // cast is still sitting in the field.
+            mob.setTarget(null);
+         }
+         if (!copies.isEmpty() && RANDOM.nextDouble() < REDIRECT_CHANCE) {
+            mob.setTarget(copies.get(RANDOM.nextInt(copies.size())));
+         }
+      }
+   }
+
+   /**
+    * Where copy {@code index} of {@code count} should stand: a ring round the caster
+    * turned to the eased formation yaw, at the caster's feet height. A slot inside a
+    * wall is pulled in toward the caster until it is clear, so copies hug a corridor
+    * instead of grinding into its sides; failing that they share the caster's spot.
+    */
+   private static Vec3 formationSlot(ServerPlayer owner, ServerLevel level, Entity copy, float yawDeg, int index, int count) {
+      double a = Math.toRadians(yawDeg) + Math.PI / 2.0 + index / (double)Math.max(1, count) * Math.PI * 2.0;
+      for (double r = FORMATION_RADIUS; r > 0.5; r -= 0.7) {
+         Vec3 at = new Vec3(owner.getX() + Math.cos(a) * r, owner.getY(), owner.getZ() + Math.sin(a) * r);
+         Entity body = copy != null ? copy : owner;
+         if (level.noCollision(body, body.getBoundingBox().move(at.x - body.getX(), at.y - body.getY(), at.z - body.getZ()))) {
+            return at;
+         }
+      }
+      return owner.position();
+   }
+
+   /**
+    * One tick of a copy walking with its caster: steered (not teleported) toward its
+    * ring slot with a speed that eases off as it arrives, so it glides to a stop
+    * instead of jittering on the spot. Gravity and collision are its own body's -
+    * {@code PossessedPlayer} runs a real player tick - and it hops when it walks into
+    * a step. Only a copy left far behind (a fall, a pearl, an elytra) is placed back
+    * in its slot. It always looks where the caster looks.
+    */
+   private static void followCaster(Player copy, ServerPlayer owner, IllusionState state, int index, int count) {
+      if (!(copy.level() instanceof ServerLevel level)) {
+         return;
+      }
+      Vec3 slot = formationSlot(owner, level, copy, state.formationYaw, index, count);
+      double dx = slot.x - copy.getX();
+      double dy = slot.y - copy.getY();
+      double dz = slot.z - copy.getZ();
+      double flat = Math.sqrt(dx * dx + dz * dz);
+      if (flat > COPY_SNAP_DISTANCE || Math.abs(dy) > COPY_SNAP_DISTANCE) {
+         copy.setPos(slot.x, slot.y, slot.z);
+         copy.setDeltaMovement(Vec3.ZERO);
+         copy.resetFallDistance();
+      } else {
+         double vy = copy.getDeltaMovement().y;
+         if (flat > 0.15) {
+            double speed = Math.min(COPY_MAX_STEP, flat * 0.35);
+            if (copy.onGround() && (copy.horizontalCollision || dy > COPY_STEP_UP * 0.5) && dy > -0.5) {
+               vy = 0.42; // a jump, the same height a player's jump has
+            }
+            copy.setDeltaMovement(dx / flat * speed, vy, dz / flat * speed);
+         } else {
+            copy.setDeltaMovement(0.0, vy, 0.0);
+         }
+         // A copy that drops off a ledge after its caster must not die of the landing.
+         copy.resetFallDistance();
+      }
+      copy.setYRot(owner.getYRot());
+      copy.setXRot(owner.getXRot());
+      copy.setYHeadRot(owner.getYHeadRot());
+      copy.yBodyRot = owner.yBodyRot;
    }
 
    /**
@@ -566,7 +811,7 @@ public final class RaidGearManager {
          if (server == null) {
             return;
          }
-         List<com.mojang.datafixers.util.Pair<EquipmentSlot, ItemStack>> slots = new java.util.ArrayList<>();
+         List<com.mojang.datafixers.util.Pair<EquipmentSlot, ItemStack>> slots = new ArrayList<>();
          for (EquipmentSlot slot : MIRRORED_SLOTS) {
             slots.add(com.mojang.datafixers.util.Pair.of(slot, copy.getItemBySlot(slot).copy()));
          }
@@ -581,8 +826,8 @@ public final class RaidGearManager {
    }
 
    /** Spawns a 1-HP illusion copy of the owner: exact skin, armor and tools
-    *  copied, glowing magenta. They are separate entities with no leash to you -
-    *  they attack anything that moves. */
+    *  copied, glowing magenta. The tick walks it in formation with the caster
+    *  (see followCaster) and lets it swing at whatever the caster hits. */
    private static Player spawnIllusionCopy(ServerPlayer owner, ServerLevel level, Vec3 at) {
       try {
          UUID fakeId = UUID.randomUUID();
@@ -629,31 +874,33 @@ public final class RaidGearManager {
       }
    }
 
-   /** Nearest living thing within 14 blocks of an illusion copy - players,
-    *  animals and monsters alike. The caster is the only creature spared. */
-   private static LivingEntity illusionCopyTarget(Player copy, ServerPlayer owner) {
+   /** How close a copy must be to something to hit it - a player's own reach. */
+   private static final double COPY_REACH = 3.0;
+
+   /**
+    * What a copy swings at, now that it walks with the caster instead of roaming:
+    * the thing the caster just hit, if it is in this copy's reach (the copies mirror
+    * the caster's attacks), else a mob in reach that has turned on this copy. The
+    * caster and every other summon of theirs are always spared.
+    */
+   private static LivingEntity copyStrikeTarget(Player copy, ServerPlayer owner, boolean ownerJustAttacked) {
       if (!(copy.level() instanceof ServerLevel level)) {
          return null;
       }
-      LivingEntity best = null;
-      double bestDist = 14.0 * 14.0;
-      for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class,
-            new net.minecraft.world.phys.AABB(copy.getX() - 14, copy.getY() - 8, copy.getZ() - 14,
-               copy.getX() + 14, copy.getY() + 8, copy.getZ() + 14))) {
-         if (e == copy || !e.isAlive() || BossManager.isFriendlySkeleton(e)
-               || copyOwner.containsKey(e.getUUID()) || illusionOwner.containsKey(e.getUUID())) {
-            continue;
-         }
-         if (owner != null && e.getUUID().equals(owner.getUUID())) {
-            continue;
-         }
-         double d = copy.distanceToSqr(e);
-         if (d < bestDist) {
-            bestDist = d;
-            best = e;
+      double reachSq = COPY_REACH * COPY_REACH;
+      if (owner != null && ownerJustAttacked) {
+         LivingEntity mark = owner.getLastHurtMob();
+         if (mark != null && mark.isAlive() && mark != owner && !copyOwner.containsKey(mark.getUUID())
+               && !BossManager.isFriendlySkeleton(mark) && copy.distanceToSqr(mark) < reachSq) {
+            return mark;
          }
       }
-      return best;
+      for (Mob mob : level.getEntitiesOfClass(Mob.class, copy.getBoundingBox().inflate(COPY_REACH))) {
+         if (mob.isAlive() && mob.getTarget() == copy && copy.distanceToSqr(mob) < reachSq) {
+            return mob;
+         }
+      }
+      return null;
    }
 
    private static void removeCopyInfo(MinecraftServer server, UUID copyId) {
@@ -677,26 +924,41 @@ public final class RaidGearManager {
    public static void tick(MinecraftServer server) {
       try {
          long now = ServerClock.clock(server);
-         // Illusioner Spellbook active window: the caster is invisible and
-         // shimmers with enchant particles; when the window ends they reappear.
-         for (UUID id : new java.util.ArrayList<>(illusionActiveUntil.keySet())) {
+         // Illusioner Spellbook active windows. Each closes on whichever comes first:
+         // the timer, the caster leaving (logout is handled by onPlayerLeave), dying,
+         // respawning into a new body, or walking into another dimension. A hit and a
+         // second use of the book close it from onPlayerHit / cancelIllusion.
+         for (UUID id : new ArrayList<>(activeIllusions.keySet())) {
+            IllusionState state = activeIllusions.get(id);
             ServerPlayer owner = server.getPlayerList().getPlayer(id);
-            if (owner == null || !owner.isAlive()) {
-               illusionActiveUntil.remove(id);
+            if (owner == null) {
+               activeIllusions.remove(id);
+               for (UUID copyId : new ArrayList<>(copyOwner.keySet())) {
+                  if (id.equals(copyOwner.get(copyId))) {
+                     discardCopy(server, copyId, true);
+                  }
+               }
                continue;
             }
-            if (now > illusionActiveUntil.get(id)) {
-               illusionActiveUntil.remove(id);
-               clearTrueInvisibility(owner);
+            if (!owner.isAlive() || owner.getId() != state.casterEntityId || owner.level() != state.level) {
+               endIllusion(owner, EndReason.LEFT);
                continue;
             }
-            if (now % 10L == 0L && owner.level() instanceof ServerLevel lv) {
-               // Deliberately still visible: the illusion keeps its shimmer, and
-               // re-hiding the armour every half second stops a mid-window gear
-               // swap from leaking the real equipment to nearby clients.
-               com.fortuneandfavors.net.FfVfx.particles(lv, ParticleTypes.ENCHANT, owner.getX(), owner.getY() + 1.0, owner.getZ(), 2, 0.3, 0.5, 0.3, 0.02);
-               hideArmourFromOthers(owner);
-               dropStaleTargets(owner);
+            if (now > state.until) {
+               endIllusion(owner, EndReason.EXPIRED);
+               continue;
+            }
+            // The ring turns with the caster, eased so a flick of the mouse does not
+            // whip the copies through them.
+            state.formationYaw += net.minecraft.util.Mth.wrapDegrees(owner.getYRot() - state.formationYaw) * 0.15F;
+            // Gear is re-hidden the tick it changes, and every 5 ticks regardless, which
+            // covers a player who has just walked into tracking range (their client was
+            // sent the real gear when the caster was paired to it).
+            if (gearChanged(owner, state) || now % 5L == 0L) {
+               sendEquipment(owner, true);
+            }
+            if (now % 10L == 0L) {
+               redirectHunters(owner, 24.0, false);
             }
          }
          // Horn raiders
@@ -846,79 +1108,53 @@ public final class RaidGearManager {
             }
          }
 
-         // Illusioner Spellbook player copies: separate entities that ATTACK
-         // EVERYTHING - players, animals and monsters - but die at 1 HP.
-         for (UUID id : new java.util.ArrayList<>(copyOwner.keySet())) {
+         // Illusioner Spellbook player copies: they walk in formation with their
+         // caster, look where the caster looks, wear what the caster wears, and swing
+         // when the caster swings - the decoys the mobs get pointed at. A copy whose
+         // caster's window is gone, or that has died, breaks apart.
+         for (UUID id : new ArrayList<>(copyOwner.keySet())) {
             Entity e = findEntity(server, id);
-            if (e == null || !e.isAlive() || now - copyBorn.getOrDefault(id, now) > ILLUSION_COPY_TICKS) {
-               if (e != null && e.isAlive()) {
-                  ServerLevel lv = (ServerLevel)e.level();
-                  com.fortuneandfavors.net.FfVfx.particles(lv, ParticleTypes.POOF, e.getX(), e.getY() + 1.0, e.getZ(), 12, 0.5, 0.7, 0.5, 0.05);
-                  lv.playSound(null, e.blockPosition(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.0F, 1.4F);
-                  e.remove(Entity.RemovalReason.DISCARDED);
-               }
-               removeCopyInfo(server, id);
-               copyOwner.remove(id);
-               copyBorn.remove(id);
-               copyStrike.remove(id);
+            UUID ownerId = copyOwner.get(id);
+            IllusionState state = ownerId != null ? activeIllusions.get(ownerId) : null;
+            ServerPlayer owner = ownerId != null ? server.getPlayerList().getPlayer(ownerId) : null;
+            if (e == null || !e.isAlive() || state == null || owner == null
+                  || now - copyBorn.getOrDefault(id, now) > ILLUSION_COPY_TICKS || e.level() != owner.level()) {
+               discardCopy(server, id, true);
                continue;
             }
-            if (e instanceof Player copy) {
-               UUID ownerId = copyOwner.get(id);
-               ServerPlayer owner = ownerId != null ? server.getPlayerList().getPlayer(ownerId) : null;
-               if (owner != null && now % 10L == 0L) {
-                  mirrorCopyGear(copy, owner);
-               }
-               LivingEntity target = copy.getLastHurtMob();
-               if (target == null || !target.isAlive()) {
-                  target = illusionCopyTarget(copy, owner);
-               } else if (owner != null && target.getUUID().equals(owner.getUUID())) {
-                  target = illusionCopyTarget(copy, owner);
-               }
-               double hx = target != null ? target.getX() : copy.getX();
-               double hz = target != null ? target.getZ() : copy.getZ();
-               // The FEET, not the eyeline. The chase used to aim at getY() + 1.0 and push
-               // the whole vector - y included - so every copy was permanently asked to
-               // stand one block above whatever it was chasing, and a body that can never
-               // quite arrive climbs for as long as it can see the mark. That is the
-               // report of illusions floating up into the sky.
-               double hy = target != null ? target.getY() : copy.getY();
-               double dx = hx - copy.getX();
-               double dy = hy - copy.getY();
-               double dz = hz - copy.getZ();
-               double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-               if (dist > 0.4) {
-                  // An illusion walks. It is pushed along the ground plane and only lifted
-                  // when the mark is a real step away - a target on a ledge, or below it -
-                  // with a one-block difference in height counted as ground, not as flight.
-                  double vy = 0.0;
-                  if (dy > COPY_STEP_UP) {
-                     vy = Math.min(0.5, dy / Math.max(1.0, dist) * 0.5);
-                  } else if (dy < -COPY_STEP_UP) {
-                     vy = Math.max(-0.5, dy / Math.max(1.0, dist) * 0.5);
-                  }
-
-                  copy.setDeltaMovement(dx / dist * 0.5, vy, dz / dist * 0.5);
-                  copy.hurtMarked = true;
-               } else {
-                  copy.setDeltaMovement(0.0, 0.0, 0.0);
-               }
-               long strike = copyStrike.getOrDefault(id, 0L);
-               if (target != null && target.isAlive() && now >= strike && copy.distanceToSqr(target) < 4.0) {
-                  copyStrike.put(id, now + 30L);
-                  ServerLevel lv = (ServerLevel)copy.level();
-                  // The copies hit for real, at a fraction of the caster's strength.
-                  // They used to mime the swing and deal nothing at all, which made
-                  // the whole spellbook a light show: a copy that cannot hurt you is
-                  // not a threat to be sorted from the real one, it is a decoration.
-                  // Half the weapon's damage is enough to matter and not enough to
-                  // make the copies better than the player who cast them.
-                  boolean cloaked = owner != null && ModItems.isIllusionerCloak(owner.getItemBySlot(EquipmentSlot.CHEST));
-                  float dmg = (cloaked ? 4.0F : 3.0F) + (owner != null ? owner.getMainHandItem().getItem().getAttackDamageBonus(target, 3.0F, lv.damageSources().playerAttack(owner)) : 0.0F);
-                  target.hurtServer(lv, lv.damageSources().mobAttack(copy), dmg);
-                  com.fortuneandfavors.net.FfVfx.particles(lv, ParticleTypes.SWEEP_ATTACK, target.getX(), target.getY() + 0.6, target.getZ(), 10, 0.4, 0.4, 0.4, 0.06);
-                  lv.playSound(null, target.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.9F, 1.1F);
-               }
+            if (!(e instanceof Player copy)) {
+               continue;
+            }
+            if (now % 10L == 0L) {
+               mirrorCopyGear(copy, owner);
+            }
+            followCaster(copy, owner, state, copySlot.getOrDefault(id, 0), copySlotCount.getOrDefault(id, 1));
+            // The caster's last landed hit, read off its own tick stamp: fresh means
+            // "within the last half second", and each hit is mirrored once.
+            int stamp = owner.getLastHurtMobTimestamp();
+            boolean ownerJustAttacked = owner.tickCount - stamp < 10 && stamp != state.mirroredAttackStamp;
+            LivingEntity target = copyStrikeTarget(copy, owner, ownerJustAttacked);
+            long strike = copyStrike.getOrDefault(id, 0L);
+            if (target != null && (ownerJustAttacked || now >= strike)) {
+               copyStrike.put(id, now + 20L);
+               ServerLevel lv = (ServerLevel)copy.level();
+               copy.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+               // The copies hit for real, at a fraction of the caster's strength.
+               // A copy that cannot hurt anything is not a threat to be sorted from
+               // the real one, it is a decoration. Half the weapon's damage is enough
+               // to matter and not enough to beat the player who cast them.
+               boolean cloaked = ModItems.isIllusionerCloak(owner.getItemBySlot(EquipmentSlot.CHEST));
+               float dmg = (cloaked ? 4.0F : 3.0F) + owner.getMainHandItem().getItem().getAttackDamageBonus(target, 3.0F, lv.damageSources().playerAttack(owner));
+               target.hurtServer(lv, lv.damageSources().mobAttack(copy), dmg);
+               Fx.slash(lv, ParticleTypes.SWEEP_ATTACK, copy.position().add(0.0, 1.1, 0.0), target.position().subtract(copy.position()), COPY_REACH, ILLUSION_PURPLE);
+               lv.playSound(null, target.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.9F, 1.1F);
+            }
+         }
+         // Marked after the loop so every copy gets to mirror the same hit.
+         for (UUID ownerId : activeIllusions.keySet()) {
+            ServerPlayer owner = server.getPlayerList().getPlayer(ownerId);
+            if (owner != null && owner.tickCount - owner.getLastHurtMobTimestamp() < 10) {
+               activeIllusions.get(ownerId).mirroredAttackStamp = owner.getLastHurtMobTimestamp();
             }
          }
          // Live cooldown readouts on the horn / spellbook tooltips, refreshed

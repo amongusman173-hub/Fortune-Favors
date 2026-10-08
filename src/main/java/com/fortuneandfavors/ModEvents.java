@@ -290,6 +290,9 @@ public final class ModEvents {
          // gets their gear back from the kit's stash file here - see SpectateKit.onJoin.
          Safe.run("moderation kit recovery", () -> com.fortuneandfavors.anticheat.SpectateKit.onJoin(handler.getPlayer()));
       });
+      // No illusion window (invisible caster, walking copies) may outlive the server.
+      net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPING
+         .register(stoppingServer -> Safe.run("illusion teardown", () -> RaidGearManager.onServerStopping(stoppingServer)));
       ServerPlayConnectionEvents.DISCONNECT.register((Disconnect)(handler, server) -> {
          Safe.run("advanced enchant state save", () -> AdvancedEnchantments.persistPlayerState(handler.getPlayer()));
          Safe.run("cloak shield cleanup", () -> CombatGear.onPlayerDisconnect(handler.getPlayer()));
@@ -299,6 +302,7 @@ public final class ModEvents {
          Safe.run("map editor disconnect", () -> MapEditor.onDisconnect(handler.getPlayer()));
          Safe.run("backpack jukebox cleanup", () -> com.fortuneandfavors.economy.BackpackJukebox.stop(handler.getPlayer()));
          Safe.run("vanish cleanup", () -> VanishManager.onDisconnect(handler.getPlayer()));
+         Safe.run("illusion cleanup", () -> RaidGearManager.onPlayerLeave(handler.getPlayer()));
          Safe.run("clockwork gear cleanup", () -> com.fortuneandfavors.economy.ClockworkGear.onPlayerDisconnect(handler.getPlayer().getUUID()));
          Safe.run("magister gear cleanup", () -> com.fortuneandfavors.economy.MagisterGear.onPlayerDisconnect(handler.getPlayer().getUUID()));
          Safe.run(
@@ -705,13 +709,16 @@ public final class ModEvents {
             if (AdvancedEnchantments.handleShieldBlock(sp, source)) {
                return false;
             }
-            // A hit while the Illusioner's Spellbook is active shatters the
-            // illusions and puts the spellbook on cooldown.
-            if (source.getEntity() instanceof LivingEntity attacker && attacker != sp) {
-               Safe.run("illusion break on hit", () -> RaidGearManager.onPlayerHit(sp));
-            }
             return amount < sp.getHealth() || !AdvancedEnchantments.tryCurseOfUndying(sp);
          }));
+      // Any hurt that actually lands while the Illusioner's Spellbook is active shatters
+      // the illusions and puts the spellbook on cooldown (read after the hit, so a
+      // cancelled or shield-blocked one does not count).
+      ServerLivingEntityEvents.AFTER_DAMAGE.register((AfterDamage)(entity, source, amount, taken, blocked) -> {
+         if (entity instanceof ServerPlayer sp && !blocked) {
+            Safe.run("illusion break on hit", () -> RaidGearManager.onPlayerHit(sp));
+         }
+      });
       ServerLivingEntityEvents.ALLOW_DAMAGE.register((AllowDamage)(entity, source, amount) -> {
          if (entity instanceof net.minecraft.world.entity.boss.wither.WitherBoss wr
             && !entity.level().isClientSide()
@@ -2788,7 +2795,9 @@ public final class ModEvents {
                         return InteractionResult.SUCCESS;
                      }
                   } else if (ModItems.isIllusionerSpellbook(held)) {
-                     if (sp.getCooldowns().isOnCooldown(held)) {
+                     if (RaidGearManager.cancelIllusion(sp)) {
+                        return InteractionResult.SUCCESS;
+                     } else if (sp.getCooldowns().isOnCooldown(held)) {
                         Chat.msg(sp, "&cThe illusion is still settling.");
                         return InteractionResult.FAIL;
                      } else {
